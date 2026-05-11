@@ -11,7 +11,7 @@
 ```bash
 bun install                    # install deps
 bun run typecheck              # tsc --noEmit, zero errors required
-bun test                       # vitest run
+bun run test                   # vitest run  (NOT `bun test` — that's bun's own runner)
 bun run test:watch             # vitest watch mode
 bun run coverage               # vitest run --coverage (v8); fails below thresholds
 bun run lint:engine-purity     # verifies src/engine/ has no UI/DOM/storage/net imports

@@ -32,7 +32,7 @@ Private Scrabble-style PWA gift for father-in-law's iPad. Solo (vs AI) + hot-sea
 
 1. Plan Mode before each phase. Wait for explicit "next" between phases.
 2. TDD. Conventional commits. One commit per logical chunk.
-3. No phase advances until `bun test` is green and `bun run typecheck` has zero errors.
+3. No phase advances until `bun run test` is green and `bun run typecheck` has zero errors.
 4. Scope creep goes to `docs/BACKLOG.md`, never into the current phase.
 
 ## Documentation
