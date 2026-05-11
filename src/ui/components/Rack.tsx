@@ -1,13 +1,13 @@
 import type { Tile as TileT } from "../../engine/types.js";
-import { ACCENT, TILE } from "../theme.js";
-import { Tile } from "./Tile.js";
+import { ACCENT } from "../theme.js";
+import { DraggableRackTile } from "./DraggableRackTile.js";
 
 export interface RackProps {
   readonly rack: ReadonlyArray<TileT>;
   readonly rackOrder: ReadonlyArray<number>;
   readonly usedIndices: ReadonlySet<number>;
-  readonly onTileTap?: (rackIndex: number) => void;
-  readonly selectedIndex?: number | null;
+  readonly onTileTap?: ((rackIndex: number) => void) | undefined;
+  readonly selectedIndex?: number | null | undefined;
 }
 
 export function Rack({
@@ -25,35 +25,24 @@ export function Rack({
       {rackOrder.map((rackIndex) => {
         const tile = rack[rackIndex];
         const used = usedIndices.has(rackIndex);
-        const selected = rackIndex === selectedIndex;
+        if (!tile) {
+          return (
+            <div
+              key={rackIndex}
+              style={{ width: 64, height: 64, opacity: 0.25 }}
+              aria-label="Empty slot"
+            />
+          );
+        }
         return (
-          <button
+          <DraggableRackTile
             key={rackIndex}
-            type="button"
-            onClick={() => onTileTap?.(rackIndex)}
-            className="rounded-md"
-            style={{
-              width: 64,
-              height: 64,
-              padding: 0,
-              opacity: used ? 0.25 : 1,
-              outline: selected ? `3px solid ${TILE.bgPending}` : "none",
-              outlineOffset: 2,
-              touchAction: "manipulation",
-              background: "transparent",
-              border: "none",
-            }}
-            disabled={!tile || used}
-            aria-label={
-              tile
-                ? tile.kind === "letter"
-                  ? `Tile ${tile.letter}`
-                  : "Blank tile"
-                : "Empty slot"
-            }
-          >
-            {tile && <Tile tile={tile} />}
-          </button>
+            tile={tile}
+            rackIndex={rackIndex}
+            disabled={used}
+            selected={rackIndex === selectedIndex}
+            onTap={() => onTileTap?.(rackIndex)}
+          />
         );
       })}
     </div>

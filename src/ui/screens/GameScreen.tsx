@@ -1,4 +1,12 @@
 import { useMemo, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
 import { useGameStore } from "../../store/gameStore.js";
 import { applyPendingToBoard, pendingKeys } from "../../store/pending.js";
 import { ActionBar } from "../components/ActionBar.js";
@@ -33,6 +41,19 @@ export function GameScreen(): JSX.Element | null {
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+  );
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const data = event.active.data.current as { kind: string; rackIndex?: number } | undefined;
+    const over = event.over?.data.current as { kind: string; position?: Position } | undefined;
+    if (data?.kind !== "rack" || over?.kind !== "cell" || !over.position) return;
+    if (typeof data.rackIndex !== "number") return;
+    placeFromRack(data.rackIndex, over.position);
+  };
+
   if (!game) return null;
 
   const player = game.players[game.turn]!;
@@ -62,6 +83,7 @@ export function GameScreen(): JSX.Element | null {
   };
 
   return (
+    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
     <div
       className="flex flex-col h-full w-full p-3"
       style={{ background: ACCENT.surface, gap: 12 }}
@@ -165,6 +187,7 @@ export function GameScreen(): JSX.Element | null {
         </Modal>
       )}
     </div>
+    </DndContext>
   );
 }
 

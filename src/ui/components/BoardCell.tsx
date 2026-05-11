@@ -1,3 +1,4 @@
+import { useDroppable } from "@dnd-kit/core";
 import type { BoardCell as BoardCellT, Position } from "../../engine/types.js";
 import { PREMIUM_COLORS, BOARD } from "../theme.js";
 import { Tile } from "./Tile.js";
@@ -19,13 +20,19 @@ export function BoardCell({
 }: BoardCellProps): JSX.Element {
   const premium = PREMIUM_COLORS[cell.premium];
   const empty = cell.tile === null;
+  const { setNodeRef, isOver } = useDroppable({
+    id: `cell-${position.row}-${position.col}`,
+    data: { kind: "cell", position },
+    disabled: !empty,
+  });
   return (
     <button
+      ref={setNodeRef}
       type="button"
       onClick={onTap ? () => onTap(position) : undefined}
       className="relative flex items-center justify-center"
       style={{
-        background: premium.bg,
+        background: isOver && empty ? "#ffe18a" : premium.bg,
         color: premium.fg,
         border: `1px solid ${BOARD.cellBorder}`,
         minWidth: 0,
