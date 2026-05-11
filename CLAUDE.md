@@ -22,8 +22,8 @@ Private Scrabble-style PWA gift for father-in-law's iPad. Solo (vs AI) + hot-sea
 
 | # | Phase | Status |
 |---|-------|--------|
-| 0 | Engine (pure TS, ≥90% test coverage) | ⏳ in progress |
-| 1 | Hot-seat iPad PWA + IndexedDB | ⏸ pending |
+| 0 | Engine (pure TS, ≥90% test coverage) | ✅ done |
+| 1 | Hot-seat iPad PWA + IndexedDB | ✅ done |
 | 2 | AI bot (Easy/Medium/Hard) in Web Worker | ⏸ pending |
 | 3 | Random-board + Mini 11×11 variants | ⏸ pending |
 | 4 | Tumbler + Spelling Bee | ⏸ pending |
@@ -43,3 +43,4 @@ Private Scrabble-style PWA gift for father-in-law's iPad. Solo (vs AI) + hot-sea
 - @docs/IP_DIVERGENCES.md — how Scrabble Babble differs from Scrabble/WWF
 - @docs/VARIANTS.md — Classic, Random, Mini, Tumbler, Spelling Bee rule deltas
 - @docs/BACKLOG.md — deferred ideas
+- @docs/DEPLOY.md — GitHub Pages / Vercel deploy instructions
