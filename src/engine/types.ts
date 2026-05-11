@@ -160,6 +160,7 @@ export type ValidationError =
   | { readonly kind: "blank_missing_letter"; readonly position: Position }
   | { readonly kind: "tile_not_in_rack"; readonly tile: Tile }
   | { readonly kind: "invalid_word"; readonly word: string }
+  | { readonly kind: "must_form_word" }
   | { readonly kind: "swap_bag_too_small"; readonly bagSize: number; readonly minimum: number }
   | { readonly kind: "swap_tile_not_in_rack"; readonly tile: Tile }
   | { readonly kind: "game_already_ended" };
