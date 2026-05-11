@@ -207,6 +207,40 @@ describe("scorePlaceMove – cross-words", () => {
   });
 });
 
+describe("scorePlaceMove – TL premium", () => {
+  it("applies triple-letter premium (place at (1,5)=TL)", () => {
+    const consumed: Set<CellKey> = new Set();
+    for (let r = 0; r < 15; r++) {
+      for (let c = 0; c < 15; c++) {
+        if (!(r === 1 && c === 5)) consumed.add(`${r},${c}` as CellKey);
+      }
+    }
+    const state = makeState({ consumedPremiums: consumed });
+    // Place 3 tiles at row 1 cols 4,5,6 - only (1,5) has active TL.
+    // A(1) + B(4×3=12) + C(4) = 17, no word premium
+    const result = scorePlaceMove(
+      state,
+      createPlaceMove([
+        { position: { row: 1, col: 4 }, tile: PT("A", 1) },
+        { position: { row: 1, col: 5 }, tile: PT("B", 4) },
+        { position: { row: 1, col: 6 }, tile: PT("C", 4) },
+      ]),
+    );
+    expect(result.mainWord.score).toBe(1 + 12 + 4);
+  });
+});
+
+describe("scorePlaceMove – error path", () => {
+  it("throws when called on a move that forms no word", () => {
+    const state = makeState();
+    // Single tile on empty board → extractWords returns null → throws
+    const badMove = createPlaceMove([
+      { position: { row: 0, col: 0 }, tile: PT("A", 1) },
+    ]);
+    expect(() => scorePlaceMove(state, badMove)).toThrow();
+  });
+});
+
 describe("rackValue", () => {
   it("sums tile values", () => {
     const rack: ReadonlyArray<Tile> = [T("A", 1), T("Z", 10), { kind: "blank", value: 0 }];
