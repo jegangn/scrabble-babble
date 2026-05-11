@@ -1,0 +1,20 @@
+{
+  "name": "scrabble-babble",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Private Scrabble-style PWA gift for father-in-law's iPad.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint:engine-purity": "node scripts/check-engine-purity.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
+  }
+}
