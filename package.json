@@ -1,20 +1,35 @@
 {
   "name": "scrabble-babble",
   "version": "0.0.0",
-  "private": true,
-  "type": "module",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^2.1.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^8.0.12",
+    "vitest": "^2.1.0"
+  },
   "description": "Private Scrabble-style PWA gift for father-in-law's iPad.",
+  "private": true,
   "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "lint:engine-purity": "node scripts/check-engine-purity.mjs"
+    "lint:engine-purity": "node scripts/check-engine-purity.mjs",
+    "fetch:enable": "node scripts/fetch-enable.mjs",
+    "gen:icons": "node scripts/generate-icons.mjs"
   },
-  "devDependencies": {
-    "@types/node": "^20.14.0",
-    "@vitest/coverage-v8": "^2.1.0",
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.0"
+  "type": "module",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
