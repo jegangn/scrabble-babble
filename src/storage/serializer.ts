@@ -3,6 +3,9 @@ import type { CellKey, GameState } from "../engine/types.js";
 /**
  * Persisted shape of GameState. Sets are arrays in JSON; everything else
  * is JSON-native already (the engine uses no Maps or Dates).
+ *
+ * Note: Phase 1 and 2 saves predate the `variant` field; deserialization
+ * tolerates its absence and defaults to "classic".
  */
 export interface SerializedGameState extends Omit<GameState, "consumedPremiums"> {
   readonly consumedPremiums: ReadonlyArray<CellKey>;
@@ -17,7 +20,9 @@ export function serializeGame(state: GameState): SerializedGameState {
 /** Inverse of serializeGame. */
 export function deserializeGame(data: SerializedGameState): GameState {
   const { consumedPremiums, ...rest } = data;
-  return { ...rest, consumedPremiums: new Set(consumedPremiums) };
+  // Backwards compatibility: pre-Phase-3 saves lack `variant`. Treat them as classic.
+  const variant = rest.variant ?? "classic";
+  return { ...rest, variant, consumedPremiums: new Set(consumedPremiums) };
 }
 
 /** Round-trip through JSON.stringify/JSON.parse for IDB or file backups. */

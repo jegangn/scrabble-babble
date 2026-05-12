@@ -16,6 +16,9 @@ export type Letter =
 /** Premium-square category. `NONE` = ordinary cell. */
 export type PremiumType = "NONE" | "DL" | "TL" | "DW" | "TW";
 
+/** Which board variant a game was started with. Determines board + bag. */
+export type Variant = "classic" | "random" | "mini";
+
 /** Direction of word placement. A single-tile move is treated as horizontal. */
 export type Direction = "horizontal" | "vertical";
 
@@ -192,6 +195,7 @@ export interface MoveHistoryEntry {
  */
 export interface GameState {
   readonly seed: number;
+  readonly variant: Variant;
   readonly boardConfig: BoardConfig;
   readonly rules: RulesConfig;
   readonly board: Board;

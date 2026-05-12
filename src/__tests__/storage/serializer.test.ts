@@ -46,4 +46,14 @@ describe("serializer", () => {
       value: 1,
     });
   });
+
+  it("defaults `variant` to classic when restoring a pre-Phase-3 save", () => {
+    const game = createGame({ seed: 1, playerNames: ["P1", "P2"] });
+    const serialized = serializeGame(game);
+    // Simulate a legacy save: strip the `variant` field that didn't exist before P3.
+    const { variant: _v, ...legacy } = serialized;
+    void _v;
+    const restored = deserializeGame(legacy as typeof serialized);
+    expect(restored.variant).toBe("classic");
+  });
 });

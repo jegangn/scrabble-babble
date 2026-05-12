@@ -29,12 +29,14 @@ import type {
   SwapMove,
   TileBag,
   TileDistribution,
+  Variant,
 } from "./types.js";
 
 /** Options for {@link createGame}. */
 export interface CreateGameOptions {
   readonly seed: number;
   readonly playerNames: ReadonlyArray<string>;
+  readonly variant?: Variant;
   readonly boardConfig?: BoardConfig;
   readonly rules?: RulesConfig;
   readonly distribution?: TileDistribution;
@@ -62,6 +64,7 @@ export function createGame(opts: CreateGameOptions): GameState {
 
   return {
     seed: opts.seed,
+    variant: opts.variant ?? "classic",
     boardConfig,
     rules,
     board: createEmptyBoard(boardConfig),

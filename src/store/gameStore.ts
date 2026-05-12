@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import type { Difficulty } from "../engine/ai/bot.js";
+import { CLASSIC_BOARD } from "../engine/config/board.js";
+import { MINI_BOARD } from "../engine/config/mini-board.js";
+import { MINI_TILES } from "../engine/config/mini-tiles.js";
+import { generateRandomBoard } from "../engine/config/random-board.js";
+import { CLASSIC_TILES } from "../engine/config/tiles.js";
 import type { TrieNode } from "../engine/dictionary.js";
 import { applyMove, createGame } from "../engine/game.js";
 import { cellKey, isOccupied } from "../engine/board.js";
@@ -8,22 +13,30 @@ import {
   createResignMove,
   createSwapMove,
 } from "../engine/move.js";
+import { createPrng } from "../engine/prng.js";
 import { tilesAreEquivalent } from "../engine/rack.js";
 import type {
+  BoardConfig,
   GameState,
   Letter,
   Move,
   PlacedTile,
   Position,
   Tile,
+  TileDistribution,
   ValidationError,
+  Variant,
 } from "../engine/types.js";
 import {
   clearInProgress,
   pushHistory,
   saveInProgress,
 } from "../storage/game-storage.js";
-import { setOpponent, setPlayerNames } from "../storage/settings-storage.js";
+import {
+  setOpponent,
+  setPlayerNames,
+  setVariant as persistVariant,
+} from "../storage/settings-storage.js";
 import { pendingAt, pendingToMove } from "./pending.js";
 import type { PendingPlacement } from "./pending.js";
 
@@ -34,6 +47,27 @@ export type Opponent =
 
 /** Default opponent for first-time players: hot-seat vs another human. */
 export const DEFAULT_OPPONENT: Opponent = { kind: "human" };
+
+/** Default variant for first-time players. */
+export const DEFAULT_VARIANT: Variant = "classic";
+
+/** Resolve a variant to the (boardConfig, distribution) used by `createGame`. */
+function resolveVariant(
+  variant: Variant,
+  seed: number,
+): { boardConfig: BoardConfig; distribution: TileDistribution } {
+  switch (variant) {
+    case "classic":
+      return { boardConfig: CLASSIC_BOARD, distribution: CLASSIC_TILES };
+    case "random":
+      return {
+        boardConfig: generateRandomBoard(createPrng(seed ^ 0x9e3779b9)),
+        distribution: CLASSIC_TILES,
+      };
+    case "mini":
+      return { boardConfig: MINI_BOARD, distribution: MINI_TILES };
+  }
+}
 
 export type Screen =
   | { kind: "loading" }
@@ -50,7 +84,7 @@ export interface StoreState {
   pending: ReadonlyArray<PendingPlacement>;
   /** Visual order of tiles in the current player's rack — UI-only. */
   rackOrder: ReadonlyArray<number>;
-  settings: { playerNames: [string, string]; opponent: Opponent };
+  settings: { playerNames: [string, string]; opponent: Opponent; variant: Variant };
   /** Index of the AI-controlled player slot in the current game (always 1 today), or null for hot-seat. */
   aiPlayerIndex: number | null;
   /** True while the bot is computing a move; UI shows a thinking overlay. */
@@ -64,11 +98,12 @@ export interface StoreState {
   setScreen: (screen: Screen) => void;
   setSettings: (names: [string, string]) => void;
   setOpponent: (opponent: Opponent) => void;
+  setVariant: (variant: Variant) => void;
   setThinking: (thinking: boolean) => void;
   hydrate: (game: GameState) => void;
 
   // Game flow
-  startNewGame: (names: [string, string], opponent?: Opponent) => void;
+  startNewGame: (names: [string, string], opponent?: Opponent, variant?: Variant) => void;
   goHome: () => void;
 
   // Move actions
@@ -174,7 +209,11 @@ export const useGameStore = create<StoreState>((set, get) => ({
   game: null,
   pending: [],
   rackOrder: newRackOrder(7),
-  settings: { playerNames: ["Player 1", "Player 2"], opponent: DEFAULT_OPPONENT },
+  settings: {
+    playerNames: ["Player 1", "Player 2"],
+    opponent: DEFAULT_OPPONENT,
+    variant: DEFAULT_VARIANT,
+  },
   aiPlayerIndex: null,
   thinking: false,
   error: null,
@@ -186,6 +225,8 @@ export const useGameStore = create<StoreState>((set, get) => ({
     set((state) => ({ settings: { ...state.settings, playerNames } })),
   setOpponent: (opponent) =>
     set((state) => ({ settings: { ...state.settings, opponent } })),
+  setVariant: (variant) =>
+    set((state) => ({ settings: { ...state.settings, variant } })),
   setThinking: (thinking) => set({ thinking }),
 
   hydrate: (game) => {
@@ -205,21 +246,30 @@ export const useGameStore = create<StoreState>((set, get) => ({
     });
   },
 
-  startNewGame: (names, opponent) => {
+  startNewGame: (names, opponent, variant) => {
     const seed = Date.now() & 0x7fffffff;
     // Computer always plays the second slot in the players list.
     const effectiveNames: [string, string] =
       opponent?.kind === "ai" ? [names[0], "Computer"] : names;
-    const game = createGame({ seed, playerNames: effectiveNames });
     const resolvedOpponent: Opponent = opponent ?? get().settings.opponent;
+    const resolvedVariant: Variant = variant ?? get().settings.variant;
+    const { boardConfig, distribution } = resolveVariant(resolvedVariant, seed);
+    const game = createGame({
+      seed,
+      playerNames: effectiveNames,
+      variant: resolvedVariant,
+      boardConfig,
+      distribution,
+    });
     void setPlayerNames(names);
     void setOpponent(resolvedOpponent);
+    void persistVariant(resolvedVariant);
     void saveInProgress(game);
     set({
       game,
       pending: [],
       rackOrder: newRackOrder(game.players[0]!.rack.length),
-      settings: { playerNames: names, opponent: resolvedOpponent },
+      settings: { playerNames: names, opponent: resolvedOpponent, variant: resolvedVariant },
       aiPlayerIndex: resolvedOpponent.kind === "ai" ? 1 : null,
       screen: { kind: "game" },
       error: null,

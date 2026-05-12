@@ -24,7 +24,11 @@ beforeEach(async () => {
     game: null,
     pending: [],
     rackOrder: [0, 1, 2, 3, 4, 5, 6],
-    settings: { playerNames: ["Player 1", "Player 2"], opponent: { kind: "human" } },
+    settings: {
+      playerNames: ["Player 1", "Player 2"],
+      opponent: { kind: "human" },
+      variant: "classic",
+    },
     aiPlayerIndex: null,
     error: null,
     pendingBlankAt: null,
@@ -140,5 +144,28 @@ describe("gameStore", () => {
     useGameStore.getState().pass();
     // Next turn is AI — screen should be `game`, not `handoff`.
     expect(useGameStore.getState().screen.kind).toBe("game");
+  });
+
+  it("startNewGame with mini variant produces an 11x11 game and stamps variant", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["A", "B"], { kind: "human" }, "mini");
+    const s = useGameStore.getState();
+    expect(s.game?.variant).toBe("mini");
+    expect(s.game?.boardConfig.size).toBe(11);
+    expect(s.settings.variant).toBe("mini");
+  });
+
+  it("startNewGame with random variant produces a 15x15 game with non-classic layout", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["A", "B"], { kind: "human" }, "random");
+    const s = useGameStore.getState();
+    expect(s.game?.variant).toBe("random");
+    expect(s.game?.boardConfig.size).toBe(15);
+  });
+
+  it("startNewGame defaults to classic when no variant is given", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["A", "B"]);
+    expect(useGameStore.getState().game?.variant).toBe("classic");
   });
 });

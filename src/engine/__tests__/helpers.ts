@@ -54,6 +54,7 @@ export function makeState(opts: MakeStateOpts = {}): GameState {
   const board = opts.board ?? createEmptyBoard(CLASSIC_BOARD);
   return {
     seed: 1,
+    variant: "classic",
     boardConfig: CLASSIC_BOARD,
     rules: DEFAULT_RULES,
     board,
