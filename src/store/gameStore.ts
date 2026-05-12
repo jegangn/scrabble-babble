@@ -12,6 +12,7 @@ import { tilesAreEquivalent } from "../engine/rack.js";
 import type {
   GameState,
   Letter,
+  Move,
   PlacedTile,
   Position,
   Tile,
@@ -52,6 +53,8 @@ export interface StoreState {
   settings: { playerNames: [string, string]; opponent: Opponent };
   /** Index of the AI-controlled player slot in the current game (always 1 today), or null for hot-seat. */
   aiPlayerIndex: number | null;
+  /** True while the bot is computing a move; UI shows a thinking overlay. */
+  thinking: boolean;
   error: string | null;
   /** A blank tile dropped on the board that needs a chosen letter. */
   pendingBlankAt: Position | null;
@@ -61,6 +64,7 @@ export interface StoreState {
   setScreen: (screen: Screen) => void;
   setSettings: (names: [string, string]) => void;
   setOpponent: (opponent: Opponent) => void;
+  setThinking: (thinking: boolean) => void;
   hydrate: (game: GameState) => void;
 
   // Game flow
@@ -74,6 +78,8 @@ export interface StoreState {
   swap: (tiles: ReadonlyArray<Tile>) => void;
   pass: () => void;
   resign: () => void;
+  /** Apply a fully-formed move on behalf of the bot. */
+  applyAiMove: (move: Move) => void;
 
   // Drag/drop actions
   placeFromRack: (rackIndex: number, position: Position) => void;
@@ -121,6 +127,47 @@ function newRackOrder(size: number): number[] {
   return Array.from({ length: size }, (_, i) => i);
 }
 
+/**
+ * Single source of truth for the screen transition after any successful move.
+ * - Game ended → game_end (plus push history, clear in-progress).
+ * - Next player is the AI → straight back to `game` (no handoff overlay).
+ * - Next player is human (hot-seat) → `handoff`.
+ *
+ * `thinking` is always reset; the AI driver effect flips it back on if needed.
+ */
+function applyPostMoveTransition(
+  nextState: GameState,
+  get: () => StoreState,
+  set: (partial: Partial<StoreState>) => void,
+): void {
+  const ended = nextState.status.kind === "ended";
+  if (ended) {
+    void pushHistory(nextState);
+    void clearInProgress();
+    set({
+      game: nextState,
+      pending: [],
+      rackOrder: newRackOrder(nextState.players[nextState.turn]!.rack.length),
+      screen: { kind: "game_end" },
+      thinking: false,
+      error: null,
+    });
+    return;
+  }
+  const aiIdx = get().aiPlayerIndex;
+  const nextIsAi = aiIdx !== null && nextState.turn === aiIdx;
+  set({
+    game: nextState,
+    pending: [],
+    rackOrder: newRackOrder(nextState.players[nextState.turn]!.rack.length),
+    screen: nextIsAi
+      ? { kind: "game" }
+      : { kind: "handoff", nextPlayerIndex: nextState.turn },
+    thinking: false,
+    error: null,
+  });
+}
+
 export const useGameStore = create<StoreState>((set, get) => ({
   screen: { kind: "loading" },
   dictionary: null,
@@ -129,6 +176,7 @@ export const useGameStore = create<StoreState>((set, get) => ({
   rackOrder: newRackOrder(7),
   settings: { playerNames: ["Player 1", "Player 2"], opponent: DEFAULT_OPPONENT },
   aiPlayerIndex: null,
+  thinking: false,
   error: null,
   pendingBlankAt: null,
 
@@ -138,14 +186,21 @@ export const useGameStore = create<StoreState>((set, get) => ({
     set((state) => ({ settings: { ...state.settings, playerNames } })),
   setOpponent: (opponent) =>
     set((state) => ({ settings: { ...state.settings, opponent } })),
+  setThinking: (thinking) => set({ thinking }),
 
   hydrate: (game) => {
     const rackSize = game.players[game.turn]?.rack.length ?? 7;
+    // Infer the AI player slot from the persisted opponent setting. Resumed
+    // games keep playing against the same opponent the user last chose.
+    const opp = get().settings.opponent;
+    const aiPlayerIndex = opp.kind === "ai" ? 1 : null;
     set({
       game,
       pending: [],
       rackOrder: newRackOrder(rackSize),
+      aiPlayerIndex,
       screen: game.status.kind === "ended" ? { kind: "game_end" } : { kind: "game" },
+      thinking: false,
       error: null,
     });
   },
@@ -172,7 +227,13 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   goHome: () => {
-    set({ screen: { kind: "home" }, error: null, pending: [], pendingBlankAt: null });
+    set({
+      screen: { kind: "home" },
+      error: null,
+      pending: [],
+      pendingBlankAt: null,
+      thinking: false,
+    });
   },
 
   submitMove: () => {
@@ -189,26 +250,7 @@ export const useGameStore = create<StoreState>((set, get) => ({
       return;
     }
     void saveInProgress(result.state);
-    const ended = result.state.status.kind === "ended";
-    if (ended) {
-      void pushHistory(result.state);
-      void clearInProgress();
-      set({
-        game: result.state,
-        pending: [],
-        rackOrder: newRackOrder(result.state.players[result.state.turn]!.rack.length),
-        screen: { kind: "game_end" },
-        error: null,
-      });
-      return;
-    }
-    set({
-      game: result.state,
-      pending: [],
-      rackOrder: newRackOrder(result.state.players[result.state.turn]!.rack.length),
-      screen: { kind: "handoff", nextPlayerIndex: result.state.turn },
-      error: null,
-    });
+    applyPostMoveTransition(result.state, get, set);
   },
 
   recallPending: () => set({ pending: [], pendingBlankAt: null, error: null }),
@@ -235,13 +277,7 @@ export const useGameStore = create<StoreState>((set, get) => ({
       return;
     }
     void saveInProgress(result.state);
-    set({
-      game: result.state,
-      pending: [],
-      rackOrder: newRackOrder(result.state.players[result.state.turn]!.rack.length),
-      screen: { kind: "handoff", nextPlayerIndex: result.state.turn },
-      error: null,
-    });
+    applyPostMoveTransition(result.state, get, set);
   },
 
   pass: () => {
@@ -252,27 +288,8 @@ export const useGameStore = create<StoreState>((set, get) => ({
       set({ error: formatError(result.error) });
       return;
     }
-    const ended = result.state.status.kind === "ended";
     void saveInProgress(result.state);
-    if (ended) {
-      void pushHistory(result.state);
-      void clearInProgress();
-      set({
-        game: result.state,
-        pending: [],
-        rackOrder: newRackOrder(result.state.players[result.state.turn]!.rack.length),
-        screen: { kind: "game_end" },
-        error: null,
-      });
-      return;
-    }
-    set({
-      game: result.state,
-      pending: [],
-      rackOrder: newRackOrder(result.state.players[result.state.turn]!.rack.length),
-      screen: { kind: "handoff", nextPlayerIndex: result.state.turn },
-      error: null,
-    });
+    applyPostMoveTransition(result.state, get, set);
   },
 
   resign: () => {
@@ -290,8 +307,28 @@ export const useGameStore = create<StoreState>((set, get) => ({
       pending: [],
       rackOrder: newRackOrder(result.state.players[result.state.turn]!.rack.length),
       screen: { kind: "game_end" },
+      thinking: false,
       error: null,
     });
+  },
+
+  applyAiMove: (move) => {
+    const { game, dictionary } = get();
+    if (!game || !dictionary) return;
+    const result = applyMove(game, move, dictionary);
+    if (!result.ok) {
+      // Bot returned an invalid move (shouldn't happen). Fall back to pass.
+      const fallback = applyMove(game, createPassMove(), dictionary);
+      if (!fallback.ok) {
+        set({ error: formatError(fallback.error), thinking: false });
+        return;
+      }
+      void saveInProgress(fallback.state);
+      applyPostMoveTransition(fallback.state, get, set);
+      return;
+    }
+    void saveInProgress(result.state);
+    applyPostMoveTransition(result.state, get, set);
   },
 
   placeFromRack: (rackIndex, position) => {

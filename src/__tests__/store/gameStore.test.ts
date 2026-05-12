@@ -120,4 +120,25 @@ describe("gameStore", () => {
     useGameStore.getState().startNewGame(["A", "B"], { kind: "human" });
     expect(useGameStore.getState().aiPlayerIndex).toBeNull();
   });
+
+  it("applyAiMove with a pass advances the game and clears thinking", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["You", "Computer"], { kind: "ai", difficulty: "easy" });
+    // Pretend the human just played; now it's the AI's turn.
+    useGameStore.getState().pass();
+    // After pass, it's AI's turn 1. Drive the AI by applying a pass move.
+    useGameStore.setState({ thinking: true });
+    useGameStore.getState().applyAiMove({ kind: "pass" });
+    const s = useGameStore.getState();
+    expect(s.thinking).toBe(false);
+    expect(s.game?.consecutivePasses).toBeGreaterThanOrEqual(2);
+  });
+
+  it("post-move transition skips handoff when the next player is the AI", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["You", "Computer"], { kind: "ai", difficulty: "easy" });
+    useGameStore.getState().pass();
+    // Next turn is AI — screen should be `game`, not `handoff`.
+    expect(useGameStore.getState().screen.kind).toBe("game");
+  });
 });

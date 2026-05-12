@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -7,6 +7,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
+import { getBotMove } from "../../ai-client/botClient.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { applyPendingToBoard, pendingKeys } from "../../store/pending.js";
 import { ActionBar } from "../components/ActionBar.js";
@@ -16,6 +17,7 @@ import { Rack } from "../components/Rack.js";
 import { ScoreBar } from "../components/ScoreBar.js";
 import { SwapPicker } from "../components/SwapPicker.js";
 import { Modal } from "../components/Modal.js";
+import { ThinkingOverlay } from "../components/ThinkingOverlay.js";
 import { ACCENT } from "../theme.js";
 import type { Position } from "../../engine/types.js";
 
@@ -25,6 +27,9 @@ export function GameScreen(): JSX.Element | null {
   const rackOrder = useGameStore((s) => s.rackOrder);
   const error = useGameStore((s) => s.error);
   const pendingBlankAt = useGameStore((s) => s.pendingBlankAt);
+  const aiPlayerIndex = useGameStore((s) => s.aiPlayerIndex);
+  const opponent = useGameStore((s) => s.settings.opponent);
+  const thinking = useGameStore((s) => s.thinking);
   const placeFromRack = useGameStore((s) => s.placeFromRack);
   const recallOne = useGameStore((s) => s.recallOne);
   const setBlankLetter = useGameStore((s) => s.setBlankLetter);
@@ -35,11 +40,46 @@ export function GameScreen(): JSX.Element | null {
   const swap = useGameStore((s) => s.swap);
   const pass = useGameStore((s) => s.pass);
   const resign = useGameStore((s) => s.resign);
+  const applyAiMove = useGameStore((s) => s.applyAiMove);
+  const setThinking = useGameStore((s) => s.setThinking);
   const goHome = useGameStore((s) => s.goHome);
 
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
+
+  // Drive the bot when it's the AI's turn. The effect runs once per turn
+  // change; a cancellation flag guards against React 18 strict-mode double-
+  // mount and against the user navigating away mid-think.
+  useEffect(() => {
+    if (!game) return;
+    if (game.status.kind === "ended") return;
+    if (aiPlayerIndex === null || game.turn !== aiPlayerIndex) return;
+    if (opponent.kind !== "ai") return;
+    if (thinking) return;
+
+    let cancelled = false;
+    setThinking(true);
+    void (async () => {
+      try {
+        const move = await getBotMove(game, opponent.difficulty);
+        if (cancelled) return;
+        applyAiMove(move);
+      } catch (err) {
+        console.error("Bot error", err);
+        if (cancelled) return;
+        // Worker failed; pass on the bot's behalf so the game keeps moving.
+        setThinking(false);
+        pass();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // We intentionally depend on game.turn (not the whole game) — a bot turn
+    // is uniquely identified by whose turn it is in the current game.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.turn, aiPlayerIndex, opponent, thinking]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -186,6 +226,7 @@ export function GameScreen(): JSX.Element | null {
           </div>
         </Modal>
       )}
+      {thinking && <ThinkingOverlay />}
     </div>
     </DndContext>
   );
