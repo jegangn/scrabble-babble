@@ -8,3 +8,8 @@ coverage/
 bun.lockb
 .env
 .env.local
+
+# Playwright
+test-results/
+playwright-report/
+screenshots/
