@@ -18,8 +18,8 @@
 
 - **Random** (Phase 3): at game start, `generateRandomBoard(prng)` picks a fresh layout while preserving 4-fold symmetry and Classic's (8 TW / 9 DW / 16 TL / 24 DL) counts. The corner orbit is pinned to TW for a Classic-feeling opening, and TW orbits orthogonally or diagonally adjacent to the centre are blocked so a 2-tile opener can't combine TW × DW.
 - **Mini 11×11** (Phase 3): finalised counts: **4 TW / 5 DW (incl. centre) / 8 TL / 12 DL** = 29 premiums on 121 cells (24 % vs Classic's 25 %). Bag totals **60 tiles** — halved from Classic with vowels and connective consonants rounded up to keep the vowel ratio within 5 % of Classic. Letter values are unchanged. 1 blank instead of 2. Rack stays at 7. All other rules (bingo bonus +35, 4-consecutive-pass end, swap legality) are unchanged.
-- **Tumbler** (Phase 4): pull 7 random tiles, 60-second timer, score by sum of (letter values × word length).
-- **Spelling Bee** (Phase 4): 7-letter set with one mandatory center letter, words must be ≥4 letters and use only the 7 letters; pangram = all 7 used.
+- **Tumbler** (Phase 4): draw 7 non-blank letters from the Classic bag with `2 ≤ vowels ≤ 5`; 60-second countdown; per-word score = `(Σ letter values) × word length`; min word length 2. Personal best persists in the `settings` store. The timer starts on first keystroke and pauses on `document.visibilitychange === hidden` so brief interruptions don't burn the clock.
+- **Spelling Bee** (Phase 4): 7-letter alphabet drawn from a deduplicated pangram; mandatory centre letter; min word length 4; letter reuse allowed; pangram bonus +7. The puzzle is deterministic per local-time `YYYY-MM-DD` so the same calendar day is the same puzzle across devices. The pangram candidate pool excludes any word containing "S" (NYT convention — prevents "add S" plurals from dominating scoring), requires ≥2 vowels among the 7 distinct letters, and rejects Q. Daily progress (found words) persists in the `settings` store under `bee_progress_<YYYY-MM-DD>`.
 
 ## Mini board layout (canonical)
 

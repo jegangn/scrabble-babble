@@ -29,6 +29,9 @@ src/
       move-generator.ts     — Appel & Jacobson (1988) generator → CandidateMove[]
       leave-eval.ts         — per-letter rack-leave values (Quackle-inspired)
       bot.ts                — decide(state, dict, difficulty, opts?) → Move
+    games/                  — Phase 4 solo word-finding minigames (pure)
+      tumbler.ts            — drawTumblerLetters + validate + score
+      spelling-bee.ts       — pangram enumeration + daily puzzle + validate + score
     __tests__/              — Vitest specs
     __fixtures__/           — reusable scenarios + 500-word dict subset
   ui/                       — React layer (screens + components)

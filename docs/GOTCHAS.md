@@ -40,3 +40,14 @@
 - **`GameState.variant` is the source of truth**: the variant tag is stamped onto the game itself, not just settings. Export/import a saved game and the right variant comes back. Settings only remember the *last-picked* choice for the New Game default.
 - **Legacy saves**: pre-Phase-3 in-progress games don't have a `variant` field. `deserializeGame` defaults it to `"classic"` so older saves still resume cleanly. Covered by `serializer.test.ts`.
 - **No IndexedDB schema bump**: settings is keyed `{ key, value }`, so adding a new `"variant"` key is additive — no DB version bump needed.
+
+## Phase 4 (solo minigames)
+
+- **No new IndexedDB stores**: Tumbler best + Bee daily progress both live in the existing `settings` store. Bee uses per-day keys like `bee_progress_2026-05-12` so each day is a separate row — easy to inspect, no migration.
+- **Bee daily key is *local* time, not UTC**: `localDateKey()` formats from `Date.getFullYear/getMonth/getDate`. The father-in-law sees a new puzzle at local midnight; he won't notice the difference unless he travels (he won't).
+- **Bee pangram cache**: `enumerateSevenLetterPangrams(dict)` walks the trie once (~50–200 ms) and caches the result per-trie-reference at module scope. HomeScreen pre-warms this on mount with a 200 ms debounce so tapping "Spelling Bee" feels instant. Bee screen re-calls the function defensively (cheap cache hit) on hot-reload paths.
+- **S-exclusion**: pangrams containing 'S' are skipped entirely. Without it, every word has a `+S` plural — `enumerateBeeWords` returns 3-5× more answers, scoring inflates, and the daily list feels overwhelming. NYT convention; we follow.
+- **Tumbler pause-on-blur**: `document.visibilitychange` listener banks elapsed time into a ref when the tab hides, resumes from the banked value when it comes back. Otherwise tapping out to read a notification burns the clock.
+- **Tumbler timer starts on first keystroke**: gives him time to read the rack. If he never types, the timer never starts. (No grace timeout — he can pause as long as he likes.)
+- **Tumbler scoring formula**: `(Σ letter values) × word length` is mathematically equivalent to `Σ (value × length)`. Both spellings appear in the spec; we implement the former because it matches the per-tile mental model.
+- **Hex layout**: 6 outer letter pills positioned at pointy-top angles (90° / 150° / 210° / 270° / 330° / 30°) in a 320×320 absolute-positioned container. Pill size 80 px. Shuffle button rotates the outer order by one — deterministic, cheap, visually pleasing.

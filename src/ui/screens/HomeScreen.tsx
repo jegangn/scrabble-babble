@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { APP_NAME } from "../../config/branding.js";
+import { enumerateSevenLetterPangrams } from "../../engine/games/spelling-bee.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { loadInProgress, saveInProgress } from "../../storage/game-storage.js";
 import { fromJSON, toJSON } from "../../storage/serializer.js";
@@ -8,6 +9,7 @@ import { ACCENT } from "../theme.js";
 export function HomeScreen(): JSX.Element {
   const hydrate = useGameStore((s) => s.hydrate);
   const setScreen = useGameStore((s) => s.setScreen);
+  const dictionary = useGameStore((s) => s.dictionary);
   const [hasInProgress, setHasInProgress] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -17,6 +19,21 @@ export function HomeScreen(): JSX.Element {
       setHasInProgress(!!game && game.status.kind !== "ended");
     })();
   }, []);
+
+  // Warm the Spelling Bee pangram cache in the background once the dictionary
+  // is loaded. The first call walks the trie (~50-200 ms); doing it here means
+  // tapping "Spelling Bee" feels instant.
+  useEffect(() => {
+    if (!dictionary) return;
+    const handle = window.setTimeout(() => {
+      try {
+        enumerateSevenLetterPangrams(dictionary);
+      } catch {
+        // No-op — Bee will retry on its own screen.
+      }
+    }, 200);
+    return () => window.clearTimeout(handle);
+  }, [dictionary]);
 
   const onResume = async () => {
     const game = await loadInProgress();
@@ -66,6 +83,20 @@ export function HomeScreen(): JSX.Element {
           style={btnStyle(hasInProgress ? "secondary" : "primary")}
         >
           New game
+        </button>
+        <button
+          type="button"
+          onClick={() => setScreen({ kind: "tumbler" })}
+          style={btnStyle("secondary")}
+        >
+          Tumbler — 60 second sprint
+        </button>
+        <button
+          type="button"
+          onClick={() => setScreen({ kind: "spelling_bee" })}
+          style={btnStyle("secondary")}
+        >
+          Spelling Bee — daily puzzle
         </button>
         <button type="button" onClick={onExport} style={btnStyle("secondary")}>
           Export current game
