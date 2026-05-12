@@ -1,5 +1,29 @@
 import { useGameStore } from "../../store/gameStore.js";
+import type { GameState } from "../../engine/types.js";
 import { ACCENT } from "../theme.js";
+
+interface GameStats {
+  readonly totalMoves: number;
+  readonly topMoveScore: number;
+  readonly topMoveWord: string | null;
+}
+
+function computeStats(game: GameState): GameStats {
+  const placeEntries = game.history.filter((e) => e.move.kind === "place");
+  let topScore = 0;
+  let topWord: string | null = null;
+  for (const entry of placeEntries) {
+    if (entry.score > topScore) {
+      topScore = entry.score;
+      topWord = entry.mainWord;
+    }
+  }
+  return {
+    totalMoves: game.history.length,
+    topMoveScore: topScore,
+    topMoveWord: topWord,
+  };
+}
 
 export function GameEndScreen(): JSX.Element | null {
   const game = useGameStore((s) => s.game);
@@ -17,6 +41,7 @@ export function GameEndScreen(): JSX.Element | null {
   const winner = sorted[0]!;
   const loser = sorted[1]!;
   const tied = winner.score === loser.score;
+  const stats = computeStats(game);
 
   let reasonLabel = "";
   switch (reason.kind) {
@@ -30,6 +55,11 @@ export function GameEndScreen(): JSX.Element | null {
       reasonLabel = `${players[reason.playerIndex]?.name} resigned.`;
       break;
   }
+
+  const difficultyLabel =
+    settings.opponent.kind === "ai"
+      ? `vs Computer (${settings.opponent.difficulty})`
+      : "Hot-seat";
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 p-6">
@@ -57,18 +87,49 @@ export function GameEndScreen(): JSX.Element | null {
           </div>
         ))}
       </div>
+
+      <div
+        className="flex flex-col gap-2 w-full max-w-md rounded-lg p-3"
+        style={{
+          background: "rgba(255,255,255,0.5)",
+          border: `1px solid ${ACCENT.primary}33`,
+          color: ACCENT.text,
+          fontSize: "0.95em",
+        }}
+      >
+        <StatRow label="Total moves" value={String(stats.totalMoves)} />
+        <StatRow
+          label="Top move"
+          value={
+            stats.topMoveWord
+              ? `${stats.topMoveWord} (${stats.topMoveScore})`
+              : "—"
+          }
+        />
+        <StatRow label="Mode" value={difficultyLabel} />
+      </div>
+
       <div className="flex gap-3 w-full max-w-md mt-3">
         <button type="button" onClick={goHome} style={btnStyle("secondary")}>
           Home
         </button>
         <button
           type="button"
-          onClick={() => startNewGame(settings.playerNames)}
+          onClick={() => startNewGame(settings.playerNames, settings.opponent)}
           style={btnStyle("primary")}
         >
           Play again
         </button>
       </div>
+    </div>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="flex justify-between items-baseline">
+      <span style={{ opacity: 0.7 }}>{label}</span>
+      <span style={{ fontWeight: 600 }}>{value}</span>
     </div>
   );
 }
