@@ -24,7 +24,8 @@ beforeEach(async () => {
     game: null,
     pending: [],
     rackOrder: [0, 1, 2, 3, 4, 5, 6],
-    settings: { playerNames: ["Player 1", "Player 2"] },
+    settings: { playerNames: ["Player 1", "Player 2"], opponent: { kind: "human" } },
+    aiPlayerIndex: null,
     error: null,
     pendingBlankAt: null,
   });
@@ -103,5 +104,20 @@ describe("gameStore", () => {
     expect(useGameStore.getState().pending).toHaveLength(1);
     useGameStore.getState().recallOne({ row: 7, col: 7 });
     expect(useGameStore.getState().pending).toHaveLength(0);
+  });
+
+  it("startNewGame with AI opponent records aiPlayerIndex=1 and names player 2 'Computer'", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["A", "B"], { kind: "ai", difficulty: "medium" });
+    const s = useGameStore.getState();
+    expect(s.aiPlayerIndex).toBe(1);
+    expect(s.game?.players[1]?.name).toBe("Computer");
+    expect(s.settings.opponent).toEqual({ kind: "ai", difficulty: "medium" });
+  });
+
+  it("startNewGame with hot-seat opponent clears aiPlayerIndex", () => {
+    useGameStore.getState().setDictionary(DICT);
+    useGameStore.getState().startNewGame(["A", "B"], { kind: "human" });
+    expect(useGameStore.getState().aiPlayerIndex).toBeNull();
   });
 });

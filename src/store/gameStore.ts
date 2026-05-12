@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { Difficulty } from "../engine/ai/bot.js";
 import type { TrieNode } from "../engine/dictionary.js";
 import { applyMove, createGame } from "../engine/game.js";
 import { cellKey, isOccupied } from "../engine/board.js";
@@ -21,9 +22,17 @@ import {
   pushHistory,
   saveInProgress,
 } from "../storage/game-storage.js";
-import { setPlayerNames } from "../storage/settings-storage.js";
+import { setOpponent, setPlayerNames } from "../storage/settings-storage.js";
 import { pendingAt, pendingToMove } from "./pending.js";
 import type { PendingPlacement } from "./pending.js";
+
+/** Who the human plays against. AI carries its difficulty. */
+export type Opponent =
+  | { readonly kind: "human" }
+  | { readonly kind: "ai"; readonly difficulty: Difficulty };
+
+/** Default opponent for first-time players: hot-seat vs another human. */
+export const DEFAULT_OPPONENT: Opponent = { kind: "human" };
 
 export type Screen =
   | { kind: "loading" }
@@ -40,7 +49,9 @@ export interface StoreState {
   pending: ReadonlyArray<PendingPlacement>;
   /** Visual order of tiles in the current player's rack — UI-only. */
   rackOrder: ReadonlyArray<number>;
-  settings: { playerNames: [string, string] };
+  settings: { playerNames: [string, string]; opponent: Opponent };
+  /** Index of the AI-controlled player slot in the current game (always 1 today), or null for hot-seat. */
+  aiPlayerIndex: number | null;
   error: string | null;
   /** A blank tile dropped on the board that needs a chosen letter. */
   pendingBlankAt: Position | null;
@@ -49,10 +60,11 @@ export interface StoreState {
   setDictionary: (trie: TrieNode) => void;
   setScreen: (screen: Screen) => void;
   setSettings: (names: [string, string]) => void;
+  setOpponent: (opponent: Opponent) => void;
   hydrate: (game: GameState) => void;
 
   // Game flow
-  startNewGame: (names: [string, string]) => void;
+  startNewGame: (names: [string, string], opponent?: Opponent) => void;
   goHome: () => void;
 
   // Move actions
@@ -115,13 +127,17 @@ export const useGameStore = create<StoreState>((set, get) => ({
   game: null,
   pending: [],
   rackOrder: newRackOrder(7),
-  settings: { playerNames: ["Player 1", "Player 2"] },
+  settings: { playerNames: ["Player 1", "Player 2"], opponent: DEFAULT_OPPONENT },
+  aiPlayerIndex: null,
   error: null,
   pendingBlankAt: null,
 
   setDictionary: (dictionary) => set({ dictionary }),
   setScreen: (screen) => set({ screen, error: null }),
-  setSettings: (playerNames) => set({ settings: { playerNames } }),
+  setSettings: (playerNames) =>
+    set((state) => ({ settings: { ...state.settings, playerNames } })),
+  setOpponent: (opponent) =>
+    set((state) => ({ settings: { ...state.settings, opponent } })),
 
   hydrate: (game) => {
     const rackSize = game.players[game.turn]?.rack.length ?? 7;
@@ -134,16 +150,22 @@ export const useGameStore = create<StoreState>((set, get) => ({
     });
   },
 
-  startNewGame: (names) => {
+  startNewGame: (names, opponent) => {
     const seed = Date.now() & 0x7fffffff;
-    const game = createGame({ seed, playerNames: names });
+    // Computer always plays the second slot in the players list.
+    const effectiveNames: [string, string] =
+      opponent?.kind === "ai" ? [names[0], "Computer"] : names;
+    const game = createGame({ seed, playerNames: effectiveNames });
+    const resolvedOpponent: Opponent = opponent ?? get().settings.opponent;
     void setPlayerNames(names);
+    void setOpponent(resolvedOpponent);
     void saveInProgress(game);
     set({
       game,
       pending: [],
       rackOrder: newRackOrder(game.players[0]!.rack.length),
-      settings: { playerNames: names },
+      settings: { playerNames: names, opponent: resolvedOpponent },
+      aiPlayerIndex: resolvedOpponent.kind === "ai" ? 1 : null,
       screen: { kind: "game" },
       error: null,
     });
