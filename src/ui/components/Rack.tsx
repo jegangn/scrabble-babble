@@ -19,7 +19,7 @@ export function Rack({
 }: RackProps): JSX.Element {
   return (
     <div
-      className="flex gap-2 items-center justify-center p-3 rounded-xl"
+      className="flex flex-wrap gap-2 items-center justify-center p-3 rounded-xl"
       style={{ background: ACCENT.primary }}
     >
       {rackOrder.map((rackIndex) => {

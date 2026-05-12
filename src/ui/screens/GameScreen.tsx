@@ -48,15 +48,17 @@ export function GameScreen(): JSX.Element | null {
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
 
-  // Drive the bot when it's the AI's turn. The effect runs once per turn
-  // change; a cancellation flag guards against React 18 strict-mode double-
-  // mount and against the user navigating away mid-think.
+  // Drive the bot when it's the AI's turn. The effect fires once per turn
+  // change (game.turn is the trigger). `thinking` is intentionally NOT in the
+  // dep array: that flag is set INSIDE the effect, so listing it would cause
+  // the effect to immediately re-mount and the cleanup would cancel the very
+  // task it just started — leaving the thinking overlay stuck forever after
+  // the worker's response is discarded.
   useEffect(() => {
     if (!game) return;
     if (game.status.kind === "ended") return;
     if (aiPlayerIndex === null || game.turn !== aiPlayerIndex) return;
     if (opponent.kind !== "ai") return;
-    if (thinking) return;
 
     let cancelled = false;
     setThinking(true);
@@ -76,10 +78,11 @@ export function GameScreen(): JSX.Element | null {
     return () => {
       cancelled = true;
     };
-    // We intentionally depend on game.turn (not the whole game) — a bot turn
-    // is uniquely identified by whose turn it is in the current game.
+    // Stable deps: turn / who-controls-AI / opponent identity. We don't
+    // depend on the entire `game` object — a bot turn is uniquely identified
+    // by whose turn it is plus the AI slot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.turn, aiPlayerIndex, opponent, thinking]);
+  }, [game?.turn, aiPlayerIndex, opponent]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -130,14 +133,33 @@ export function GameScreen(): JSX.Element | null {
     >
       <ScoreBar players={game.players} turn={game.turn} bagCount={game.bag.length} />
 
-      <div className="flex flex-1 gap-3 min-h-0">
-        <div className="flex-1 min-h-0 flex items-center justify-center">
-          <div style={{ maxHeight: "100%", aspectRatio: "1", minWidth: 0 }}>
+      <div className="flex flex-1 gap-3 min-h-0 items-stretch">
+        <div className="flex-1 min-w-0 flex items-center justify-center">
+          {/*
+            Layout note: the wrapper needs an explicit `height: 100%` for
+            the aspect-ratio-driven square to fill the column vertically. With
+            only `max-height: 100%` (the previous implementation) the wrapper
+            collapsed to its empty content, leaving the board at ~30% of the
+            screen — a serious eyesight regression for older users.
+          */}
+          <div
+            style={{
+              height: "100%",
+              aspectRatio: "1",
+              maxWidth: "100%",
+              containerType: "size",
+              containerName: "board",
+            }}
+          >
             <Board board={board} pendingKeys={keys} onCellTap={onCellTap} />
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 items-center justify-center" style={{ minWidth: 280 }}>
+        <div
+          className="flex flex-col gap-3 items-stretch justify-center"
+          style={{ width: 300, flexShrink: 0 }}
+        >
+          {/* Rack wraps to 4+3 to keep the right column narrow and the board large. */}
           <Rack
             rack={player.rack}
             rackOrder={rackOrder}

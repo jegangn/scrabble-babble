@@ -168,8 +168,11 @@ function newRackOrder(size: number): number[] {
 /**
  * Single source of truth for the screen transition after any successful move.
  * - Game ended → game_end (plus push history, clear in-progress).
- * - Next player is the AI → straight back to `game` (no handoff overlay).
- * - Next player is human (hot-seat) → `handoff`.
+ * - AI mode → straight back to `game` (no handoff overlay in either direction;
+ *   the handoff exists to hide the rack from a second human, which doesn't
+ *   apply when one of the seats is the bot).
+ * - Hot-seat → `handoff` so the next human picks up the iPad without seeing
+ *   the previous player's rack.
  *
  * `thinking` is always reset; the AI driver effect flips it back on if needed.
  */
@@ -193,12 +196,15 @@ function applyPostMoveTransition(
     return;
   }
   const aiIdx = get().aiPlayerIndex;
-  const nextIsAi = aiIdx !== null && nextState.turn === aiIdx;
+  const isAiMode = aiIdx !== null;
   set({
     game: nextState,
     pending: [],
     rackOrder: newRackOrder(nextState.players[nextState.turn]!.rack.length),
-    screen: nextIsAi
+    // In AI mode there's no second human to "pass the iPad to" — go straight
+    // to the game screen in both directions. In hot-seat mode we still show
+    // the handoff so the next human picks up without peeking at the rack.
+    screen: isAiMode
       ? { kind: "game" }
       : { kind: "handoff", nextPlayerIndex: nextState.turn },
     thinking: false,

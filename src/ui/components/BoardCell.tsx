@@ -40,13 +40,21 @@ export function BoardCell({
         aspectRatio: "1",
         padding: 0,
         touchAction: "manipulation",
+        // Base font scales with the board container so tile letters + values
+        // (rendered by <Tile> in em units) inherit a size proportional to
+        // the cell. Older-user eyesight friendly.
+        fontSize: "min(3.2cqi, 1.6rem)",
       }}
     >
       {empty ? (
         isCenter ? (
-          <span style={{ color: BOARD.star, fontSize: "1.5em" }}>★</span>
+          // Star scales with the board container so it stays visible on any size.
+          <span style={{ color: BOARD.star, fontSize: "min(6cqi, 3rem)" }}>★</span>
         ) : (
-          <span style={{ fontSize: "0.55em", fontWeight: 700 }}>{premium.label}</span>
+          // Premium label uses em (≈ 0.7× cell font) — readable at any size.
+          <span style={{ fontSize: "0.7em", fontWeight: 700 }}>
+            {premium.label}
+          </span>
         )
       ) : (
         <div className="absolute inset-[2px]">
