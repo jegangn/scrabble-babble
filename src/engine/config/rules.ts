@@ -6,9 +6,6 @@ export const BINGO_BONUS = 35;
 /** Tiles in each player's rack at full. */
 export const RACK_SIZE = 7;
 
-/** Default board side length for Classic and Random variants. */
-export const BOARD_SIZE = 15;
-
 /**
  * Number of consecutive passes after which the game ends.
  * "Both players pass twice in a row" → 4 passes.
