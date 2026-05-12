@@ -24,25 +24,37 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     void (async () => {
+      // Every load is wrapped so a corrupt IndexedDB or a missing wordlist
+      // doesn't strand the user on the loading screen. Defaults are sane.
       const [trie, inProgress, names, opponent, variant] = await Promise.all([
         loadDictionary().catch((e: unknown) => {
           console.error("Dictionary load failed", e);
           return null;
         }),
-        loadInProgress(),
-        getPlayerNames(),
-        getOpponent(),
-        getVariant(),
+        loadInProgress().catch((e: unknown) => {
+          console.error("Load in-progress failed", e);
+          return null;
+        }),
+        getPlayerNames().catch((e: unknown) => {
+          console.error("Load player names failed", e);
+          return ["Player 1", "Player 2"] as [string, string];
+        }),
+        getOpponent().catch((e: unknown) => {
+          console.error("Load opponent failed", e);
+          return { kind: "human" } as const;
+        }),
+        getVariant().catch((e: unknown) => {
+          console.error("Load variant failed", e);
+          return "classic" as const;
+        }),
       ]);
       if (trie) setDictionary(trie);
       setSettings(names);
       setOpponent(opponent);
       setVariant(variant);
-      if (inProgress && inProgress.status.kind !== "ended") {
-        setScreen({ kind: "home" });
-      } else {
-        setScreen({ kind: "home" });
-      }
+      // Always land on Home — Resume button availability is computed there.
+      void inProgress;
+      setScreen({ kind: "home" });
     })();
   }, [setDictionary, setScreen, setSettings, setOpponent, setVariant]);
 

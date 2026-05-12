@@ -66,11 +66,10 @@ export function SpellingBeeScreen(): JSX.Element | null {
     return () => window.clearTimeout(handle);
   }, [dictionary, dateKey]);
 
-  // Persist on every found-words change (skip the empty load-from-storage state).
-  useEffect(() => {
-    if (!puzzle) return;
-    void setBeeProgress({ dateKey, found: foundWords });
-  }, [puzzle, dateKey, foundWords]);
+  // NOTE: persistence happens explicitly inside `submit()` on accept, NOT via
+  // a deps-based effect. An effect would echo the saved-progress hydration
+  // back to IndexedDB on every mount, which was wasteful and confusing in
+  // dev tools. Explicit-on-action is also easier to reason about.
 
   // Auto-clear flash toast.
   useEffect(() => {
@@ -121,8 +120,11 @@ export function SpellingBeeScreen(): JSX.Element | null {
       return;
     }
     const points = scoreBeeWord(w, puzzle);
-    setFoundWords([w, ...foundWords]);
+    const next = [w, ...foundWords];
+    setFoundWords(next);
     setFlash({ kind: "added", word: w, points });
+    // Persist explicitly so we only write on user action, not on hydration.
+    void setBeeProgress({ dateKey, found: next });
   };
 
   const shuffleOuter = () => {
