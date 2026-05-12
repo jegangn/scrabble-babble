@@ -9,9 +9,12 @@ src/
     types.ts                — readonly types + discriminated unions
     prng.ts                 — mulberry32 seeded PRNG
     config/
-      board.ts              — 15×15 premium layout (4-fold symmetric)
-      tiles.ts              — 104-tile distribution
+      board.ts              — Classic 15×15 premium layout (4-fold symmetric)
+      tiles.ts              — Classic 104-tile distribution
       rules.ts              — bingo bonus, rack size, end-condition limits
+      mini-board.ts         — Mini 11×11 premium layout
+      mini-tiles.ts         — Mini 60-tile distribution
+      random-board.ts       — generateRandomBoard(prng): orbit-shuffle generator
     board.ts                — board ops (immutable)
     tilebag.ts              — bag ops with injected PRNG
     rack.ts                 — rack ops

@@ -32,3 +32,11 @@
 - **React strict-mode double-fire**: React 18 dev mode mounts effects twice. The AI driver effect uses a `cancelled` flag in its cleanup so the second async resolution is a no-op. A redundant `getBotMove` call goes to the worker in dev only.
 - **Skipping handoff for AI turns**: the store's `applyPostMoveTransition` peeks at `aiPlayerIndex` and emits `screen: { kind: "game" }` (no handoff overlay) when the next player is the bot. The GameScreen effect picks it up automatically.
 - **`hydrate` infers AI mode from settings**: when resuming an in-progress game, we read `settings.opponent` to set `aiPlayerIndex`. Settings always reflect the last-picked opponent for the most recently started game.
+
+## Phase 3 (board variants)
+
+- **4-fold rotational orbits**: on an odd-sized square (15 or 11), the centre `(c,c)` is the only fixed point of `(r,c) → (c, size-1-r)`. Every other cell belongs to an orbit of size 4. Random-board generation works at the orbit level — assigning a premium to one orbit means assigning it to 4 cells at once, so symmetry is invariant by construction.
+- **Random-board safety pins**: the corner orbit is force-assigned TW (so corners always feel Classic), and the two orbits orthogonally/diagonally adjacent to the centre are blocked from TW (a TW one cell from the centre DW lets a 2-tile opener stack TW × DW for a 6× word multiplier on the very first move). Rejection rate is tiny; the shuffle pool is large.
+- **`GameState.variant` is the source of truth**: the variant tag is stamped onto the game itself, not just settings. Export/import a saved game and the right variant comes back. Settings only remember the *last-picked* choice for the New Game default.
+- **Legacy saves**: pre-Phase-3 in-progress games don't have a `variant` field. `deserializeGame` defaults it to `"classic"` so older saves still resume cleanly. Covered by `serializer.test.ts`.
+- **No IndexedDB schema bump**: settings is keyed `{ key, value }`, so adding a new `"variant"` key is additive — no DB version bump needed.

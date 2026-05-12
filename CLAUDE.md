@@ -25,7 +25,7 @@ Private Scrabble-style PWA gift for father-in-law's iPad. Solo (vs AI) + hot-sea
 | 0 | Engine (pure TS, ≥90% test coverage) | ✅ done |
 | 1 | Hot-seat iPad PWA + IndexedDB | ✅ done |
 | 2 | AI bot (Easy/Medium/Hard) in Web Worker | ✅ done |
-| 3 | Random-board + Mini 11×11 variants | ⏸ pending |
+| 3 | Random-board + Mini 11×11 variants | ✅ done |
 | 4 | Tumbler + Spelling Bee | ⏸ pending |
 
 ## Workflow
