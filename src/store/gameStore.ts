@@ -75,7 +75,10 @@ export type Screen =
   | { kind: "new_game" }
   | { kind: "game" }
   | { kind: "handoff"; nextPlayerIndex: number }
-  | { kind: "game_end" };
+  | { kind: "game_end" }
+  | { kind: "tumbler" }
+  | { kind: "tumbler_end"; score: number; foundWords: ReadonlyArray<string> }
+  | { kind: "spelling_bee" };
 
 export interface StoreState {
   screen: Screen;

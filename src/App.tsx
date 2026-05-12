@@ -8,6 +8,8 @@ import { HomeScreen } from "./ui/screens/HomeScreen.js";
 import { NewGameScreen } from "./ui/screens/NewGameScreen.js";
 import { GameScreen } from "./ui/screens/GameScreen.js";
 import { GameEndScreen } from "./ui/screens/GameEndScreen.js";
+import { TumblerScreen } from "./ui/screens/TumblerScreen.js";
+import { TumblerEndScreen } from "./ui/screens/TumblerEndScreen.js";
 import { HotSeatHandoff } from "./ui/components/HotSeatHandoff.js";
 
 export function App(): JSX.Element {
@@ -63,5 +65,12 @@ export function App(): JSX.Element {
     }
     case "game_end":
       return <GameEndScreen />;
+    case "tumbler":
+      return <TumblerScreen />;
+    case "tumbler_end":
+      return <TumblerEndScreen />;
+    case "spelling_bee":
+      // Stub until P4.5 ships.
+      return <LoadingScreen />;
   }
 }
