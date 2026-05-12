@@ -20,3 +20,15 @@
 - Animations capped at 300 ms (older user reflexes).
 - **Vite dev gzip quirk**: `enable.txt.gz` is served with `Content-Encoding: gzip` and auto-decompressed by the browser. Our `loadDictionary` detects gzip magic bytes (`0x1f 0x8b`) and decompresses only if the server didn't. Both dev and production paths work.
 - `exactOptionalPropertyTypes: true`: optional component props that may receive `undefined` must be typed `T | undefined` explicitly, not just `T?`. Otherwise React's JSX inference passes `undefined` and TS rejects.
+
+## Phase 2 (AI bot + Web Worker)
+
+- **Web Worker bundling**: import the worker via Vite's `?worker` suffix (`import BotWorker from "../workers/bot.worker.ts?worker"`). This emits a separate chunk lazily loaded on `new BotWorker()`. Without `?worker`, Vite inlines the file into the main bundle.
+- **Tree-shaking gotcha**: if nothing in the React tree imports `botClient`, Vite never traverses to the `?worker` import and silently skips emitting the worker chunk. Smoke-test by checking `dist/assets/` after a build — `bot.worker-*.js` must be present.
+- **Worker globals**: the WebWorker lib conflicts with our DOM lib, so we don't pull it in. Instead, the worker uses a locally-declared structural type for `self` (`postMessage`, `addEventListener("message")`, `location.href`). All structurally compatible.
+- **`document.baseURI` is undefined in workers**: the worker can't resolve relative URLs the way the main thread can. The client passes `document.baseURI` in the `init` message so the worker knows where to fetch `enable.txt.gz`.
+- **Dictionary lives once per worker**: `loadDictionary` is called once and the resulting trie is held in worker module scope. Subsequent `decide` calls reuse it. The service-worker cache makes the second load instantaneous (offline-friendly).
+- **Bot deadline vs client timeout**: the client times out at 4 800 ms, but tells the bot to stop at 4 600 ms (`internalDeadline = now + timeoutMs - 200`). This 200 ms buffer ensures the bot returns its best-so-far move before the client gives up.
+- **React strict-mode double-fire**: React 18 dev mode mounts effects twice. The AI driver effect uses a `cancelled` flag in its cleanup so the second async resolution is a no-op. A redundant `getBotMove` call goes to the worker in dev only.
+- **Skipping handoff for AI turns**: the store's `applyPostMoveTransition` peeks at `aiPlayerIndex` and emits `screen: { kind: "game" }` (no handoff overlay) when the next player is the bot. The GameScreen effect picks it up automatically.
+- **`hydrate` infers AI mode from settings**: when resuming an in-progress game, we read `settings.opponent` to set `aiPlayerIndex`. Settings always reflect the last-picked opponent for the most recently started game.
