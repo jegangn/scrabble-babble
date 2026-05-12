@@ -1,6 +1,17 @@
 import { useGameStore } from "../../store/gameStore.js";
-import type { GameState } from "../../engine/types.js";
+import type { GameState, Variant } from "../../engine/types.js";
 import { ACCENT } from "../theme.js";
+
+function variantLabel(variant: Variant): string {
+  switch (variant) {
+    case "classic":
+      return "Classic — 15×15";
+    case "random":
+      return "Random — 15×15";
+    case "mini":
+      return "Mini — 11×11";
+  }
+}
 
 interface GameStats {
   readonly totalMoves: number;
@@ -106,6 +117,7 @@ export function GameEndScreen(): JSX.Element | null {
               : "—"
           }
         />
+        <StatRow label="Board" value={variantLabel(game.variant)} />
         <StatRow label="Mode" value={difficultyLabel} />
       </div>
 
@@ -115,7 +127,9 @@ export function GameEndScreen(): JSX.Element | null {
         </button>
         <button
           type="button"
-          onClick={() => startNewGame(settings.playerNames, settings.opponent)}
+          onClick={() =>
+            startNewGame(settings.playerNames, settings.opponent, settings.variant)
+          }
           style={btnStyle("primary")}
         >
           Play again

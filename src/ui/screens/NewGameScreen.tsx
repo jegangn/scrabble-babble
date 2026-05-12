@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Difficulty } from "../../engine/ai/bot.js";
+import type { Variant } from "../../engine/types.js";
 import type { Opponent } from "../../store/gameStore.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { ACCENT } from "../theme.js";
@@ -17,13 +18,14 @@ export function NewGameScreen(): JSX.Element {
   const [difficulty, setDifficulty] = useState<Difficulty>(
     settings.opponent.kind === "ai" ? settings.opponent.difficulty : "medium",
   );
+  const [variant, setVariant] = useState<Variant>(settings.variant);
 
   const onStart = () => {
     const n1 = name1.trim() || "Player 1";
     const n2 = name2.trim() || "Player 2";
     const opponent: Opponent =
       opponentKind === "ai" ? { kind: "ai", difficulty } : { kind: "human" };
-    startNewGame([n1, n2], opponent);
+    startNewGame([n1, n2], opponent, variant);
   };
 
   return (
@@ -56,6 +58,33 @@ export function NewGameScreen(): JSX.Element {
               checked={opponentKind === "ai"}
               onChange={() => setOpponentKind("ai")}
               label="Computer"
+            />
+          </div>
+        </fieldset>
+
+        <fieldset style={fieldsetStyle}>
+          <legend style={labelStyle}>Board</legend>
+          <div className="flex flex-col gap-2 mt-1">
+            <RadioRow
+              name="variant"
+              value="classic"
+              checked={variant === "classic"}
+              onChange={() => setVariant("classic")}
+              label="Classic — 15×15"
+            />
+            <RadioRow
+              name="variant"
+              value="random"
+              checked={variant === "random"}
+              onChange={() => setVariant("random")}
+              label="Random — 15×15 shuffled premiums"
+            />
+            <RadioRow
+              name="variant"
+              value="mini"
+              checked={variant === "mini"}
+              onChange={() => setVariant("mini")}
+              label="Mini — 11×11, shorter game"
             />
           </div>
         </fieldset>

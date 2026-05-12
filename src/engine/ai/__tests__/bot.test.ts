@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildTrie } from "../../dictionary.js";
 import { FIXTURE_WORDS } from "../../__fixtures__/dictionary-subset.js";
+import { MINI_BOARD } from "../../config/mini-board.js";
+import { MINI_TILES } from "../../config/mini-tiles.js";
 import { createGame } from "../../game.js";
 import type { Tile } from "../../types.js";
 import { decide } from "../bot.js";
@@ -10,6 +12,20 @@ const T = (l: string, v: number): Tile => ({ kind: "letter", letter: l as "A", v
 
 function withRack(rack: Tile[]) {
   const game = createGame({ seed: 1, playerNames: ["A", "B"] });
+  return {
+    ...game,
+    players: game.players.map((p, i) => (i === 0 ? { ...p, rack } : p)),
+  };
+}
+
+function miniWithRack(rack: Tile[]) {
+  const game = createGame({
+    seed: 1,
+    playerNames: ["A", "B"],
+    variant: "mini",
+    boardConfig: MINI_BOARD,
+    distribution: MINI_TILES,
+  });
   return {
     ...game,
     players: game.players.map((p, i) => (i === 0 ? { ...p, rack } : p)),
@@ -78,6 +94,23 @@ describe("bot.decide", () => {
     const state = withRack([T("Z", 10), T("Q", 10), T("J", 10), T("X", 8)]);
     const move = decide(state, DICT, "medium");
     expect(["swap", "pass"]).toContain(move.kind);
+  });
+
+  it("returns a place move on a Mini opening rack for all difficulties", () => {
+    const rack: Tile[] = [
+      T("R", 1),
+      T("E", 1),
+      T("T", 1),
+      T("A", 1),
+      T("I", 1),
+      T("N", 2),
+      T("S", 1),
+    ];
+    for (const diff of ["easy", "medium", "hard"] as const) {
+      const state = miniWithRack(rack);
+      const move = decide(state, DICT, diff);
+      expect(move.kind, `${diff} on Mini`).toBe("place");
+    }
   });
 
   it("respects the deadline on hard", () => {
