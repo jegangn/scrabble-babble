@@ -29,9 +29,16 @@ export function NewGameScreen(): JSX.Element {
   };
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 p-6">
-      <h2 style={{ fontSize: "2em", fontWeight: 700, color: ACCENT.primary }}>New game</h2>
-      <div className="flex flex-col gap-4 w-full max-w-sm">
+    // NOTE: justify-start (not justify-center) + overflow-y-auto. When the
+    // Computer opponent is selected, the Difficulty fieldset replaces the
+    // Player 2 input and the form gets ~90 px taller — on 800 px viewports
+    // (Tab S8) that was clipping the Start button. Anchoring to the top
+    // and allowing scroll is robust on any landscape size.
+    <div className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto">
+      <h2 style={{ fontSize: "1.8em", fontWeight: 700, color: ACCENT.primary, margin: 0 }}>
+        New game
+      </h2>
+      <div className="flex flex-col gap-3 w-full max-w-sm">
         <label className="flex flex-col gap-1">
           <span style={labelStyle}>Player 1</span>
           <input
@@ -155,7 +162,10 @@ function RadioRow({ name, value, checked, onChange, label }: RadioRowProps): JSX
       style={{
         fontSize: "1em",
         color: ACCENT.text,
-        minHeight: 44,
+        // 40 keeps a generous tap target while shaving ~32 px across the 8
+        // radios shown when the AI flow is selected — the form fits a 800 px
+        // landscape viewport (Tab S8) without scrolling.
+        minHeight: 40,
         cursor: "pointer",
         touchAction: "manipulation",
       }}
@@ -192,7 +202,7 @@ const inputStyle: React.CSSProperties = {
 const fieldsetStyle: React.CSSProperties = {
   border: `1px solid ${ACCENT.primary}33`,
   borderRadius: 8,
-  padding: "8px 12px 12px",
+  padding: "6px 12px 8px",
   background: "rgba(255,255,255,0.4)",
 };
 
