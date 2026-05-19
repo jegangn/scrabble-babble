@@ -50,23 +50,31 @@ export function Tile({ tile, pending = false, size }: TileProps): JSX.Element {
     >
       <span
         style={{
-          fontSize: "1.35em",
+          fontSize: "1.3em",
           lineHeight: 1,
-          transform: "translateY(-12%)",
+          // -14 % shift instead of -12 %: letters with low-right ink (N, A,
+          // W, B, R) still had their descending strokes brushing the digit
+          // even after the first fix.
+          transform: "translateY(-14%)",
         }}
       >
         {displayLetter}
       </span>
       {tile.kind === "letter" && (
+        // Digit pulled deeper into the corner (right 4 %, bottom 4 %) so it
+        // sits OUTSIDE the letter's bounding box, not under its right leg.
+        // A subtle white text-shadow gives a tiny "halo" so any remaining
+        // sub-pixel overlap with the letter still reads clearly.
         <span
           className="absolute"
           style={{
-            right: "9%",
-            bottom: "5%",
+            right: "4%",
+            bottom: "4%",
             fontSize: "0.55em",
             lineHeight: 1,
             color: TILE.value,
             fontWeight: 700,
+            textShadow: "0 0 2px rgba(255,244,220,0.9)",
           }}
         >
           {displayValue}
