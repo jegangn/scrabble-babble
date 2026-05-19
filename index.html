@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <!--
+      Pinch-zoom MUST stay enabled. The target user has eyesight problems;
+      blocking user-scalable strands him at the designed font size with no
+      recourse. iOS 10+ Safari ignores user-scalable=no for accessibility
+      anyway, but in installed-PWA (Add to Home Screen) standalone mode it
+      DOES honor it — so dropping the flag is necessary, not cosmetic.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#7c4a2a" />

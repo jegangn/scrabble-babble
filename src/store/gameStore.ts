@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { disposeBotClient } from "../ai-client/botClient.js";
 import type { Difficulty } from "../engine/ai/bot.js";
 import { CLASSIC_BOARD } from "../engine/config/board.js";
 import { MINI_BOARD } from "../engine/config/mini-board.js";
@@ -286,6 +287,14 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   goHome: () => {
+    // Free the bot Web Worker (and its ~30 MB dictionary trie copy) on every
+    // return to Home. Long sessions where the user bounces between Tumbler /
+    // Bee / hot-seat games otherwise pin the worker indefinitely; iOS Safari
+    // is known to evict background tabs holding live workers, forcing a
+    // full reload on return. The next AI game re-spawns lazily — first move
+    // costs an extra ~500 ms which is invisible while the user reads the
+    // ScoreBar.
+    disposeBotClient();
     set({
       screen: { kind: "home" },
       error: null,
@@ -296,7 +305,14 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   submitMove: () => {
-    const { game, pending, dictionary } = get();
+    const { game, pending, dictionary, screen } = get();
+    // RE-ENTRY GUARD: after a successful move the screen flips to "handoff" /
+    // "game_end" synchronously, but React hasn't unmounted GameScreen yet.
+    // A queued double-tap on iPad fires its handler against the OLD button —
+    // refusing here is the only place we can be sure the previous move has
+    // landed. (Older users are prone to double-taps; missing this guard let
+    // 4 rapid Pass taps end a game prematurely. See gameStore audit.)
+    if (screen.kind !== "game") return;
     if (!game || !dictionary) return;
     if (pending.length === 0) {
       set({ error: "Place tiles before submitting." });
@@ -328,7 +344,8 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   swap: (tiles) => {
-    const { game, dictionary } = get();
+    const { game, dictionary, screen } = get();
+    if (screen.kind !== "game") return; // re-entry guard, see submitMove
     if (!game || !dictionary) return;
     const result = applyMove(game, createSwapMove(tiles), dictionary);
     if (!result.ok) {
@@ -340,7 +357,12 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   pass: () => {
-    const { game, dictionary } = get();
+    const { game, dictionary, screen } = get();
+    // Critical for hot-seat: 4 rapid Pass taps would otherwise end the game
+    // (consecutivePasses = 4). After the first Pass, screen flips to
+    // "handoff" synchronously but the React unmount hasn't happened yet —
+    // a queued double-tap on iPad fires its handler against the old button.
+    if (screen.kind !== "game") return;
     if (!game || !dictionary) return;
     const result = applyMove(game, createPassMove(), dictionary);
     if (!result.ok) {
@@ -352,7 +374,8 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   resign: () => {
-    const { game, dictionary } = get();
+    const { game, dictionary, screen } = get();
+    if (screen.kind !== "game") return; // re-entry guard, see submitMove
     if (!game || !dictionary) return;
     const result = applyMove(game, createResignMove(), dictionary);
     if (!result.ok) {
@@ -372,8 +395,14 @@ export const useGameStore = create<StoreState>((set, get) => ({
   },
 
   applyAiMove: (move) => {
-    const { game, dictionary } = get();
+    const { game, dictionary, aiPlayerIndex } = get();
     if (!game || !dictionary) return;
+    // Defensive: only apply the bot's move if it really is the bot's turn
+    // right now. Guards against React-18 strict-mode double-fire of the AI
+    // driver effect, or any future path where two `decide` promises resolve
+    // for the same turn.
+    if (aiPlayerIndex === null || game.turn !== aiPlayerIndex) return;
+    if (game.status.kind !== "in_progress") return;
     const result = applyMove(game, move, dictionary);
     if (!result.ok) {
       // Bot returned an invalid move (shouldn't happen). Fall back to pass.

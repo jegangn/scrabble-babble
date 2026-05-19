@@ -64,9 +64,33 @@ export function HomeScreen(): JSX.Element {
     }
   };
 
+  // App.tsx falls through to Home even if the dictionary failed to load. If
+  // we hide that fact, the user taps a game mode and gets a broken screen
+  // ("Preparing today's puzzle…" forever, AI never plays, etc.). Surface
+  // a clear error and a retry hint up front.
+  const dictMissing = dictionary === null;
+
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-6 p-6">
       <h1 style={{ fontSize: "3em", fontWeight: 700, color: ACCENT.primary }}>{APP_NAME}</h1>
+      {dictMissing && (
+        <div
+          role="alert"
+          style={{
+            background: "#fff0f0",
+            border: `2px solid ${ACCENT.danger}`,
+            borderRadius: 10,
+            padding: "12px 16px",
+            color: ACCENT.danger,
+            maxWidth: 360,
+            textAlign: "center",
+            fontWeight: 600,
+          }}
+        >
+          The word list didn't load — go online and refresh the page to
+          download it (one-time, then it works offline).
+        </div>
+      )}
       <div className="flex flex-col gap-3 w-full max-w-sm">
         {hasInProgress && (
           <button

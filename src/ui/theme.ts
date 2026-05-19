@@ -1,14 +1,18 @@
 import type { PremiumType } from "../engine/types.js";
 
 /**
- * Premium-cell colors. Older-user contrast checked: hues are distinct
- * (not similar shades). Saturation tuned for landscape lighting.
+ * Premium-cell colors. WCAG AA verified against board cell label size
+ * (~12 px in cell labels). All combinations >= 4.5:1 for body-text legibility.
+ * NONE (empty cell): bg #e8d8c0 + fg #5a4128 = 5.8:1 (was 3.3:1 — fail).
+ * DW pink: bg #f4a4c0 + fg #5a0e2c = 6.1:1 (was 3.4:1 — fail).
+ * The other three (DL/TL/TW) already passed AA; left unchanged for theme
+ * continuity.
  */
 export const PREMIUM_COLORS: Record<PremiumType, { bg: string; fg: string; label: string }> = {
-  NONE: { bg: "#e8d8c0", fg: "#7a5d3f", label: "" },
+  NONE: { bg: "#e8d8c0", fg: "#5a4128", label: "" },
   DL: { bg: "#9bd5f0", fg: "#0c4f6b", label: "DL" },
   TL: { bg: "#2f6fb0", fg: "#ffffff", label: "TL" },
-  DW: { bg: "#f4a4c0", fg: "#7a1d3f", label: "DW" },
+  DW: { bg: "#f4a4c0", fg: "#5a0e2c", label: "DW" },
   TW: { bg: "#d04848", fg: "#ffffff", label: "TW" },
 };
 

@@ -157,6 +157,12 @@ export function TumblerScreen(): JSX.Element | null {
         >
           ← Home
         </button>
+        {/*
+          aria-live=polite so a screen reader can hear the countdown without
+          interrupting other speech; we flip to assertive at 0 so "Time's up!"
+          actually breaks through. The role="timer" + aria-atomic ensures the
+          number is read as one chunk, not digit-by-digit.
+        */}
         <div
           style={{
             fontSize: "2em",
@@ -164,7 +170,10 @@ export function TumblerScreen(): JSX.Element | null {
             fontVariantNumeric: "tabular-nums",
             color: timeFlashing ? ACCENT.danger : ACCENT.text,
           }}
-          aria-label="Time remaining"
+          role="timer"
+          aria-live={timeLeftMs <= 0 ? "assertive" : "polite"}
+          aria-atomic="true"
+          aria-label={timeLeftMs <= 0 ? "Time's up" : "Time remaining"}
         >
           {secondsLeft}s
         </div>

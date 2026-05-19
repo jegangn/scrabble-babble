@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { BoardCell as BoardCellT, Position } from "../../engine/types.js";
 import { PREMIUM_COLORS, BOARD } from "../theme.js";
@@ -11,7 +12,7 @@ export interface BoardCellProps {
   readonly onTap?: ((position: Position) => void) | undefined;
 }
 
-export function BoardCell({
+function BoardCellInner({
   cell,
   position,
   isCenter,
@@ -64,3 +65,24 @@ export function BoardCell({
     </button>
   );
 }
+
+/**
+ * Memoized so placing one tile doesn't re-render all 225 board cells. The
+ * comparator compares `cell` by REFERENCE — applyPendingToBoard preserves
+ * cell-object identity for unchanged cells, so only the cell whose tile
+ * changed gets a fresh reference. `position` is recreated each render in
+ * Board.tsx (a fresh literal), so compare row+col by value. The rest are
+ * booleans / stable function references.
+ *
+ * Drag-over highlight (`isOver`) is internal to useDroppable's hook state,
+ * not a prop, so React.memo doesn't suppress those updates — that's the
+ * desired behaviour (only the hovered cell re-renders during drag).
+ */
+export const BoardCell = memo(BoardCellInner, (a, b) =>
+  a.cell === b.cell &&
+  a.position.row === b.position.row &&
+  a.position.col === b.position.col &&
+  a.isCenter === b.isCenter &&
+  a.isPending === b.isPending &&
+  a.onTap === b.onTap,
+);

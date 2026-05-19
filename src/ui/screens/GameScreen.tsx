@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -84,9 +84,12 @@ export function GameScreen(): JSX.Element | null {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.turn, aiPlayerIndex, opponent]);
 
+  // Drag thresholds bumped from 8 → 12 px so a shaky older-user hand on iPad
+  // is more reliably interpreted as a tap (placement via tap-to-place) rather
+  // than an ambiguous drag that doesn't reach a drop target.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 12 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 12 } }),
   );
 
   const onDragEnd = (event: DragEndEvent) => {
@@ -117,18 +120,21 @@ export function GameScreen(): JSX.Element | null {
   const player = game.players[game.turn]!;
   const canSwap = game.bag.length >= game.rules.minBagToSwap;
 
-  const onCellTap = (pos: Position) => {
-    // If a tile is selected from the rack, place it.
-    if (selectedRackIndex !== null) {
-      placeFromRack(selectedRackIndex, pos);
-      setSelectedRackIndex(null);
-      return;
-    }
-    // Otherwise: if cell is pending, recall.
-    if (keys.has(`${pos.row},${pos.col}` as `${number},${number}`)) {
-      recallOne(pos);
-    }
-  };
+  // useCallback so BoardCell's React.memo can skip re-rendering cells whose
+  // own props haven't changed when a single tile is placed.
+  const onCellTap = useCallback(
+    (pos: Position) => {
+      if (selectedRackIndex !== null) {
+        placeFromRack(selectedRackIndex, pos);
+        setSelectedRackIndex(null);
+        return;
+      }
+      if (keys.has(`${pos.row},${pos.col}` as `${number},${number}`)) {
+        recallOne(pos);
+      }
+    },
+    [selectedRackIndex, keys, placeFromRack, recallOne],
+  );
 
   const onRackTap = (rackIndex: number) => {
     if (usedRackIndices.has(rackIndex)) return;
@@ -137,8 +143,45 @@ export function GameScreen(): JSX.Element | null {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    {/*
+      Portrait warning: GameScreen's layout assumes a landscape flex-row
+      (board on the left, rack column on the right). In portrait the board
+      collapses to a thin strip. The installed-PWA manifest pins landscape,
+      but pre-install in mobile Safari there's no orientation lock. CSS
+      media query overlays a "Please rotate" message in portrait only.
+    */}
+    <style>{`
+      @media (orientation: portrait) {
+        .gs-portrait-warning { display: flex !important; }
+        .gs-game-body { display: none; }
+      }
+    `}</style>
     <div
-      className="flex flex-col h-full w-full p-3"
+      className="gs-portrait-warning"
+      style={{
+        display: "none",
+        position: "fixed",
+        inset: 0,
+        zIndex: 300,
+        background: ACCENT.surface,
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        padding: 24,
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div style={{ fontSize: "4em" }}>↻</div>
+      <div style={{ fontSize: "1.4em", fontWeight: 700, color: ACCENT.primary }}>
+        Rotate to landscape
+      </div>
+      <div style={{ opacity: 0.7 }}>
+        The Scrabble board needs the wide side of your screen.
+      </div>
+    </div>
+    <div
+      className="gs-game-body flex flex-col h-full w-full p-3"
       style={{ background: ACCENT.surface, gap: 12 }}
     >
       <ScoreBar players={game.players} turn={game.turn} bagCount={game.bag.length} />
@@ -246,6 +289,12 @@ export function GameScreen(): JSX.Element | null {
             >
               Cancel
             </button>
+            {/*
+              Confirm button text is intentionally NOT "Resign" — that's the
+              same word the user just tapped (in the action bar) to open this
+              modal. Identical-looking buttons invite second-tap mistakes from
+              older users. "End game now" is more deliberate and destructive.
+            */}
             <button
               type="button"
               onClick={() => {
@@ -254,7 +303,7 @@ export function GameScreen(): JSX.Element | null {
               }}
               style={modalBtn("danger")}
             >
-              Resign
+              End game now
             </button>
           </div>
         </Modal>

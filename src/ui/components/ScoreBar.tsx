@@ -9,7 +9,13 @@ export interface ScoreBarProps {
 
 export function ScoreBar({ players, turn, bagCount }: ScoreBarProps): JSX.Element {
   return (
+    // role="status" + aria-live=polite so a screen reader announces score
+    // changes after a turn. aria-atomic groups the whole bar into one
+    // announcement instead of reading individual updated nodes.
     <div className="flex w-full items-center justify-between gap-3 p-3 rounded-xl"
+         role="status"
+         aria-live="polite"
+         aria-atomic="true"
          style={{ background: TILE.bg, border: `2px solid ${ACCENT.primary}` }}>
       {players.map((p, i) => (
         <div

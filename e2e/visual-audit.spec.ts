@@ -120,9 +120,9 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await expect(page.getByText(/this ends the game/i)).toBeVisible();
       await shot(page, "08-resign-modal", vpName);
 
-      // Confirm — drops us on GameEndScreen.
-      await page.getByRole("button", { name: /^resign$/i }).nth(1).click();
-      // GameEnd has a final-score block and a Home / New game pair.
+      // Confirm — the destructive button is intentionally NOT labelled
+      // "Resign" (which would match the trigger) but "End game now".
+      await page.getByRole("button", { name: /end game now/i }).click();
       await expect(page.getByRole("button", { name: /home|new game/i }).first()).toBeVisible({
         timeout: 5000,
       });

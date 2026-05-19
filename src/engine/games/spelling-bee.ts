@@ -230,6 +230,15 @@ export function scoreBeeWord(word: string, puzzle: BeePuzzle): number {
  * Returned in ascending length, then alphabetical. Mostly used to compute
  * the day's "you found N of M" denominator.
  */
+/**
+ * Cap the DFS depth. The ENABLE dictionary has words up to 28 letters but
+ * realistic NYT-style Bee answers max out at ~15. Without this cap the walk
+ * recurses to every leaf, producing thousands of pathologically long words
+ * and blocking the main thread for hundreds of ms on first paint. 15 covers
+ * every common pangram while keeping the walk to a single frame.
+ */
+const MAX_BEE_WORD_LENGTH = 15;
+
 export function enumerateBeeWords(
   puzzle: BeePuzzle,
   dict: TrieNode,
@@ -246,6 +255,7 @@ export function enumerateBeeWords(
     ) {
       out.push(buffer.join(""));
     }
+    if (buffer.length >= MAX_BEE_WORD_LENGTH) return;
     for (const [ch, child] of node.children) {
       if (!allowed.has(ch)) continue;
       buffer.push(ch);

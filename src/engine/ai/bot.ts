@@ -84,8 +84,13 @@ export function decide(
   // Hard: 1-ply lookahead. Score each candidate by base + leave − weighted opponent reply.
   let best = candidates[0]!;
   let bestUtility = -Infinity;
-  // Limit how many we deeply evaluate to stay within deadline.
-  const maxToEvaluate = Math.min(candidates.length, 30);
+  // Cap deep-evaluation at 12 (was 30). Each iteration runs a full opponent
+  // generateMoves walk, ~100-500 ms on a dense mid-game board. 30 × 300 ms
+  // = 9 s, easily blowing the 4.6 s deadline; the worker would return
+  // mid-loop and the client timeout would fire pass() instead. 12 fits
+  // comfortably and the difference in play quality is marginal — the top
+  // 12 candidates are already heavily filtered by base score.
+  const maxToEvaluate = Math.min(candidates.length, 12);
 
   for (let i = 0; i < maxToEvaluate; i++) {
     if (Date.now() > deadline) break;
