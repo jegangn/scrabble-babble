@@ -2,12 +2,18 @@ node_modules/
 dist/
 coverage/
 .DS_Store
+Thumbs.db
 *.log
+*.tsbuildinfo
 .vscode/
 .idea/
 bun.lockb
 .env
-.env.local
+.env.*
+!.env.example
+
+# Claude Code working files (worktrees, plans, etc.)
+.claude/
 
 # Playwright
 test-results/
