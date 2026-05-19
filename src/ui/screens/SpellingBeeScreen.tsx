@@ -47,11 +47,24 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [totalWords, setTotalWords] = useState<number | null>(null);
+  const [puzzleError, setPuzzleError] = useState<string | null>(null);
 
   // Resolve today's puzzle once on mount.
   useEffect(() => {
     if (!dictionary) return;
-    const p = generatePuzzle(dateKey, dictionary);
+    let p: BeePuzzle;
+    try {
+      p = generatePuzzle(dateKey, dictionary);
+    } catch (e) {
+      // Catastrophic dictionary state (corrupted gz, missing pangrams).
+      // Surface a friendly error instead of crashing the React tree with
+      // no way back to Home.
+      console.error("Spelling Bee puzzle generation failed", e);
+      setPuzzleError(
+        e instanceof Error ? e.message : "Couldn't generate today's puzzle.",
+      );
+      return;
+    }
     setPuzzle(p);
     setOuterOrder(p.letters.filter((l) => l !== p.center));
     void (async () => {
@@ -60,8 +73,12 @@ export function SpellingBeeScreen(): JSX.Element | null {
     })();
     // Compute total possible words lazily after first paint (heavier walk).
     const handle = window.setTimeout(() => {
-      const words = enumerateBeeWords(p, dictionary);
-      setTotalWords(words.length);
+      try {
+        const words = enumerateBeeWords(p, dictionary);
+        setTotalWords(words.length);
+      } catch (e) {
+        console.error("Bee enumeration failed", e);
+      }
     }, 50);
     return () => window.clearTimeout(handle);
   }, [dictionary, dateKey]);
@@ -77,6 +94,40 @@ export function SpellingBeeScreen(): JSX.Element | null {
     const t = window.setTimeout(() => setFlash(null), FLASH_DURATION_MS);
     return () => window.clearTimeout(t);
   }, [flash]);
+
+  if (puzzleError) {
+    return (
+      <div
+        className="flex h-full w-full flex-col items-center justify-center gap-4 p-6"
+        style={{ background: ACCENT.surface }}
+      >
+        <div style={{ fontSize: "1.4em", fontWeight: 700, color: ACCENT.danger }}>
+          Couldn't load today's puzzle
+        </div>
+        <div style={{ opacity: 0.7, textAlign: "center", maxWidth: 360 }}>
+          {puzzleError}. Try refreshing the page — if it persists, the dictionary
+          file may be missing.
+        </div>
+        <button
+          type="button"
+          onClick={goHome}
+          style={{
+            background: ACCENT.primary,
+            color: "white",
+            border: "none",
+            padding: "12px 20px",
+            fontSize: "1.1em",
+            fontWeight: 600,
+            borderRadius: 10,
+            minHeight: 48,
+            touchAction: "manipulation",
+          }}
+        >
+          Back to home
+        </button>
+      </div>
+    );
+  }
 
   if (!dictionary || !puzzle) {
     return (

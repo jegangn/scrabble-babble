@@ -13,8 +13,12 @@ export interface BlankLetterPickerProps {
 }
 
 export function BlankLetterPicker({ onPick, onCancel }: BlankLetterPickerProps): JSX.Element {
+  // NOTE: deliberately NOT passing onClose to Modal. A stray backdrop-tap on
+  // iPad would silently discard the placed blank (cancelBlankPicker removes the
+  // pending placement) with no feedback. Force the user to click Cancel
+  // explicitly so the action is always intentional.
   return (
-    <Modal title="Pick a letter for the blank" onClose={onCancel}>
+    <Modal title="Pick a letter for the blank">
       <div className="grid grid-cols-7 gap-2">
         {LETTERS.map((l) => (
           <button

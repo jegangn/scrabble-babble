@@ -97,15 +97,25 @@ export function GameScreen(): JSX.Element | null {
     placeFromRack(data.rackIndex, over.position);
   };
 
-  if (!game) return null;
-
-  const player = game.players[game.turn]!;
-  const board = useMemo(() => applyPendingToBoard(game.board, pending), [game.board, pending]);
+  // NOTE: these useMemo calls were previously placed *after* `if (!game) return
+  // null` — a Rules-of-Hooks violation. Today the flow never reaches GameScreen
+  // with `game === null`, but any future bug that nulls game while this
+  // component is mounted would throw "Rendered fewer hooks than expected".
+  // Hoisted above the early return; each tolerates a null game.
+  const board = useMemo(
+    () => (game ? applyPendingToBoard(game.board, pending) : null),
+    [game, pending],
+  );
   const keys = useMemo(() => pendingKeys(pending), [pending]);
   const usedRackIndices = useMemo(
     () => new Set(pending.map((p) => p.rackIndex)),
     [pending],
   );
+
+  if (!game || !board) return null;
+
+  const player = game.players[game.turn]!;
+  const canSwap = game.bag.length >= game.rules.minBagToSwap;
 
   const onCellTap = (pos: Position) => {
     // If a tile is selected from the rack, place it.
@@ -185,6 +195,7 @@ export function GameScreen(): JSX.Element | null {
           <ActionBar
             canSubmit={pending.length > 0}
             hasPending={pending.length > 0}
+            canSwap={canSwap}
             onSubmit={submitMove}
             onRecall={() => {
               recallPending();

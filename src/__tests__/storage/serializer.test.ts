@@ -56,4 +56,56 @@ describe("serializer", () => {
     const restored = deserializeGame(legacy as typeof serialized);
     expect(restored.variant).toBe("classic");
   });
+
+  describe("import validation (defensive)", () => {
+    // These tests cover the structural validator added to deserializeGame.
+    // The validator rejects hand-edited / corrupted imports at the boundary
+    // so the engine never has to deal with malformed state.
+    const validSave = () => serializeGame(createGame({ seed: 1, playerNames: ["P1", "P2"] }));
+
+    it("rejects a non-object payload", () => {
+      expect(() => deserializeGame(null as unknown as ReturnType<typeof validSave>)).toThrow();
+      expect(() => deserializeGame("oops" as unknown as ReturnType<typeof validSave>)).toThrow();
+    });
+
+    it("rejects negative player scores", () => {
+      const v = validSave();
+      const corrupted = {
+        ...v,
+        players: v.players.map((p, i) => (i === 0 ? { ...p, score: -10 } : p)) as typeof v.players,
+      };
+      expect(() => deserializeGame(corrupted)).toThrow(/score/i);
+    });
+
+    it("rejects when there are not exactly 2 players", () => {
+      const v = validSave();
+      const corrupted = { ...v, players: [v.players[0]!] as unknown as typeof v.players };
+      expect(() => deserializeGame(corrupted)).toThrow(/2 players/i);
+    });
+
+    it("rejects turn values outside {0, 1}", () => {
+      const v = validSave();
+      const corrupted = { ...v, turn: 5 as unknown as 0 | 1 };
+      expect(() => deserializeGame(corrupted)).toThrow(/turn/i);
+    });
+
+    it("rejects when board.cells row count does not match board.size", () => {
+      const v = validSave();
+      const corrupted = {
+        ...v,
+        board: { ...v.board, cells: v.board.cells.slice(0, 3) } as typeof v.board,
+      };
+      expect(() => deserializeGame(corrupted)).toThrow(/row count/i);
+    });
+
+    it("rejects when consumedPremiums is not an array", () => {
+      const v = validSave();
+      const corrupted = { ...v, consumedPremiums: "not-an-array" as unknown as ReadonlyArray<never> };
+      expect(() => deserializeGame(corrupted)).toThrow(/consumedPremiums/i);
+    });
+
+    it("accepts a well-formed save", () => {
+      expect(() => deserializeGame(validSave())).not.toThrow();
+    });
+  });
 });

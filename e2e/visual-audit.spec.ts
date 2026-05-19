@@ -110,5 +110,56 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       }
       await shot(page, "07b-bee-typing", vpName);
     });
+
+    test("Resign confirm modal + GameEnd screen", async ({ page }) => {
+      await gotoHome(page);
+      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /^start$/i }).click();
+      // Open Resign confirmation.
+      await page.getByRole("button", { name: /^resign$/i }).click();
+      await expect(page.getByText(/this ends the game/i)).toBeVisible();
+      await shot(page, "08-resign-modal", vpName);
+
+      // Confirm — drops us on GameEndScreen.
+      await page.getByRole("button", { name: /^resign$/i }).nth(1).click();
+      // GameEnd has a final-score block and a Home / New game pair.
+      await expect(page.getByRole("button", { name: /home|new game/i }).first()).toBeVisible({
+        timeout: 5000,
+      });
+      await page.waitForTimeout(300);
+      await shot(page, "09-game-end", vpName);
+    });
+
+    test("Swap modal opens with rack tiles", async ({ page }) => {
+      await gotoHome(page);
+      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /^start$/i }).click();
+      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+      // Swap should be enabled at game start (bag has 90+ tiles).
+      const swapBtn = page.getByRole("button", { name: /^swap$/i });
+      await expect(swapBtn).toBeEnabled();
+      await swapBtn.click();
+      // SwapPicker is a Modal with the rack tiles inside.
+      await expect(page.getByText(/swap/i).first()).toBeVisible();
+      await page.waitForTimeout(200);
+      await shot(page, "10-swap-modal", vpName);
+    });
+
+    test("HotSeatHandoff after passing in hot-seat", async ({ page }) => {
+      await gotoHome(page);
+      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /^start$/i }).click();
+      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+      // Pass — that flips the turn, which in hot-seat shows the handoff overlay.
+      await page.getByRole("button", { name: /^pass$/i }).click();
+      // Handoff overlay shows "Pass the iPad to <name>" and a Ready button.
+      await expect(page.getByText(/pass the ipad to/i)).toBeVisible({ timeout: 5000 });
+      await expect(page.getByRole("button", { name: /ready/i })).toBeVisible();
+      await page.waitForTimeout(200);
+      await shot(page, "11-handoff", vpName);
+      // Tapping Ready returns to the game.
+      await page.getByRole("button", { name: /ready/i }).click();
+      await expect(page.getByText("★").first()).toBeVisible();
+    });
   });
 }

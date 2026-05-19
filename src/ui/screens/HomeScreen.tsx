@@ -111,6 +111,10 @@ export function HomeScreen(): JSX.Element {
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
+            // Reset BEFORE handling so re-selecting the same file still fires
+            // the change event next time. Without this, a failed import (alert
+            // dismissed) couldn't be retried with the same file.
+            e.target.value = "";
             if (f) void onImport(f);
           }}
         />

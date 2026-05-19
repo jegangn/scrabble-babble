@@ -3,6 +3,8 @@ import { ACCENT } from "../theme.js";
 export interface ActionBarProps {
   readonly canSubmit: boolean;
   readonly hasPending: boolean;
+  /** False when the bag is too small to swap (rules.minBagToSwap floor). */
+  readonly canSwap: boolean;
   readonly onSubmit: () => void;
   readonly onRecall: () => void;
   readonly onShuffle: () => void;
@@ -51,7 +53,7 @@ export function ActionBar(props: ActionBarProps): JSX.Element {
       </Btn>
       <Btn onClick={props.onRecall} disabled={!props.hasPending}>Recall</Btn>
       <Btn onClick={props.onShuffle}>Shuffle</Btn>
-      <Btn onClick={props.onSwap}>Swap</Btn>
+      <Btn onClick={props.onSwap} disabled={!props.canSwap}>Swap</Btn>
       <Btn onClick={props.onPass}>Pass</Btn>
       <Btn onClick={props.onResign} variant="danger">Resign</Btn>
     </div>
