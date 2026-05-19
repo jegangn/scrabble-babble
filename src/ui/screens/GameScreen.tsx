@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -56,6 +56,20 @@ export function GameScreen(): JSX.Element | null {
   // at <body> level (escapes overflow clipping) and slides smoothly.
   const [activeDragRackIndex, setActiveDragRackIndex] = useState<number | null>(null);
 
+  // Tracks whether the most recent drop landed on a valid board cell. We
+  // mutate this synchronously in onDragEnd (BEFORE the setState that clears
+  // the active drag) so the next render of <DragOverlay> picks up a fresh
+  // `dropAnimation` prop. Refs are read at render time so the value is
+  // current; useState would also work but adds a render cycle.
+  //
+  // On a successful placement we set `dropAnimation={null}` → the overlay
+  // disappears instantly, because the placed tile is already visible on
+  // the board. Animating it back to the rack would be visually confusing
+  // (you just put it on the board — why is it flying back?). On a failed
+  // drop (released outside any cell), we keep the snap-back animation so
+  // the user sees the tile return to its source.
+  const dropSuccessfulRef = useRef(false);
+
   // Drive the bot when it's the AI's turn. The effect fires once per turn
   // change (game.turn is the trigger). `thinking` is intentionally NOT in the
   // dep array: that flag is set INSIDE the effect, so listing it would cause
@@ -108,15 +122,23 @@ export function GameScreen(): JSX.Element | null {
   };
 
   const onDragEnd = (event: DragEndEvent) => {
-    setActiveDragRackIndex(null);
     const data = event.active.data.current as { kind: string; rackIndex?: number } | undefined;
     const over = event.over?.data.current as { kind: string; position?: Position } | undefined;
-    if (data?.kind !== "rack" || over?.kind !== "cell" || !over.position) return;
-    if (typeof data.rackIndex !== "number") return;
-    placeFromRack(data.rackIndex, over.position);
+    const wasSuccessful =
+      data?.kind === "rack" && over?.kind === "cell" && !!over.position;
+    // Set BEFORE clearing the active drag, so the re-render's <DragOverlay>
+    // already sees the updated `dropAnimation` prop.
+    dropSuccessfulRef.current = wasSuccessful;
+    setActiveDragRackIndex(null);
+    if (wasSuccessful && typeof data?.rackIndex === "number" && over?.position) {
+      placeFromRack(data.rackIndex, over.position);
+    }
   };
 
   const onDragCancel = () => {
+    // A cancelled drag (e.g. user dragged out of bounds then released) is a
+    // failure case — animate the snap-back so the user sees the tile return.
+    dropSuccessfulRef.current = false;
     setActiveDragRackIndex(null);
   };
 
@@ -351,10 +373,15 @@ export function GameScreen(): JSX.Element | null {
       "snap" when releasing over a valid cell.
     */}
     <DragOverlay
-      dropAnimation={{
-        duration: 180,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      }}
+      dropAnimation={
+        // Successful placement: no animation — placed tile is on the board,
+        // animating the overlay back to the rack would be misleading.
+        // Failed drop: 220 ms ease-out back to source, so the user gets
+        // visual feedback that the tile is returning to the rack.
+        dropSuccessfulRef.current
+          ? null
+          : { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      }
       zIndex={400}
     >
       {activeDragTile && (
