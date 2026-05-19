@@ -145,6 +145,37 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await shot(page, "10-swap-modal", vpName);
     });
 
+    test("Drag overlay shows a moving tile (no disappearing)", async ({ page }) => {
+      await gotoHome(page);
+      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /^start$/i }).click();
+      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+
+      // Find a rack tile (DraggableRackTile renders a <div role="button">
+      // around a <Tile> with the letter).
+      const firstRackTile = page.locator('[role="button"][tabindex="0"]').first();
+      const box = await firstRackTile.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+
+      // Begin a slow drag — the DragOverlay tile should appear in the DOM
+      // (a child of the body, outside the React tree). Hold partway through
+      // so we can screenshot the in-flight state.
+      const startX = box.x + box.width / 2;
+      const startY = box.y + box.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      // Multi-step move triggers @dnd-kit's pointer-activation distance and
+      // mounts the DragOverlay portal at body level.
+      await page.mouse.move(startX + 40, startY + 40, { steps: 6 });
+      await page.mouse.move(startX + 120, startY + 80, { steps: 8 });
+
+      // While the drag is in flight, screenshot to verify a moving tile
+      // is visibly present (not just an empty rack slot).
+      await shot(page, "12-drag-in-flight", vpName);
+      await page.mouse.up();
+    });
+
     test("HotSeatHandoff after passing in hot-seat", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();

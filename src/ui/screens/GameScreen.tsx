@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import type { DragEndEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { getBotMove } from "../../ai-client/botClient.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { applyPendingToBoard, pendingKeys } from "../../store/pending.js";
@@ -18,6 +19,7 @@ import { ScoreBar } from "../components/ScoreBar.js";
 import { SwapPicker } from "../components/SwapPicker.js";
 import { Modal } from "../components/Modal.js";
 import { ThinkingOverlay } from "../components/ThinkingOverlay.js";
+import { Tile } from "../components/Tile.js";
 import { ACCENT } from "../theme.js";
 import type { Position } from "../../engine/types.js";
 
@@ -47,6 +49,12 @@ export function GameScreen(): JSX.Element | null {
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
+  // Tracks which rack slot is currently being dragged so the <DragOverlay>
+  // can render a moving tile that follows the cursor. Without this overlay
+  // the original tile sat at its rack slot with opacity 0 — the user saw
+  // *nothing* moving with their finger. With it, the overlay is mounted
+  // at <body> level (escapes overflow clipping) and slides smoothly.
+  const [activeDragRackIndex, setActiveDragRackIndex] = useState<number | null>(null);
 
   // Drive the bot when it's the AI's turn. The effect fires once per turn
   // change (game.turn is the trigger). `thinking` is intentionally NOT in the
@@ -92,12 +100,24 @@ export function GameScreen(): JSX.Element | null {
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 12 } }),
   );
 
+  const onDragStart = (event: DragStartEvent) => {
+    const data = event.active.data.current as { kind: string; rackIndex?: number } | undefined;
+    if (data?.kind === "rack" && typeof data.rackIndex === "number") {
+      setActiveDragRackIndex(data.rackIndex);
+    }
+  };
+
   const onDragEnd = (event: DragEndEvent) => {
+    setActiveDragRackIndex(null);
     const data = event.active.data.current as { kind: string; rackIndex?: number } | undefined;
     const over = event.over?.data.current as { kind: string; position?: Position } | undefined;
     if (data?.kind !== "rack" || over?.kind !== "cell" || !over.position) return;
     if (typeof data.rackIndex !== "number") return;
     placeFromRack(data.rackIndex, over.position);
+  };
+
+  const onDragCancel = () => {
+    setActiveDragRackIndex(null);
   };
 
   // NOTE: these useMemo calls were previously placed *after* `if (!game) return
@@ -141,8 +161,21 @@ export function GameScreen(): JSX.Element | null {
     setSelectedRackIndex(selectedRackIndex === rackIndex ? null : rackIndex);
   };
 
+  // Resolve the actual tile object for the in-flight drag (if any) so the
+  // overlay can render it. Reading from game.players[turn].rack keeps the
+  // overlay in sync with the source of truth, no separate copy needed.
+  const activeDragTile =
+    activeDragRackIndex !== null && game
+      ? game.players[game.turn]!.rack[activeDragRackIndex] ?? null
+      : null;
+
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
     {/*
       Portrait warning: GameScreen's layout assumes a landscape flex-row
       (board on the left, rack column on the right). In portrait the board
@@ -310,6 +343,37 @@ export function GameScreen(): JSX.Element | null {
       )}
       {thinking && <ThinkingOverlay />}
     </div>
+    {/*
+      DragOverlay: mounted at document.body via portal, escapes any
+      overflow-hidden ancestor (the brown rack, the board grid, the
+      score bar). Drag motion is GPU-accelerated transform — no React
+      re-renders during the drag itself. dropAnimation handles the
+      "snap" when releasing over a valid cell.
+    */}
+    <DragOverlay
+      dropAnimation={{
+        duration: 180,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+      zIndex={400}
+    >
+      {activeDragTile && (
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            // Slight scale-up + drop-shadow gives a tactile "lifted" feel
+            // older eyes track better than a flat-following tile.
+            transform: "scale(1.1)",
+            filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.3))",
+            cursor: "grabbing",
+            pointerEvents: "none",
+          }}
+        >
+          <Tile tile={activeDragTile} pending />
+        </div>
+      )}
+    </DragOverlay>
     </DndContext>
   );
 }
