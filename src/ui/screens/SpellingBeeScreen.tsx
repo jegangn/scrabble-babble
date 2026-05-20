@@ -590,7 +590,11 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </div>
         </div>
 
-        {/* Action row — centred Delete / Shuffle / Submit, small. */}
+        {/* Action row — matches Tumbler's Shuffle / Clear / Submit rhythm:
+            Shuffle is a filled white secondary with the ⇅ icon, Delete
+            sits in the middle as a text-only ghost button (same role
+            Clear plays in Tumbler), Submit is the filled brown primary
+            on the right. */}
         <div
           style={{
             display: "flex",
@@ -604,25 +608,24 @@ export function SpellingBeeScreen(): JSX.Element | null {
             size="sm"
             onClick={() => {
               playUiTap();
-              deleteLetter();
-            }}
-            disabled={currentWord.length === 0}
-            icon={<span>⌫</span>}
-            muted
-          >
-            Delete
-          </Button>
-          <Button
-            kind="secondary"
-            size="sm"
-            onClick={() => {
-              playUiTap();
               shuffleOuter();
             }}
             icon={<span>⇅</span>}
             muted
           >
             Shuffle
+          </Button>
+          <Button
+            kind="ghost"
+            size="sm"
+            onClick={() => {
+              playUiTap();
+              deleteLetter();
+            }}
+            disabled={currentWord.length === 0}
+            muted
+          >
+            ⌫ Delete
           </Button>
           <Button
             kind="primary"
