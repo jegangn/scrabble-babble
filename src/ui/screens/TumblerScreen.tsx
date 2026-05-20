@@ -23,7 +23,6 @@ import { CurrentWord } from "../components/CurrentWord.js";
 import { FoundList } from "../components/FoundList.js";
 import { SectionLabel } from "../components/SectionLabel.js";
 import { Surface } from "../components/Surface.js";
-import { Tagline } from "../components/Tagline.js";
 import { Tile } from "../components/Tile.js";
 import { Toast } from "../components/Toast.js";
 import { UserChip } from "../components/UserChip.js";
@@ -261,9 +260,9 @@ export function TumblerScreen(): JSX.Element | null {
           width: "100%",
         }}
       >
-        {/* Header — tight: tagline + h3 title. */}
+        {/* Header — title only. Subtitle ("Solo · 60-second sprint") was
+            dropped to claw back vertical space on shorter screens. */}
         <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <Tagline>Solo · 60-second sprint</Tagline>
           <h1
             style={{
               fontFamily: font.serif,
@@ -278,31 +277,30 @@ export function TumblerScreen(): JSX.Element | null {
           </h1>
         </header>
 
-        {/* Timer + score + Restart, side-by-side. Each BigNumber gets a
-            fixed pixel width so the timer's box never breathes as the
-            seconds tick down — tabular-nums alone isn't enough because
-            a digit dropping from "60.0s" to "8.4s" still shrinks the
-            box unless its outer width is explicit. Restart is always
-            mounted; visibility: hidden before the round starts keeps
-            the row's layout identical pre- and mid-round. */}
+        {/* Timer + score, side-by-side. Each BigNumber gets a fixed pixel
+            width so the timer's box never breathes as the seconds tick
+            down — tabular-nums alone isn't enough because a digit dropping
+            from "60.0s" to "8.4s" still shrinks the box unless its outer
+            width is explicit. */}
         <div style={{ display: "flex", gap: space.x3, alignItems: "center", justifyContent: "center" }}>
           <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} compact width={112} />
           <BigNumber value={score} label="Score" tone="brown" compact width={112} />
-          <div style={{ visibility: started ? "visible" : "hidden" }}>
-            <Button
-              kind="ghost"
-              size="sm"
-              onClick={() => {
-                playUiTap();
-                restartGame();
-              }}
-              muted
-              ariaLabel="Restart round"
-            >
-              ↻ Restart
-            </Button>
-          </div>
         </div>
+
+        {/* Restart — always visible, beneath Time/Score. Resets the
+            seed, rack, score, and timer; safe to tap mid-round. */}
+        <Button
+          kind="ghost"
+          size="sm"
+          onClick={() => {
+            playUiTap();
+            restartGame();
+          }}
+          muted
+          ariaLabel="Restart round"
+        >
+          ↻ Restart
+        </Button>
 
         {/* CurrentWord + Flash overlay — the flash toast renders
             absolutely on top of the strip so its appearance/disappearance

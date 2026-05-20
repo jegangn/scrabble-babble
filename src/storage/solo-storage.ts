@@ -149,6 +149,59 @@ export async function getBeeLeaderboard(
   return sanitizeBoard(entry?.value);
 }
 
+/** Bee top-scores entry — same shape as a leaderboard entry plus the
+ *  date the score was achieved on, so the UI can show "May 18" next
+ *  to a historical high.
+ */
+export interface BeeTopEntry extends LeaderboardEntry {
+  readonly dateKey: string;
+}
+
+/** Iterate every per-day Bee leaderboard once and flatten the entries
+ *  into a single list. Used by both `getBeeTopScores` and
+ *  `getBeePersonalBest`; doing the IDB scan once per call is fine —
+ *  the settings store stays under a few hundred rows in normal use.
+ */
+async function readAllBeeEntries(): Promise<ReadonlyArray<BeeTopEntry>> {
+  const db = await open();
+  const all = await db.getAll("settings");
+  db.close();
+  const out: BeeTopEntry[] = [];
+  for (const row of all) {
+    if (typeof row.key !== "string") continue;
+    if (!row.key.startsWith(BEE_LEADERBOARD_PREFIX)) continue;
+    const dateKey = row.key.slice(BEE_LEADERBOARD_PREFIX.length);
+    for (const entry of sanitizeBoard(row.value)) {
+      out.push({ ...entry, dateKey });
+    }
+  }
+  return out;
+}
+
+/** All-time top Spelling Bee scores across every day played on this
+ *  device. Sorted by score desc, then timestamp asc. Default limit 10.
+ */
+export async function getBeeTopScores(limit = 10): Promise<ReadonlyArray<BeeTopEntry>> {
+  const all = await readAllBeeEntries();
+  return [...all]
+    .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
+    .slice(0, limit);
+}
+
+/** The given player's highest single-day Bee score across all days.
+ *  Returns 0 if the player has no history yet (or the name is empty).
+ */
+export async function getBeePersonalBest(name: string): Promise<number> {
+  const cleanName = name.trim();
+  if (cleanName.length === 0) return 0;
+  const all = await readAllBeeEntries();
+  let best = 0;
+  for (const entry of all) {
+    if (entry.name === cleanName && entry.score > best) best = entry.score;
+  }
+  return best;
+}
+
 export async function recordBeeScore(
   dateKey: string,
   name: string,

@@ -9,12 +9,13 @@ import {
 import type { BeePuzzle } from "../../engine/games/spelling-bee.js";
 import type { Letter } from "../../engine/types.js";
 import {
-  getBeeLeaderboard,
+  getBeePersonalBest,
   getBeeProgress,
+  getBeeTopScores,
   localDateKey,
   recordBeeScore,
   setBeeProgress,
-  type LeaderboardEntry,
+  type BeeTopEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
@@ -26,7 +27,6 @@ import { CurrentWord } from "../components/CurrentWord.js";
 import { FoundList } from "../components/FoundList.js";
 import { SectionLabel } from "../components/SectionLabel.js";
 import { Surface } from "../components/Surface.js";
-import { Tagline } from "../components/Tagline.js";
 import { Toast } from "../components/Toast.js";
 import { UserChip } from "../components/UserChip.js";
 
@@ -79,7 +79,12 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const [puzzle, setPuzzle] = useState<BeePuzzle | null>(null);
   const [outerOrder, setOuterOrder] = useState<ReadonlyArray<Letter>>([]);
   const [currentWord, setCurrentWord] = useState("");
-  const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
+  // Historical top scores aggregated across every past Bee day on this
+  // device (replaces the old today-only leaderboard). Personal best is
+  // the current user's highest single-day score.
+  const [topScores, setTopScores] = useState<ReadonlyArray<BeeTopEntry>>([]);
+  const [personalBest, setPersonalBest] = useState(0);
+  const [topScoresExpanded, setTopScoresExpanded] = useState(false);
   const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [totalWords, setTotalWords] = useState<number | null>(null);
@@ -127,8 +132,12 @@ export function SpellingBeeScreen(): JSX.Element | null {
     void (async () => {
       const saved = await getBeeProgress(dateKey);
       if (saved) setFoundWords(saved.found);
-      const board = await getBeeLeaderboard(dateKey);
-      setLeaderboard(board);
+      const [top, best] = await Promise.all([
+        getBeeTopScores(10),
+        currentUser ? getBeePersonalBest(currentUser) : Promise.resolve(0),
+      ]);
+      setTopScores(top);
+      setPersonalBest(best);
     })();
     // Lazy total-word enumeration after first paint (heavier walk).
     const handle = window.setTimeout(() => {
@@ -140,7 +149,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
       }
     }, 50);
     return () => window.clearTimeout(handle);
-  }, [dictionary, dateKey]);
+  }, [dictionary, dateKey, currentUser]);
 
   // Auto-clear the flash toast.
   useEffect(() => {
@@ -242,7 +251,15 @@ export function SpellingBeeScreen(): JSX.Element | null {
       if (currentUser) {
         const total = next.reduce((acc, word) => acc + scoreBeeWord(word, puzzle), 0);
         await recordBeeScore(dateKey, currentUser, total);
-        setLeaderboard(await getBeeLeaderboard(dateKey));
+        // Refresh both aggregates — recordBeeScore may have raised the
+        // user's personal best AND/OR introduced a new entry into the
+        // all-time top scores list.
+        const [top, best] = await Promise.all([
+          getBeeTopScores(10),
+          getBeePersonalBest(currentUser),
+        ]);
+        setTopScores(top);
+        setPersonalBest(best);
       }
     })();
     playSuccess();
@@ -412,9 +429,10 @@ export function SpellingBeeScreen(): JSX.Element | null {
           width: "100%",
         }}
       >
-        {/* Header — tight: tagline · h3 · inline score · progress. */}
+        {/* Header — title + inline score + progress. The "Daily puzzle ·
+            <date>" subtitle was dropped to claw back vertical space; the
+            same date is implicit (today's puzzle, today's session). */}
         <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <Tagline>Daily puzzle · {formatHeaderDate(dateKey)}</Tagline>
           <h1
             style={{
               fontFamily: font.serif,
@@ -657,93 +675,247 @@ export function SpellingBeeScreen(): JSX.Element | null {
             words={[...foundWords].sort()}
           />
 
-          <div
-            style={{
-              background: color.paper,
-              border: `1.5px solid ${color.stroke}`,
-              borderRadius: radius.card,
-              boxShadow: shadow.card,
-              padding: space.x3,
-              display: "flex",
-              flexDirection: "column",
-              gap: space.x2,
-              flexShrink: 0,
-              maxHeight: 140,
-              overflow: "hidden",
+          {/* Personal best — compact strip mirroring the Tumbler card.
+              Shows the user's best single-day Bee score across all days
+              played; "New high — up X" tag fires while live score > best. */}
+          <BeePersonalBestCard best={personalBest} current={score} />
+
+          {/* Top scores — collapsed by default, expands inline on tap.
+              When expanded, the inner ol scrolls; the page itself stays
+              pinned (per spec). Collapsed height ≈ 44 px, expanded
+              capped at 220 px so it never crowds out the FoundList. */}
+          <BeeTopScoresCard
+            entries={topScores}
+            expanded={topScoresExpanded}
+            currentUser={currentUser}
+            onToggle={() => {
+              playUiTap();
+              setTopScoresExpanded((v) => !v);
             }}
-          >
-            <SectionLabel style={{ margin: 0 }}>Today's leaderboard</SectionLabel>
-            {leaderboard.length === 0 ? (
-              <span style={{ fontSize: size.caption, color: color.inkSoft }}>
-                No scores yet today.
-              </span>
-            ) : (
-              <ol style={{ listStyle: "none", padding: 0, margin: 0, overflowY: "auto", minHeight: 0, paddingRight: 4 }}>
-                {leaderboard.map((entry, i) => {
-                  const isYou = currentUser !== null && entry.name === currentUser;
-                  return (
-                    <li
-                      key={entry.name}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "auto 1fr auto",
-                        gap: space.x3,
-                        alignItems: "center",
-                        padding: "6px 4px",
-                        borderRadius: 6,
-                        borderBottom:
-                          i === leaderboard.length - 1
-                            ? "none"
-                            : `1px dashed ${color.creamDark}`,
-                        background: isYou
-                          ? `color-mix(in oklab, ${color.successBg} 60%, transparent)`
-                          : "transparent",
-                        fontSize: size.body,
-                      }}
-                    >
-                      <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
-                      <span
-                        style={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          color: color.ink,
-                          fontWeight: isYou ? weight.bold : weight.med,
-                        }}
-                      >
-                        {entry.name}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: font.serif,
-                          fontWeight: weight.bold,
-                          fontVariantNumeric: "tabular-nums",
-                          color: color.brown,
-                          minWidth: 32,
-                          textAlign: "right",
-                        }}
-                      >
-                        {entry.score}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
+          />
         </div>
       </div>
     </Surface>
   );
 }
 
-/** Format a YYYY-MM-DD date key as "Tue · May 20". */
-function formatHeaderDate(dateKey: string): string {
+interface BeePersonalBestCardProps {
+  readonly best: number;
+  readonly current: number;
+}
+
+/** Compact personal-best strip — mirrors the Tumbler PersonalBestCard.
+ *  Highlights when the live score has eclipsed the saved best. */
+function BeePersonalBestCard({ best, current }: BeePersonalBestCardProps): JSX.Element {
+  const { color, radius, shadow, space, font, size, weight } = tokens;
+  const beating = current > best;
+  return (
+    <div
+      style={{
+        padding: `${space.x3}px ${space.x4}px`,
+        background: color.paper,
+        border: `1.5px solid ${color.stroke}`,
+        borderRadius: radius.card,
+        boxShadow: shadow.card,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+        }}
+      >
+        <span
+          style={{
+            fontSize: size.caption,
+            color: color.inkSoft,
+            textTransform: "uppercase",
+            letterSpacing: ".1em",
+            fontWeight: weight.med,
+          }}
+        >
+          Personal best
+        </span>
+        <span
+          style={{
+            fontFamily: font.serif,
+            fontWeight: weight.bold,
+            fontSize: size.h4,
+            color: beating ? color.success : color.brown,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {best}
+        </span>
+      </div>
+      {beating && (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: size.micro + 1,
+            color: color.success,
+            fontWeight: weight.med,
+          }}
+        >
+          New high — up {current - best}.
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface BeeTopScoresCardProps {
+  readonly entries: ReadonlyArray<BeeTopEntry>;
+  readonly expanded: boolean;
+  readonly currentUser: string | null;
+  readonly onToggle: () => void;
+}
+
+/** Collapsible Top-Scores list. Header is a button that toggles the
+ *  body open/closed; when open, the inner ol is the only thing that
+ *  scrolls (page itself stays single-screen, per spec). */
+function BeeTopScoresCard({
+  entries,
+  expanded,
+  currentUser,
+  onToggle,
+}: BeeTopScoresCardProps): JSX.Element {
+  const { color, radius, shadow, space, font, size, weight } = tokens;
+  return (
+    <div
+      style={{
+        background: color.paper,
+        border: `1.5px solid ${color.stroke}`,
+        borderRadius: radius.card,
+        boxShadow: shadow.card,
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        style={{
+          appearance: "none",
+          font: "inherit",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: `${space.x3}px ${space.x4}px`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: space.x3,
+          touchAction: "manipulation",
+          width: "100%",
+        }}
+      >
+        <SectionLabel style={{ margin: 0 }}>Top scores</SectionLabel>
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: space.x2,
+            fontSize: size.caption,
+            color: color.inkSoft,
+            fontWeight: weight.med,
+          }}
+        >
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{entries.length}</span>
+          <span aria-hidden style={{ fontSize: size.body, color: color.brown }}>
+            {expanded ? "▾" : "▸"}
+          </span>
+        </span>
+      </button>
+      {expanded && (
+        <ol
+          style={{
+            listStyle: "none",
+            padding: `0 ${space.x4}px ${space.x3}px`,
+            margin: 0,
+            overflowY: "auto",
+            maxHeight: 220,
+          }}
+        >
+          {entries.length === 0 ? (
+            <li style={{ fontSize: size.caption, color: color.inkSoft, padding: "6px 0" }}>
+              No scores yet — play a day to start building history.
+            </li>
+          ) : (
+            entries.map((entry, i) => {
+              const isYou = currentUser !== null && entry.name === currentUser;
+              return (
+                <li
+                  key={`${entry.name}-${entry.dateKey}-${entry.timestamp}`}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr auto auto",
+                    gap: space.x3,
+                    alignItems: "center",
+                    padding: "6px 4px",
+                    borderRadius: 6,
+                    borderBottom:
+                      i === entries.length - 1
+                        ? "none"
+                        : `1px dashed ${color.creamDark}`,
+                    background: isYou
+                      ? `color-mix(in oklab, ${color.successBg} 60%, transparent)`
+                      : "transparent",
+                    fontSize: size.body,
+                  }}
+                >
+                  <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: color.ink,
+                      fontWeight: isYou ? weight.bold : weight.med,
+                    }}
+                  >
+                    {entry.name}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: size.micro + 1,
+                      color: color.inkSoft,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatTopScoreDate(entry.dateKey)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: font.serif,
+                      fontWeight: weight.bold,
+                      fontVariantNumeric: "tabular-nums",
+                      color: color.brown,
+                      minWidth: 32,
+                      textAlign: "right",
+                    }}
+                  >
+                    {entry.score}
+                  </span>
+                </li>
+              );
+            })
+          )}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Render a YYYY-MM-DD as dd/MM/yyyy (project default). */
+function formatTopScoreDate(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number) as [number, number, number];
-  const dt = new Date(y, m - 1, d);
-  const weekday = dt.toLocaleString(undefined, { weekday: "short" });
-  const month = dt.toLocaleString(undefined, { month: "short" });
-  return `${weekday} · ${month} ${d}`;
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
 }
 
 interface FlashToastProps {
