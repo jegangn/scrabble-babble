@@ -3,21 +3,39 @@ import type { Difficulty } from "../../engine/ai/bot.js";
 import type { Variant } from "../../engine/types.js";
 import type { Opponent } from "../../store/gameStore.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playUiTap } from "../../audio/sounds.js";
-import { BackToHomeButton } from "../components/BackToHomeButton.js";
-import { ACCENT } from "../theme.js";
+import { BackPill } from "../components/BackPill.js";
+import { BoardOption } from "../components/BoardOption.js";
+import { Button } from "../components/Button.js";
+import { DifficultyCards } from "../components/DifficultyCards.js";
+import { FooterMark } from "../components/FooterMark.js";
+import { NameInput } from "../components/NameInput.js";
+import { SectionLabel } from "../components/SectionLabel.js";
+import { Segmented } from "../components/Segmented.js";
+import { Surface } from "../components/Surface.js";
+import { Tagline } from "../components/Tagline.js";
+import { tokens } from "../tokens.js";
 
+/**
+ * New Game screen — full rebuild per the design handoff.
+ *
+ * Two-column iPad-landscape layout:
+ *   Left  — header, Players (avatar name inputs), Opponent (segmented),
+ *           Difficulty (5-card star picker, conditional on Computer)
+ *   Right — Board (3 cards with mini-thumbnails), Start anchored bottom
+ *
+ * Falls back to a single-column stack at narrow widths (≤ 720 px) so
+ * the phone-portrait path doesn't run off the side. The `auto-fit`
+ * grid track keeps the breakpoint logic in CSS — no JS resize work.
+ */
 export function NewGameScreen(): JSX.Element {
   const settings = useGameStore((s) => s.settings);
   const currentUser = useGameStore((s) => s.currentUser);
   const startNewGame = useGameStore((s) => s.startNewGame);
   const goHome = useGameStore((s) => s.goHome);
 
-  // Player 1 defaults to the device's "current user" (the name set on the
-  // home screen / first-launch prompt) so they don't have to retype it
-  // every new game. Falls back to the last-used Player 1 name and finally
-  // to "Player 1" if neither is set. The user can still override in the
-  // input before tapping Start.
+  // Player 1 defaults to the device "current user" so the device-owner
+  // doesn't retype their own name every new game. Falls back to the last
+  // saved Player 1 name, then to "Player 1".
   const [name1, setName1] = useState(currentUser ?? settings.playerNames[0]);
   const [name2, setName2] = useState(settings.playerNames[1]);
   const [opponentKind, setOpponentKind] = useState<Opponent["kind"]>(
@@ -28,7 +46,14 @@ export function NewGameScreen(): JSX.Element {
   );
   const [variant, setVariant] = useState<Variant>(settings.variant);
 
-  const onStart = () => {
+  // Start gate: both names must have a non-whitespace trimmed value.
+  // Player 2 is auto-filled to "Computer" so it's never empty when AI;
+  // but we still validate the hot-seat case here.
+  const validName1 = name1.trim().length > 0;
+  const validName2 = opponentKind === "ai" || name2.trim().length > 0;
+  const canStart = validName1 && validName2;
+
+  const onStart = (): void => {
     const n1 = name1.trim() || "Player 1";
     const n2 = name2.trim() || "Player 2";
     const opponent: Opponent =
@@ -37,219 +62,134 @@ export function NewGameScreen(): JSX.Element {
   };
 
   return (
-    // NOTE: justify-start (not justify-center) + overflow-y-auto. When the
-    // Computer opponent is selected, the Difficulty fieldset replaces the
-    // Player 2 input and the form gets ~90 px taller — on 800 px viewports
-    // (Tab S8) that was clipping the Start button. Anchoring to the top
-    // and allowing scroll is robust on any landscape size.
-    <div
-      className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto"
-      style={{ position: "relative" }}
-    >
-      <BackToHomeButton onClick={goHome} />
-      <h2 style={{ fontSize: "1.8em", fontWeight: 700, color: ACCENT.primary, margin: 0 }}>
-        New game
-      </h2>
-      <div className="flex flex-col gap-3 w-full max-w-sm">
-        <label className="flex flex-col gap-1">
-          <span style={labelStyle}>Player 1</span>
-          <input
-            value={name1}
-            onChange={(e) => setName1(e.target.value)}
-            style={inputStyle}
-            autoFocus
-          />
-        </label>
+    <Surface padding={0}>
+      <BackPill onClick={goHome} />
 
-        <fieldset style={fieldsetStyle}>
-          <legend style={labelStyle}>Opponent</legend>
-          <div className="flex flex-col gap-2 mt-1">
-            <RadioRow
-              name="opponent"
-              value="human"
-              checked={opponentKind === "human"}
-              onChange={() => setOpponentKind("human")}
-              label="Hot-seat (pass the iPad)"
-            />
-            <RadioRow
-              name="opponent"
-              value="ai"
-              checked={opponentKind === "ai"}
-              onChange={() => setOpponentKind("ai")}
-              label="Computer"
-            />
-          </div>
-        </fieldset>
+      <div
+        style={{
+          flex: 1,
+          display: "grid",
+          // 1fr 1fr on iPad; collapses to a single column at narrow
+          // widths so the form remains usable on phones.
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: tokens.space.x12,
+          padding: `${tokens.space.x16}px ${tokens.space.x12}px ${tokens.space.x8}px`,
+          alignContent: "start",
+          maxWidth: 1240,
+          margin: "0 auto",
+          width: "100%",
+        }}
+      >
+        {/* Left column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x8 }}>
+          <header>
+            <Tagline>Start a game</Tagline>
+            <h1
+              style={{
+                fontFamily: tokens.font.serif,
+                fontWeight: tokens.weight.heavy,
+                fontSize: tokens.size.h1,
+                margin: `${tokens.space.x2}px 0 0`,
+                letterSpacing: "-0.02em",
+                color: tokens.color.brown,
+              }}
+            >
+              New game
+            </h1>
+          </header>
 
-        <fieldset style={fieldsetStyle}>
-          <legend style={labelStyle}>Board</legend>
-          <div className="flex flex-col gap-2 mt-1">
-            <RadioRow
-              name="variant"
-              value="classic"
-              checked={variant === "classic"}
-              onChange={() => setVariant("classic")}
-              label="Classic — 15×15"
-            />
-            <RadioRow
-              name="variant"
-              value="random"
-              checked={variant === "random"}
-              onChange={() => setVariant("random")}
-              label="Random — 15×15 shuffled premiums"
-            />
-            <RadioRow
-              name="variant"
-              value="mini"
-              checked={variant === "mini"}
-              onChange={() => setVariant("mini")}
-              label="Mini — 11×11, shorter game"
-            />
-          </div>
-        </fieldset>
-
-        {opponentKind === "human" ? (
-          <label className="flex flex-col gap-1">
-            <span style={labelStyle}>Player 2</span>
-            <input
-              value={name2}
-              onChange={(e) => setName2(e.target.value)}
-              style={inputStyle}
-            />
-          </label>
-        ) : (
-          <fieldset style={fieldsetStyle}>
-            <legend style={labelStyle}>Difficulty</legend>
-            <div className="flex flex-col gap-2 mt-1">
-              <RadioRow
-                name="difficulty"
-                value="friendly"
-                checked={difficulty === "friendly"}
-                onChange={() => setDifficulty("friendly")}
-                label="Friendly"
-              />
-              <RadioRow
-                name="difficulty"
-                value="easygoing"
-                checked={difficulty === "easygoing"}
-                onChange={() => setDifficulty("easygoing")}
-                label="Easygoing"
-              />
-              <RadioRow
-                name="difficulty"
-                value="steady"
-                checked={difficulty === "steady"}
-                onChange={() => setDifficulty("steady")}
-                label="Steady"
-              />
-              <RadioRow
-                name="difficulty"
-                value="sharp"
-                checked={difficulty === "sharp"}
-                onChange={() => setDifficulty("sharp")}
-                label="Sharp"
-              />
-              <RadioRow
-                name="difficulty"
-                value="master"
-                checked={difficulty === "master"}
-                onChange={() => setDifficulty("master")}
-                label="Master"
+          <section>
+            <SectionLabel>Players</SectionLabel>
+            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x3 }}>
+              <NameInput label="Player 1" value={name1} onChange={setName1} you />
+              <NameInput
+                label="Player 2"
+                value={opponentKind === "ai" ? "Computer" : name2}
+                onChange={setName2}
+                disabled={opponentKind === "ai"}
               />
             </div>
-          </fieldset>
-        )}
+          </section>
 
-        {/* Bottom "Back" button removed — the top-left ← Home pill is the
-            single canonical exit path now, consistent with every other
-            screen. Start gets the full width so it's harder to miss. */}
-        <div className="flex gap-3 mt-2">
-          <button
-            type="button"
-            onClick={() => {
-              playUiTap();
-              onStart();
-            }}
-            style={btnStyle("primary")}
-          >
-            Start
-          </button>
+          <section>
+            <SectionLabel>Opponent</SectionLabel>
+            <Segmented<Opponent["kind"]>
+              options={[
+                { value: "human", label: "Hot-seat" },
+                { value: "ai", label: "Computer" },
+              ]}
+              value={opponentKind}
+              onChange={setOpponentKind}
+            />
+          </section>
+
+          {opponentKind === "ai" && (
+            <section>
+              <SectionLabel>Difficulty</SectionLabel>
+              <DifficultyCards value={difficulty} onChange={setDifficulty} />
+            </section>
+          )}
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x6 }}>
+          <section>
+            <SectionLabel>Board</SectionLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: tokens.space.x3,
+              }}
+            >
+              <BoardOption
+                variant="classic"
+                label="Classic"
+                sub="15 × 15"
+                selected={variant === "classic"}
+                onSelect={() => setVariant("classic")}
+              />
+              <BoardOption
+                variant="random"
+                label="Random"
+                sub="15 × 15 shuffled"
+                selected={variant === "random"}
+                onSelect={() => setVariant("random")}
+              />
+              <BoardOption
+                variant="mini"
+                label="Mini"
+                sub="11 × 11"
+                selected={variant === "mini"}
+                onSelect={() => setVariant("mini")}
+              />
+            </div>
+          </section>
+
+          <section style={{ marginTop: "auto" }}>
+            <Button kind="primary" size="lg" full onClick={onStart} disabled={!canStart} muted>
+              Start game
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path
+                  d="M6 3l5 5-5 5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Button>
+          </section>
         </div>
       </div>
-    </div>
+
+      <footer
+        style={{
+          padding: `${tokens.space.x4}px ${tokens.space.x8}px ${tokens.space.x6}px`,
+        }}
+      >
+        <FooterMark />
+      </footer>
+    </Surface>
   );
-}
-
-interface RadioRowProps {
-  readonly name: string;
-  readonly value: string;
-  readonly checked: boolean;
-  readonly onChange: () => void;
-  readonly label: string;
-}
-
-function RadioRow({ name, value, checked, onChange, label }: RadioRowProps): JSX.Element {
-  return (
-    <label
-      className="flex items-center gap-3"
-      style={{
-        fontSize: "1em",
-        color: ACCENT.text,
-        // 40 keeps a generous tap target while shaving ~32 px across the 8
-        // radios shown when the AI flow is selected — the form fits a 800 px
-        // landscape viewport (Tab S8) without scrolling.
-        minHeight: 40,
-        cursor: "pointer",
-        touchAction: "manipulation",
-      }}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-        style={{ width: 22, height: 22, accentColor: ACCENT.primary }}
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: "0.9em",
-  color: ACCENT.text,
-  fontWeight: 600,
-};
-
-const inputStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  fontSize: "1.1em",
-  borderRadius: 8,
-  border: `2px solid ${ACCENT.primary}`,
-  background: "white",
-  color: ACCENT.text,
-  minHeight: 48,
-};
-
-const fieldsetStyle: React.CSSProperties = {
-  border: `1px solid ${ACCENT.primary}33`,
-  borderRadius: 8,
-  padding: "6px 12px 8px",
-  background: "rgba(255,255,255,0.4)",
-};
-
-function btnStyle(variant: "primary" | "secondary"): React.CSSProperties {
-  return {
-    flex: 1,
-    background: variant === "primary" ? ACCENT.primary : "white",
-    color: variant === "primary" ? "white" : ACCENT.text,
-    border: variant === "primary" ? "none" : `2px solid ${ACCENT.primary}`,
-    padding: "14px 20px",
-    fontSize: "1.1em",
-    fontWeight: 600,
-    borderRadius: 10,
-    minHeight: 56,
-    touchAction: "manipulation",
-  };
 }
