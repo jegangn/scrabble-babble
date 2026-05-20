@@ -19,20 +19,30 @@ let ctx: AudioContext | null = null;
 let muted = false;
 
 function getCtx(): AudioContext | null {
-  if (ctx) return ctx;
   if (muted) return null;
   if (typeof window === "undefined") return null;
-  try {
-    // Safari still ships the webkit-prefixed constructor on some builds.
-    type CtxCtor = typeof AudioContext;
-    const Ctor: CtxCtor | undefined =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: CtxCtor }).webkitAudioContext;
-    if (!Ctor) return null;
-    ctx = new Ctor();
-    return ctx;
-  } catch {
-    return null;
+  if (!ctx) {
+    try {
+      // Safari still ships the webkit-prefixed constructor on some builds.
+      type CtxCtor = typeof AudioContext;
+      const Ctor: CtxCtor | undefined =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: CtxCtor }).webkitAudioContext;
+      if (!Ctor) return null;
+      ctx = new Ctor();
+    } catch {
+      return null;
+    }
   }
+  // CRITICAL: AudioContext often starts (or becomes) "suspended" — iOS Safari
+  // does this by default; Chrome may do it after a tab is backgrounded. If
+  // we don't resume it, every play* call silently runs through a muted
+  // graph and the user hears nothing. Resume is a no-op when already
+  // running, so calling it on every getCtx() is cheap and bulletproof.
+  if (ctx.state === "suspended") {
+    void ctx.resume().catch(() => undefined);
+  }
+  return ctx;
 }
 
 /**
@@ -76,14 +86,38 @@ function tone(
 /**
  * Soft warm thud — a low sine wave with a quick decay. Plays when a tile is
  * successfully placed on a board cell (tap-to-place or drag-drop).
+ *
+ * Gain peaks bumped slightly (0.22 / 0.18 → 0.32 / 0.26) after release
+ * testing — at the original levels the click was inaudible on iPad with
+ * room noise even at moderate device volume. Still well below 0.5 so it
+ * won't startle.
  */
 export function playPlace(): void {
   const ac = getCtx();
   if (!ac) return;
-  // Two stacked sines (180 Hz + 80 Hz) approximate a wood-on-wood click
-  // without sounding like a generic synthesizer ping.
-  tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.22 });
-  tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.18 });
+  tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.32 });
+  tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.26 });
+}
+
+/**
+ * Soft reverse-thud — a brief upward sine sweep — when a tile is recalled
+ * from the board back to the rack. Distinct from the place sound (which is
+ * downward / heavier) so the user can tell place from recall by ear alone.
+ */
+export function playRecall(): void {
+  const ac = getCtx();
+  if (!ac) return;
+  // Quick frequency sweep from 220 Hz up to 360 Hz over 100 ms. Implemented
+  // as two short overlapping notes since `tone()` doesn't expose frequency
+  // automation — the ear hears it as a brief "thwip" rather than a thud.
+  tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.22 });
+  tone(ac, {
+    freq: 360,
+    type: "sine",
+    startOffset: 0.04,
+    duration: 0.08,
+    gainPeak: 0.2,
+  });
 }
 
 /**

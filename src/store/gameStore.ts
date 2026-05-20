@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { disposeBotClient } from "../ai-client/botClient.js";
-import { playError, playPlace, playSuccess } from "../audio/sounds.js";
+import { playError, playPlace, playRecall, playSuccess } from "../audio/sounds.js";
 import type { Difficulty } from "../engine/ai/bot.js";
 import { CLASSIC_BOARD } from "../engine/config/board.js";
 import { MINI_BOARD } from "../engine/config/mini-board.js";
@@ -347,7 +347,13 @@ export const useGameStore = create<StoreState>((set, get) => ({
     playSuccess();
   },
 
-  recallPending: () => set({ pending: [], pendingBlankAt: null, error: null }),
+  recallPending: () => {
+    // Only play the recall sound if there were tiles to recall. Calling
+    // recallPending on an already-empty pending list shouldn't make noise.
+    const hadPending = get().pending.length > 0;
+    set({ pending: [], pendingBlankAt: null, error: null });
+    if (hadPending) playRecall();
+  },
 
   shuffleRack: () => {
     const { rackOrder } = get();
@@ -471,12 +477,18 @@ export const useGameStore = create<StoreState>((set, get) => ({
 
   recallOne: (position) => {
     const { pending } = get();
+    // Only play if the position actually had a pending tile — keeps the
+    // sound tied to a real action (no silent no-op clicks).
+    const hadTile = pending.some(
+      (p) => p.position.row === position.row && p.position.col === position.col,
+    );
     set({
       pending: pending.filter(
         (p) => !(p.position.row === position.row && p.position.col === position.col),
       ),
       error: null,
     });
+    if (hadTile) playRecall();
   },
 
   setBlankLetter: (letter) => {
@@ -503,6 +515,9 @@ export const useGameStore = create<StoreState>((set, get) => ({
       ),
       pendingBlankAt: null,
     });
+    // Cancelling the blank picker yanks the just-placed tile back off the
+    // board → same audio cue as any other recall.
+    playRecall();
   },
 }));
 
