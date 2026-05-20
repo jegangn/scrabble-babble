@@ -126,35 +126,35 @@ export function NewGameScreen(): JSX.Element {
                 value="friendly"
                 checked={difficulty === "friendly"}
                 onChange={() => setDifficulty("friendly")}
-                label="Friendly — short words, very forgiving"
+                label="Friendly"
               />
               <RadioRow
                 name="difficulty"
                 value="easygoing"
                 checked={difficulty === "easygoing"}
                 onChange={() => setDifficulty("easygoing")}
-                label="Easygoing — mid-length words, no bingos"
+                label="Easygoing"
               />
               <RadioRow
                 name="difficulty"
                 value="steady"
                 checked={difficulty === "steady"}
                 onChange={() => setDifficulty("steady")}
-                label="Steady — full play, varies its picks"
+                label="Steady"
               />
               <RadioRow
                 name="difficulty"
                 value="sharp"
                 checked={difficulty === "sharp"}
                 onChange={() => setDifficulty("sharp")}
-                label="Sharp — defends, manages rack"
+                label="Sharp"
               />
               <RadioRow
                 name="difficulty"
                 value="master"
                 checked={difficulty === "master"}
                 onChange={() => setDifficulty("master")}
-                label="Master — relentlessly optimal"
+                label="Master"
               />
             </div>
           </fieldset>
