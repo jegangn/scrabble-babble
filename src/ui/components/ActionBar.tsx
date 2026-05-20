@@ -1,9 +1,11 @@
-import { playUiTap } from "../../audio/sounds.js";
-import { ACCENT } from "../theme.js";
+import { tokens } from "../tokens.js";
+import { Button } from "./Button.js";
 
 export interface ActionBarProps {
   readonly canSubmit: boolean;
   readonly hasPending: boolean;
+  /** Number of tiles placed but not yet submitted — shown on the Submit button. */
+  readonly placedCount: number;
   /** False when the bag is too small to swap (rules.minBagToSwap floor). */
   readonly canSwap: boolean;
   readonly onSubmit: () => void;
@@ -14,82 +16,77 @@ export interface ActionBarProps {
   readonly onResign: () => void;
 }
 
-interface ButtonProps {
-  readonly onClick: () => void;
-  readonly children: React.ReactNode;
-  readonly disabled?: boolean;
-  readonly variant?: "primary" | "secondary" | "danger";
-  /** Tall + bold prominent style. Used for Submit. */
-  readonly large?: boolean;
-}
-
-function Btn({
-  onClick,
-  children,
-  disabled,
-  variant = "secondary",
-  large = false,
-}: ButtonProps): JSX.Element {
-  const styles: Record<NonNullable<ButtonProps["variant"]>, React.CSSProperties> = {
-    primary: { background: ACCENT.primary, color: "white", border: "none" },
-    secondary: { background: "white", color: ACCENT.text, border: `2px solid ${ACCENT.primary}` },
-    danger: { background: ACCENT.danger, color: "white", border: "none" },
-  };
+/**
+ * Horizontal action row that sits below the rack in the in-game bottom
+ * strip. Layout per the handoff:
+ *
+ *   [Shuffle] [Swap] [Pass] [Resign]    [Recall*] [Submit · N]
+ *                                  ↑ flex spacer pushes Submit right
+ *
+ * Submit is the only primary button; Resign is destructive; Recall is a
+ * ghost button that only renders when there are pending placements.
+ * Shuffle / Swap / Pass / Submit all play their own action sounds via
+ * the click handlers in gameStore — the Button component is `muted`
+ * for those so the soft UI-tap doesn't double up on the action sound.
+ */
+export function ActionBar({
+  canSubmit,
+  hasPending,
+  placedCount,
+  canSwap,
+  onSubmit,
+  onRecall,
+  onShuffle,
+  onSwap,
+  onPass,
+  onResign,
+}: ActionBarProps): JSX.Element {
+  const { space, size, weight } = tokens;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-md font-semibold w-full"
+    <div
       style={{
-        ...styles[variant],
-        padding: large ? "16px 20px" : "10px 14px",
-        minHeight: large ? 64 : 44,
-        fontSize: large ? "1.3em" : "1em",
-        fontWeight: large ? 700 : 600,
-        opacity: disabled ? 0.4 : 1,
-        touchAction: "manipulation",
-        // letterSpacing on the large Submit gives it more visual weight.
-        letterSpacing: large ? "0.04em" : "normal",
-        // boxShadow for primary button only — implies "this is the action".
-        boxShadow:
-          large && variant === "primary" && !disabled
-            ? "0 3px 0 rgba(0,0,0,0.18)"
-            : "none",
+        display: "flex",
+        alignItems: "center",
+        gap: space.x3,
+        flexWrap: "wrap",
       }}
     >
-      {children}
-    </button>
-  );
-}
+      <Button kind="secondary" onClick={onShuffle} icon={<span>⇅</span>}>
+        Shuffle
+      </Button>
+      <Button kind="secondary" onClick={onSwap} disabled={!canSwap} icon={<span>⇌</span>}>
+        Swap
+      </Button>
+      <Button kind="secondary" onClick={onPass}>
+        Pass
+      </Button>
+      <Button kind="destructive" onClick={onResign}>
+        Resign
+      </Button>
 
-/**
- * Vertical action stack for the right column. The Submit button is the
- * primary affordance — full-width, taller, larger type — so it's never
- * lost in a wrap-row with the others. Secondary actions sit in a tight
- * 2-column grid below. Resign stays on its own row in danger style.
- */
-export function ActionBar(props: ActionBarProps): JSX.Element {
-  // Submit and Recall already trigger their own audio cues (success/error
-  // chime, recall sweep). The four secondary actions don't — they get the
-  // UI-tap tick so the user gets feedback that a press registered, but
-  // without competing with the heavier game-action sounds.
-  const withTick = (cb: () => void) => () => {
-    playUiTap();
-    cb();
-  };
-  return (
-    <div className="flex flex-col w-full" style={{ gap: 8 }}>
-      <Btn onClick={props.onSubmit} disabled={!props.canSubmit} variant="primary" large>
+      {/* Flex spacer pushes Recall + Submit to the right edge. */}
+      <div style={{ flex: 1, minWidth: space.x4 }} />
+
+      {hasPending && (
+        <Button kind="ghost" onClick={onRecall} icon={<span>↺</span>}>
+          Recall
+        </Button>
+      )}
+      <Button kind="primary" onClick={onSubmit} disabled={!canSubmit} muted>
         Submit
-      </Btn>
-      <div className="grid grid-cols-2" style={{ gap: 8 }}>
-        <Btn onClick={props.onRecall} disabled={!props.hasPending}>Recall</Btn>
-        <Btn onClick={withTick(props.onShuffle)}>Shuffle</Btn>
-        <Btn onClick={withTick(props.onSwap)} disabled={!props.canSwap}>Swap</Btn>
-        <Btn onClick={withTick(props.onPass)}>Pass</Btn>
-      </div>
-      <Btn onClick={withTick(props.onResign)} variant="danger">Resign</Btn>
+        {placedCount > 0 && (
+          <span
+            style={{
+              marginLeft: 8,
+              fontSize: size.caption,
+              fontWeight: weight.med,
+              opacity: 0.85,
+            }}
+          >
+            · {placedCount} tile{placedCount === 1 ? "" : "s"}
+          </span>
+        )}
+      </Button>
     </div>
   );
 }

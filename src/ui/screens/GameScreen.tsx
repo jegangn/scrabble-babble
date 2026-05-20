@@ -327,6 +327,7 @@ export function GameScreen(): JSX.Element | null {
         <ActionBar
           canSubmit={pending.length > 0}
           hasPending={pending.length > 0}
+          placedCount={pending.length}
           canSwap={canSwap}
           onSubmit={submitMove}
           onRecall={() => {

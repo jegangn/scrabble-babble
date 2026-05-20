@@ -1,7 +1,8 @@
 import { memo } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { BoardCell as BoardCellT, Position } from "../../engine/types.js";
-import { PREMIUM_COLORS, BOARD } from "../theme.js";
+import { tokens } from "../tokens.js";
+import { PREMIUM_COLORS } from "../theme.js";
 import { Tile } from "./Tile.js";
 
 export interface BoardCellProps {
@@ -47,9 +48,21 @@ function BoardCellInner({
       onClick={onTap ? () => onTap(position) : undefined}
       className="relative flex items-center justify-center"
       style={{
-        background: isOver && empty ? "#ffe18a" : premium.bg,
-        color: premium.fg,
-        border: `1px solid ${BOARD.cellBorder}`,
+        // Centre cell on an empty board is the brown star square; otherwise
+        // the premium colour (or cream-step for plain cells). A drop-target
+        // highlight tints the moss/success backdrop while the user is
+        // dragging a tile over.
+        background: isOver && empty
+          ? tokens.color.successBg
+          : isCenter && empty
+            ? tokens.color.brown
+            : premium.bg,
+        color: isCenter && empty ? tokens.color.cream : premium.fg,
+        // Border removed — Board uses a 3 px gap on a brown background to
+        // separate cells, per the handoff. A border on top of the gap
+        // would double up and look chunky.
+        border: "none",
+        borderRadius: 3,
         minWidth: 0,
         minHeight: 0,
         aspectRatio: "1",
@@ -59,12 +72,16 @@ function BoardCellInner({
         // (rendered by <Tile> in em units) inherit a size proportional to
         // the cell. Older-user eyesight friendly.
         fontSize: "min(3.2cqi, 1.6rem)",
+        fontFamily: tokens.font.sans,
+        fontWeight: tokens.weight.bold,
+        letterSpacing: ".02em",
       }}
     >
       {empty ? (
         isCenter ? (
-          // Star scales with the board container so it stays visible on any size.
-          <span style={{ color: BOARD.star, fontSize: "min(6cqi, 3rem)" }}>★</span>
+          // Cream ★ on the brown centre square — matches the brand tile-hero
+          // language: cream-on-brown is the inverted treatment.
+          <span style={{ color: tokens.color.cream, fontSize: "min(6cqi, 3rem)" }}>★</span>
         ) : (
           // Premium label uses em (≈ 0.7× cell font) — readable at any size.
           <span style={{ fontSize: "0.7em", fontWeight: 700 }}>
