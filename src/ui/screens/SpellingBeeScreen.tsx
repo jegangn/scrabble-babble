@@ -37,15 +37,21 @@ type Flash =
 const FLASH_DURATION_MS = 1200;
 
 // Hex geometry — tightened from the handoff's 360 px so the page fits
-// on iPad without scrolling. 280 px container + 78 px radius + 64 px
-// pill (matches the standard Scrabble rack tile size). With adjacent
-// positions 78 px apart and 64 px tiles, the visible gap between
-// neighbours is ~14 px — comfortable, no overlap, well above the
-// 44 px tap-min for a fingertip.
-const HEX_BOX = 280;
+// on iPad without scrolling. 78 px radius + 64 px pill (matches the
+// standard Scrabble rack tile size). With adjacent positions 78 px
+// apart and 64 px tiles, the visible gap between neighbours is ~14 px
+// — comfortable, no overlap, well above the 44 px tap-min.
+//
+// The CONTAINER is wider than the pill cluster (420 vs 220 px) so the
+// touchable area for slide gestures spans the same width as the
+// CurrentWord strip above. The pills stay centred at HEX_RADIUS from
+// the container's middle; the extra width is dead-touchable space the
+// finger can travel through. Height stays compact since the hex itself
+// is roughly square (220 × 220).
+const HEX_BOX_W = 420;
+const HEX_BOX_H = 280;
 const HEX_RADIUS = 78;
 const HEX_PILL = 64;
-const HEX_CENTRE = HEX_BOX / 2;
 
 /** Outer-position offsets — pointy-top hex, clockwise from 12 o'clock. */
 const HEX_OFFSETS = [
@@ -485,14 +491,14 @@ export function SpellingBeeScreen(): JSX.Element | null {
             tracks the finger correctly at any scale. */}
         <div
           className="bee-hex-scale-wrap"
-          style={{ width: HEX_BOX, height: HEX_BOX, flexShrink: 0 }}
+          style={{ width: HEX_BOX_W, height: HEX_BOX_H, flexShrink: 0 }}
         >
           <div
             ref={hexContainerRef}
             style={{
               position: "relative",
-              width: HEX_BOX,
-              height: HEX_BOX,
+              width: HEX_BOX_W,
+              height: HEX_BOX_H,
               touchAction: "none",
             }}
             aria-label="Letter hex"
@@ -521,8 +527,8 @@ export function SpellingBeeScreen(): JSX.Element | null {
             {/* Slide-trail polyline overlay */}
             {trailPoints.length >= 2 && (
               <svg
-                width={HEX_BOX}
-                height={HEX_BOX}
+                width={HEX_BOX_W}
+                height={HEX_BOX_H}
                 aria-hidden
                 style={{
                   position: "absolute",
