@@ -11,12 +11,32 @@ export interface CurrentWordProps {
   /** Outer strip height in px. Defaults to 64. Both empty + populated
       states use this so the layout doesn't jump on first keystroke. */
   readonly stripHeight?: number;
+  /**
+   * The strip's effective max inline width in px. Used to auto-shrink
+   * tiles so the longest possible word (15 letters in Tumbler / Bee)
+   * fits on a single line instead of wrapping. Defaults to 480 — matches
+   * Tumbler's wrapper. Pass the parent's actual `maxWidth` so the math
+   * stays accurate if the wrapper changes.
+   */
+  readonly availableWidth?: number;
+  /**
+   * Smallest the tile is allowed to shrink to when fitting many letters.
+   * Defaults to 24 — letter still ~14 px (0.55 × 24), readable on iPad.
+   */
+  readonly minTileSize?: number;
 }
+
+const GAP = 6;
+const STRIP_HORIZONTAL_PADDING = 24; // space.x3 (12px) × 2 sides
 
 /**
  * Display strip for the word being composed in Tumbler and Spelling Bee.
  * Empty state is a dashed rounded panel with a hint; populated state
  * lays out cream tiles in a row with a 6 px gap.
+ *
+ * Tiles auto-shrink (down to `minTileSize`) so a 15-letter word stays
+ * on a single line — `flex-wrap: nowrap` enforces this and the size
+ * calculation guarantees we never overflow horizontally.
  *
  * Both states share the same `stripHeight` so the column doesn't jump
  * when the user types the first letter.
@@ -26,6 +46,8 @@ export function CurrentWord({
   hint = "Tap rack tiles to build a word",
   tileSize = 56,
   stripHeight = 64,
+  availableWidth = 480,
+  minTileSize = 24,
 }: CurrentWordProps): JSX.Element {
   const { color, radius, space, size, shadow } = tokens;
   const letters = word.split("");
@@ -49,11 +71,21 @@ export function CurrentWord({
     );
   }
 
+  // Fit-to-strip math — for N tiles with GAP between them and the strip's
+  // horizontal padding, the largest tile size that doesn't overflow is:
+  //   floor((availableWidth − padding − GAP × (N − 1)) / N)
+  // Cap by the caller's requested tileSize so short words don't suddenly
+  // render huge tiles; floor by minTileSize so a 15-letter word stays
+  // legible without wrapping.
+  const inner = availableWidth - STRIP_HORIZONTAL_PADDING;
+  const fittedSize = Math.floor((inner - GAP * (letters.length - 1)) / letters.length);
+  const effectiveSize = Math.max(minTileSize, Math.min(tileSize, fittedSize));
+
   return (
     <div
       style={{
         display: "flex",
-        gap: 6,
+        gap: GAP,
         justifyContent: "center",
         padding: `0 ${space.x3}px`,
         background: color.paper,
@@ -62,11 +94,12 @@ export function CurrentWord({
         boxShadow: shadow.card,
         height: stripHeight,
         alignItems: "center",
-        flexWrap: "wrap",
+        flexWrap: "nowrap",
+        overflow: "hidden",
       }}
     >
       {letters.map((ch, i) => (
-        <Tile key={i} letter={ch} size={tileSize} variant="cream" />
+        <Tile key={i} letter={ch} size={effectiveSize} variant="cream" />
       ))}
     </div>
   );

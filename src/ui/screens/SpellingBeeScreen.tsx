@@ -461,7 +461,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
             flash fires (submit), so the strip beneath shows its hint and
             the overlay covers plain text only. */}
         <div style={{ position: "relative", width: "100%", maxWidth: 420 }}>
-          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={32} stripHeight={52} />
+          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={32} stripHeight={52} availableWidth={420} />
           {flash && (
             <div
               style={{

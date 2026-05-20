@@ -245,26 +245,6 @@ export function TumblerScreen(): JSX.Element | null {
         <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
       )}
 
-      {/* Restart — absolute top-right (mirrors BackPill at top-left) so
-          its appearance/disappearance doesn't shift the centre column.
-          Hidden pre-game; only visible once the timer has started. */}
-      {started && (
-        <div style={{ position: "absolute", top: space.x4, right: space.x4, zIndex: 20 }}>
-          <Button
-            kind="ghost"
-            size="sm"
-            onClick={() => {
-              playUiTap();
-              restartGame();
-            }}
-            muted
-            ariaLabel="Restart round"
-          >
-            ↻ Restart
-          </Button>
-        </div>
-      )}
-
       <div
         // Pinned to viewport — page itself doesn't scroll. Only the
         // bottom "Top scores / Found this round" card has overflow-y
@@ -301,11 +281,30 @@ export function TumblerScreen(): JSX.Element | null {
           </h1>
         </header>
 
-        {/* Timer + score, side-by-side. Restart lives top-right (above)
-            so this row never reflows once the round starts. */}
+        {/* Timer + score + Restart, side-by-side. Each BigNumber gets a
+            fixed pixel width so the timer's box never breathes as the
+            seconds tick down — tabular-nums alone isn't enough because
+            a digit dropping from "60.0s" to "8.4s" still shrinks the
+            box unless its outer width is explicit. Restart is always
+            mounted; visibility: hidden before the round starts keeps
+            the row's layout identical pre- and mid-round. */}
         <div style={{ display: "flex", gap: space.x3, alignItems: "center", justifyContent: "center" }}>
-          <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} compact />
-          <BigNumber value={score} label="Score" tone="brown" compact />
+          <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} compact width={112} />
+          <BigNumber value={score} label="Score" tone="brown" compact width={112} />
+          <div style={{ visibility: started ? "visible" : "hidden" }}>
+            <Button
+              kind="ghost"
+              size="sm"
+              onClick={() => {
+                playUiTap();
+                restartGame();
+              }}
+              muted
+              ariaLabel="Restart round"
+            >
+              ↻ Restart
+            </Button>
+          </div>
         </div>
 
         {/* CurrentWord + Flash overlay — the flash toast renders
@@ -319,6 +318,7 @@ export function TumblerScreen(): JSX.Element | null {
             hint={started ? "Tap a letter to extend the word" : "Tap a letter to start"}
             tileSize={36}
             stripHeight={56}
+            availableWidth={480}
           />
           {flash && (
             <div

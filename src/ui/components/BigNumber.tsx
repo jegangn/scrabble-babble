@@ -12,6 +12,11 @@ export interface BigNumberProps {
   /** Compact variant — smaller padding + h3 number. Used when screen
       real estate is tight (Tumbler header). */
   readonly compact?: boolean;
+  /** Fixed pixel width — pins the outer box so the readout's value
+      changing (e.g. a ticking timer dropping a digit) doesn't reflow
+      the row. Tabular-nums handles digit-width parity inside, but the
+      box itself only stays still if width is explicit. */
+  readonly width?: number;
 }
 
 /**
@@ -21,7 +26,7 @@ export interface BigNumberProps {
  * many seconds are left. `tabular-nums` keeps the digit columns aligned
  * as the timer ticks down.
  */
-export function BigNumber({ value, label, tone = "ink", compact = false }: BigNumberProps): JSX.Element {
+export function BigNumber({ value, label, tone = "ink", compact = false, width }: BigNumberProps): JSX.Element {
   const { color, radius, space, font, size, weight, shadow } = tokens;
   const palette =
     tone === "brown"
@@ -43,7 +48,9 @@ export function BigNumber({ value, label, tone = "ink", compact = false }: BigNu
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        minWidth: compact ? 96 : 140,
+        ...(width !== undefined
+          ? { width }
+          : { minWidth: compact ? 96 : 140 }),
         boxShadow: tone === "ink" ? shadow.card : "none",
       }}
     >
