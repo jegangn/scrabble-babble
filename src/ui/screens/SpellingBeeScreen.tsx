@@ -37,12 +37,14 @@ type Flash =
 const FLASH_DURATION_MS = 1200;
 
 // Hex geometry — tightened from the handoff's 360 px so the page fits
-// on iPad without scrolling. 280 px container + 78 px radius + 86 px
-// pill keeps the touch target comfortable (well above the 44 px tap min)
-// while leaving room for the score header + found-list below.
+// on iPad without scrolling. 280 px container + 78 px radius + 64 px
+// pill (matches the standard Scrabble rack tile size). With adjacent
+// positions 78 px apart and 64 px tiles, the visible gap between
+// neighbours is ~14 px — comfortable, no overlap, well above the
+// 44 px tap-min for a fingertip.
 const HEX_BOX = 280;
 const HEX_RADIUS = 78;
-const HEX_PILL = 86;
+const HEX_PILL = 64;
 const HEX_CENTRE = HEX_BOX / 2;
 
 /** Outer-position offsets — pointy-top hex, clockwise from 12 o'clock. */
@@ -324,13 +326,13 @@ export function SpellingBeeScreen(): JSX.Element | null {
     if (!letter) return;
     if (dragLetterRef.current === letter) return; // same pill, no-op
     dragLetterRef.current = letter;
-    let appended = false;
-    setCurrentWord((cw) => {
-      if (cw.length >= 15) return cw;
-      appended = true;
-      return cw + letter;
-    });
-    if (appended) playPlace();
+    // Fire the place sound unconditionally per new pill — the
+    // dragLetterRef gate above already throttles to one sound per
+    // distinct pill, and the 15-char cap is an edge case the user
+    // shouldn't notice in normal play. (The closure-flag pattern
+    // we used before was brittle in production builds.)
+    setCurrentWord((cw) => (cw.length >= 15 ? cw : cw + letter));
+    playPlace();
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>): void => {
