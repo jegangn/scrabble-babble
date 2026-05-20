@@ -144,25 +144,33 @@ export function playSuccess(): void {
 }
 
 /**
- * Soft descending 2-tone buzz — plays on an invalid / rejected submission.
- * Sawtooth gives it just enough harmonic edge to read as "wrong" without
- * being abrasive. Two short notes are softer than one long honk.
+ * Gentle "that wasn't right" cue — a descending minor third (G4 → E♭4)
+ * on triangle waves. Soft attacks (~15 ms) keep the onset from punching;
+ * triangle waves have only odd harmonics and no edge, so the result reads
+ * as a quiet flute-ish "uh-uh" rather than a buzz.
+ *
+ * Earlier versions used sawtooth waves which gave the error a sharp,
+ * abrasive timbre — fine for a desktop alarm, too harsh for a calm
+ * iPad word-game. The minor-third descent still telegraphs "no" musically
+ * without setting off the user.
  */
 export function playError(): void {
   const ac = getCtx();
   if (!ac) return;
   tone(ac, {
-    freq: 330,
-    type: "sawtooth",
-    duration: 0.1,
-    gainPeak: 0.12,
+    freq: 392, // G4
+    type: "triangle",
+    attack: 0.015,
+    duration: 0.16,
+    gainPeak: 0.18,
   });
   tone(ac, {
-    freq: 210,
-    type: "sawtooth",
-    startOffset: 0.08,
-    duration: 0.16,
-    gainPeak: 0.14,
+    freq: 311, // E♭4 — a minor third below G4
+    type: "triangle",
+    startOffset: 0.11,
+    attack: 0.015,
+    duration: 0.26,
+    gainPeak: 0.2,
   });
 }
 
