@@ -16,16 +16,11 @@ import { Tagline } from "../components/Tagline.js";
 import { tokens } from "../tokens.js";
 
 /**
- * New Game screen — full rebuild per the design handoff.
- *
- * Two-column iPad-landscape layout:
- *   Left  — header, Players (avatar name inputs), Opponent (segmented),
- *           Difficulty (5-card star picker, conditional on Computer)
- *   Right — Board (3 cards with mini-thumbnails), Start anchored bottom
- *
- * Falls back to a single-column stack at narrow widths (≤ 720 px) so
- * the phone-portrait path doesn't run off the side. The `auto-fit`
- * grid track keeps the breakpoint logic in CSS — no JS resize work.
+ * New Game screen — single-column stacked layout to match the rhythm
+ * of the other solo screens (Tumbler, Spelling Bee). Sections cascade
+ * top-to-bottom: header → Players → Opponent → Difficulty (when
+ * Computer is selected) → Board → Start. Max-width matches the solo
+ * screens so the form column stays comfortable on iPad and phones.
  */
 export function NewGameScreen(): JSX.Element {
   const settings = useGameStore((s) => s.settings);
@@ -68,119 +63,110 @@ export function NewGameScreen(): JSX.Element {
       <div
         style={{
           flex: 1,
-          display: "grid",
-          // 1fr 1fr on iPad; collapses to a single column at narrow
-          // widths so the form remains usable on phones.
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: tokens.space.x12,
-          padding: `${tokens.space.x16 + 16}px ${tokens.space.x12}px ${tokens.space.x8}px`,
-          alignContent: "start",
-          maxWidth: 1240,
+          display: "flex",
+          flexDirection: "column",
+          gap: tokens.space.x6,
+          padding: `${tokens.space.x16 + 16}px ${tokens.space.x6}px ${tokens.space.x8}px`,
+          maxWidth: 720,
           margin: "0 auto",
           width: "100%",
         }}
       >
-        {/* Left column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x8 }}>
-          <header>
-            <Tagline>Start a game</Tagline>
-            <h1
-              style={{
-                fontFamily: tokens.font.serif,
-                fontWeight: tokens.weight.heavy,
-                fontSize: tokens.size.h1,
-                margin: `${tokens.space.x2}px 0 0`,
-                letterSpacing: "-0.02em",
-                color: tokens.color.brown,
-              }}
-            >
-              New game
-            </h1>
-          </header>
+        <header>
+          <Tagline>Start a game</Tagline>
+          <h1
+            style={{
+              fontFamily: tokens.font.serif,
+              fontWeight: tokens.weight.heavy,
+              fontSize: tokens.size.h1,
+              margin: `${tokens.space.x2}px 0 0`,
+              letterSpacing: "-0.02em",
+              color: tokens.color.brown,
+            }}
+          >
+            New game
+          </h1>
+        </header>
 
-          <section>
-            <SectionLabel>Players</SectionLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x3 }}>
-              <NameInput label="Player 1" value={name1} onChange={setName1} you />
-              <NameInput
-                label="Player 2"
-                value={opponentKind === "ai" ? "Computer" : name2}
-                onChange={setName2}
-                disabled={opponentKind === "ai"}
-              />
-            </div>
-          </section>
-
-          <section>
-            <SectionLabel>Opponent</SectionLabel>
-            <Segmented<Opponent["kind"]>
-              options={[
-                { value: "human", label: "Hot-seat" },
-                { value: "ai", label: "Computer" },
-              ]}
-              value={opponentKind}
-              onChange={setOpponentKind}
+        <section>
+          <SectionLabel>Players</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x3 }}>
+            <NameInput label="Player 1" value={name1} onChange={setName1} you />
+            <NameInput
+              label="Player 2"
+              value={opponentKind === "ai" ? "Computer" : name2}
+              onChange={setName2}
+              disabled={opponentKind === "ai"}
             />
-          </section>
+          </div>
+        </section>
 
-          {opponentKind === "ai" && (
-            <section>
-              <SectionLabel>Difficulty</SectionLabel>
-              <DifficultyCards value={difficulty} onChange={setDifficulty} />
-            </section>
-          )}
-        </div>
+        <section>
+          <SectionLabel>Opponent</SectionLabel>
+          <Segmented<Opponent["kind"]>
+            options={[
+              { value: "human", label: "Hot-seat" },
+              { value: "ai", label: "Computer" },
+            ]}
+            value={opponentKind}
+            onChange={setOpponentKind}
+          />
+        </section>
 
-        {/* Right column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x6 }}>
+        {opponentKind === "ai" && (
           <section>
-            <SectionLabel>Board</SectionLabel>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gap: tokens.space.x3,
-              }}
-            >
-              <BoardOption
-                variant="classic"
-                label="Classic"
-                sub="15 × 15"
-                selected={variant === "classic"}
-                onSelect={() => setVariant("classic")}
-              />
-              <BoardOption
-                variant="random"
-                label="Random"
-                sub="15 × 15 shuffled"
-                selected={variant === "random"}
-                onSelect={() => setVariant("random")}
-              />
-              <BoardOption
-                variant="mini"
-                label="Mini"
-                sub="11 × 11"
-                selected={variant === "mini"}
-                onSelect={() => setVariant("mini")}
-              />
-            </div>
+            <SectionLabel>Difficulty</SectionLabel>
+            <DifficultyCards value={difficulty} onChange={setDifficulty} />
           </section>
+        )}
 
-          <section style={{ marginTop: "auto" }}>
-            <Button kind="primary" size="lg" full onClick={onStart} disabled={!canStart}>
-              Start game
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
-                <path
-                  d="M6 3l5 5-5 5"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </Button>
-          </section>
-        </div>
+        <section>
+          <SectionLabel>Board</SectionLabel>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: tokens.space.x3,
+            }}
+          >
+            <BoardOption
+              variant="classic"
+              label="Classic"
+              sub="15 × 15"
+              selected={variant === "classic"}
+              onSelect={() => setVariant("classic")}
+            />
+            <BoardOption
+              variant="random"
+              label="Random"
+              sub="15 × 15 shuffled"
+              selected={variant === "random"}
+              onSelect={() => setVariant("random")}
+            />
+            <BoardOption
+              variant="mini"
+              label="Mini"
+              sub="11 × 11"
+              selected={variant === "mini"}
+              onSelect={() => setVariant("mini")}
+            />
+          </div>
+        </section>
+
+        <section>
+          <Button kind="primary" size="lg" full onClick={onStart} disabled={!canStart}>
+            Start game
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path
+                d="M6 3l5 5-5 5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Button>
+        </section>
       </div>
 
       <footer

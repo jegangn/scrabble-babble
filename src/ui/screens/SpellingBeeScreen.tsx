@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  enumerateBeeWords,
   enumerateSevenLetterPangrams,
   generatePuzzle,
   scoreBeeWord,
@@ -87,7 +86,6 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const [topScoresExpanded, setTopScoresExpanded] = useState(false);
   const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [totalWords, setTotalWords] = useState<number | null>(null);
   const [puzzleError, setPuzzleError] = useState<string | null>(null);
 
   // Drag-to-spell refs. Refs (not state) because they fire on every
@@ -139,16 +137,6 @@ export function SpellingBeeScreen(): JSX.Element | null {
       setTopScores(top);
       setPersonalBest(best);
     })();
-    // Lazy total-word enumeration after first paint (heavier walk).
-    const handle = window.setTimeout(() => {
-      try {
-        const words = enumerateBeeWords(p, dictionary);
-        setTotalWords(words.length);
-      } catch (e) {
-        console.error("Bee enumeration failed", e);
-      }
-    }, 50);
-    return () => window.clearTimeout(handle);
   }, [dictionary, dateKey, currentUser]);
 
   // Auto-clear the flash toast.
@@ -445,29 +433,6 @@ export function SpellingBeeScreen(): JSX.Element | null {
           >
             Spelling Bee
           </h1>
-          <span
-            style={{
-              fontFamily: font.serif,
-              fontWeight: weight.bold,
-              fontSize: size.body,
-              color: color.brown,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {score}
-            {totalWords !== null && (
-              <span
-                style={{
-                  fontSize: size.caption,
-                  color: color.inkSoft,
-                  marginLeft: 6,
-                  fontWeight: weight.med,
-                }}
-              >
-                · {foundWords.length}/{totalWords}
-              </span>
-            )}
-          </span>
         </header>
 
         {/* CurrentWord + Flash overlay — the flash toast renders
