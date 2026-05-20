@@ -14,6 +14,7 @@ import {
   setBeeProgress,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
+import { playError, playSuccess } from "../../audio/sounds.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
 
@@ -155,6 +156,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
     setCurrentWord("");
     if (foundWords.includes(w)) {
       setFlash({ kind: "duplicate", word: w });
+      playError();
       return;
     }
     const validation = validateBeeWord(puzzle, w, dictionary);
@@ -168,6 +170,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
               ? "Letters not in puzzle"
               : "Not a word";
       setFlash({ kind: "invalid", word: w, reason });
+      playError();
       return;
     }
     const points = scoreBeeWord(w, puzzle);
@@ -176,6 +179,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
     setFlash({ kind: "added", word: w, points });
     // Persist explicitly so we only write on user action, not on hydration.
     void setBeeProgress({ dateKey, found: next });
+    playSuccess();
   };
 
   const shuffleOuter = () => {

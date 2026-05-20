@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { disposeBotClient } from "../ai-client/botClient.js";
+import { playError, playPlace, playSuccess } from "../audio/sounds.js";
 import type { Difficulty } from "../engine/ai/bot.js";
 import { CLASSIC_BOARD } from "../engine/config/board.js";
 import { MINI_BOARD } from "../engine/config/mini-board.js";
@@ -316,16 +317,19 @@ export const useGameStore = create<StoreState>((set, get) => ({
     if (!game || !dictionary) return;
     if (pending.length === 0) {
       set({ error: "Place tiles before submitting." });
+      playError();
       return;
     }
     const move = pendingToMove(pending);
     const result = applyMove(game, move, dictionary);
     if (!result.ok) {
       set({ error: formatError(result.error) });
+      playError();
       return;
     }
     void saveInProgress(result.state);
     applyPostMoveTransition(result.state, get, set);
+    playSuccess();
   },
 
   recallPending: () => set({ pending: [], pendingBlankAt: null, error: null }),
@@ -444,6 +448,10 @@ export const useGameStore = create<StoreState>((set, get) => ({
       pendingBlankAt: needsLetter ? position : null,
       error: null,
     });
+    // Soft "clack" feedback when the tile lands on the cell. Fired AFTER
+    // the state set so we never play a sound for a placement that gets
+    // rejected by the guards above.
+    playPlace();
   },
 
   recallOne: (position) => {

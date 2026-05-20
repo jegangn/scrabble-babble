@@ -9,6 +9,7 @@ import {
 import { createPrng } from "../../engine/prng.js";
 import type { Letter } from "../../engine/types.js";
 import { useGameStore } from "../../store/gameStore.js";
+import { playError, playSuccess } from "../../audio/sounds.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
 
@@ -108,6 +109,7 @@ export function TumblerScreen(): JSX.Element | null {
 
     if (foundWords.includes(raw)) {
       setFlash({ kind: "duplicate", word: raw });
+      playError();
       return;
     }
     const validation = validateTumblerWord(rack, raw, dictionary);
@@ -119,12 +121,14 @@ export function TumblerScreen(): JSX.Element | null {
             ? "Not a word"
             : "Not in rack";
       setFlash({ kind: "invalid", word: raw, reason });
+      playError();
       return;
     }
     const points = scoreTumblerWord(raw);
     setFoundWords([raw, ...foundWords]);
     setScore(score + points);
     setFlash({ kind: "added", word: raw, points });
+    playSuccess();
   };
 
   // Start the timer on first keystroke. Once running, startedRef mirrors `started`.
