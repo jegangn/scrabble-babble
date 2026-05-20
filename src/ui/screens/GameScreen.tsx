@@ -27,7 +27,6 @@ import { Tagline } from "../components/Tagline.js";
 import { ThinkingOverlay } from "../components/ThinkingOverlay.js";
 import { Tile } from "../components/Tile.js";
 import { TilesLeft } from "../components/TilesLeft.js";
-import { Toast } from "../components/Toast.js";
 import { UserChip } from "../components/UserChip.js";
 
 /**
@@ -453,11 +452,15 @@ export function GameScreen(): JSX.Element | null {
             width: 360,
             display: "flex",
             flexDirection: "column",
-            gap: space.x3,
+            gap: space.x1,
             height: "100%",
             minHeight: 0,
-            paddingTop: space.x16,
-            overflowY: "auto",
+            paddingTop: space.x10,
+            // Pinned — never scrolls. The contextual status strip
+            // (last-move / pending / error) collapses three would-be
+            // strips into one slot so this stays true even when a
+            // submission is rejected.
+            overflowY: "hidden",
           }}
         >
           <div
@@ -483,101 +486,129 @@ export function GameScreen(): JSX.Element | null {
             ))}
           </div>
 
-          {lastMove && (
-            <div
-              style={{
-                padding: `${space.x3}px ${space.x4}px`,
-                background: color.paper,
-                border: `1.5px solid ${color.stroke}`,
-                borderRadius: radius.card,
-                boxShadow: shadow.card,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: size.micro + 1,
-                  color: color.inkSoft,
-                  letterSpacing: ".08em",
-                  textTransform: "uppercase",
-                  fontWeight: weight.med,
-                }}
-              >
-                Last · {lastMove.name}
-              </span>
-              <span
-                style={{
-                  fontSize: size.body,
-                  color: color.ink,
-                  fontFamily: font.serif,
-                  fontWeight: weight.bold,
-                }}
-              >
-                {lastMove.word} · +{lastMove.score}
-              </span>
-            </div>
-          )}
-
-          {pendingPreview && (
-            <div
-              style={{
-                padding: `${space.x3}px ${space.x4}px`,
-                background: color.successBg,
-                border: `1.5px solid ${color.success}`,
-                borderRadius: radius.card,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: size.micro + 1,
-                  color: color.success,
-                  letterSpacing: ".08em",
-                  textTransform: "uppercase",
-                  fontWeight: weight.med,
-                }}
-              >
-                Pending
-              </span>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                }}
-              >
-                <span
+          {/* Contextual status strip — single slot covering three states:
+              ERROR  (a placement was rejected) — red, shows the rejected
+                     word + the failure reason
+              PENDING (tiles laid, not yet submitted) — moss, shows the
+                     word being composed + its projected score
+              LAST   (most recent committed place-move) — paper, shows
+                     the opponent's last word + score
+              Priority error > pending > last so the sidebar stays a single
+              card tall and the right pane never has to scroll, even when
+              a submission fails while pending tiles are still on the board. */}
+          {(() => {
+            const labelStyle = {
+              fontSize: size.micro + 1,
+              letterSpacing: ".08em",
+              textTransform: "uppercase" as const,
+              fontWeight: weight.med,
+            };
+            const rowStyle = {
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: space.x3,
+            };
+            const wordStyle = {
+              fontSize: size.body,
+              color: color.ink,
+              fontFamily: font.serif,
+              fontWeight: weight.bold,
+              minWidth: 0,
+              overflow: "hidden" as const,
+              textOverflow: "ellipsis" as const,
+              whiteSpace: "nowrap" as const,
+            };
+            if (error) {
+              return (
+                <div
+                  role="alert"
                   style={{
-                    fontSize: size.bodyLg,
-                    color: color.ink,
-                    fontFamily: font.serif,
-                    fontWeight: weight.bold,
+                    padding: `${space.x2}px ${space.x4}px`,
+                    background: color.dangerBg,
+                    border: `1.5px solid ${color.danger}`,
+                    borderRadius: radius.card,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
                   }}
                 >
-                  {pendingPreview.word.toUpperCase()}
-                </span>
-                <span
+                  <span style={{ ...labelStyle, color: color.danger }}>Try again</span>
+                  <div style={rowStyle}>
+                    <span style={wordStyle}>
+                      {pendingPreview?.word.toUpperCase() ?? "—"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: size.caption,
+                        color: color.danger,
+                        fontWeight: weight.med,
+                        textAlign: "right",
+                      }}
+                    >
+                      {error}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            if (pendingPreview) {
+              return (
+                <div
                   style={{
-                    fontSize: size.body,
-                    color: pendingPreview.score === null ? color.inkSoft : color.success,
-                    fontWeight: weight.med,
+                    padding: `${space.x2}px ${space.x4}px`,
+                    background: color.successBg,
+                    border: `1.5px solid ${color.success}`,
+                    borderRadius: radius.card,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
                   }}
                 >
-                  {pendingPreview.score === null ? "Composing…" : `+${pendingPreview.score}`}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <Toast kind="error" title={error} />
-            </div>
-          )}
+                  <span style={{ ...labelStyle, color: color.success }}>Pending</span>
+                  <div style={rowStyle}>
+                    <span style={wordStyle}>{pendingPreview.word.toUpperCase()}</span>
+                    <span
+                      style={{
+                        fontSize: size.body,
+                        color: pendingPreview.score === null ? color.inkSoft : color.success,
+                        fontWeight: weight.med,
+                      }}
+                    >
+                      {pendingPreview.score === null ? "Composing…" : `+${pendingPreview.score}`}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            if (lastMove) {
+              return (
+                <div
+                  style={{
+                    padding: `${space.x2}px ${space.x4}px`,
+                    background: color.paper,
+                    border: `1.5px solid ${color.stroke}`,
+                    borderRadius: radius.card,
+                    boxShadow: shadow.card,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  <span style={{ ...labelStyle, color: color.inkSoft }}>
+                    Last · {lastMove.name}
+                  </span>
+                  <div style={rowStyle}>
+                    <span style={wordStyle}>{lastMove.word}</span>
+                    <span style={{ fontSize: size.body, color: color.brown, fontWeight: weight.med }}>
+                      +{lastMove.score}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {/* Rack — slots into the sidebar, wraps to two rows of 4 + 3
               tiles inside a 320 px column. Brown felt + inset shadow
