@@ -149,11 +149,11 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Thud",
       description: "Two-layer warm bass — the default",
       impl: (ac, m) => {
-        // Pulled down from 0.45/0.36 → 0.32/0.28 (-9.9 / -11.1 dB) as part
-        // of the hierarchy rebalance. Tile place is an input cue — it
-        // should be felt, not be the loudest sound in the app.
-        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.32 * m });
-        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.28 * m });
+        // 0.38 / 0.33 (-8.4 / -9.6 dB) — a ~1.5 dB bump on the prior
+        // 0.32/0.28 so the place cue actually carries on iPad speakers
+        // without crowding the outcome tier (success / error).
+        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.38 * m });
+        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.33 * m });
       },
     },
     {
