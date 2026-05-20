@@ -281,13 +281,13 @@ export function HomeScreen(): JSX.Element {
           />
           <MenuItem
             icon="↑"
-            label="Export current game"
+            label="Export data"
             disabled={!hasInProgress}
             onClick={() => {
               void onExport();
             }}
           />
-          <MenuItem icon="↓" label="Import game" onClick={() => fileInput.current?.click()} />
+          <MenuItem icon="↓" label="Import data" onClick={() => fileInput.current?.click()} />
         </nav>
 
         {/* Footer — small "S" brand mark + version label. */}
