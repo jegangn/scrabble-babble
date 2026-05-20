@@ -363,13 +363,21 @@ export function SpellingBeeScreen(): JSX.Element | null {
           dragLetterRef.current = null;
           // Reset the slide-trail. Any previous fade in progress is
           // cancelled so we don't visually mix a new trail with a fading
-          // old one.
+          // old one. Seed the trail with the touch-down point (container-
+          // relative) so the polyline can grow from the user's finger
+          // immediately once they start moving.
           if (trailFadeTimerRef.current !== null) {
             window.clearTimeout(trailFadeTimerRef.current);
             trailFadeTimerRef.current = null;
           }
           setTrailFading(false);
-          setTrailPoints([]);
+          const containerEl = hexContainerRef.current;
+          if (containerEl) {
+            const r = containerEl.getBoundingClientRect();
+            setTrailPoints([{ x: e.clientX - r.left, y: e.clientY - r.top }]);
+          } else {
+            setTrailPoints([]);
+          }
         }}
         onPointerMove={(e) => {
           if (!dragActiveRef.current) return;
@@ -390,36 +398,37 @@ export function SpellingBeeScreen(): JSX.Element | null {
               // Some browsers reject capture if the pointer isn't down — fine.
             }
           }
+          // Append the current finger position to the slide-trail, throttled
+          // so we don't push hundreds of near-duplicate points. ~4 px gap is
+          // dense enough for a smooth curve at any natural finger speed.
+          const containerEl = hexContainerRef.current;
+          if (containerEl) {
+            const r = containerEl.getBoundingClientRect();
+            const fx = e.clientX - r.left;
+            const fy = e.clientY - r.top;
+            setTrailPoints((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && Math.abs(last.x - fx) < 4 && Math.abs(last.y - fy) < 4) {
+                return prev;
+              }
+              return [...prev, { x: fx, y: fy }];
+            });
+          }
+          // Word-build logic: figure out which pill is under the finger and,
+          // if it's a NEW one, append its letter.
           const el = document.elementFromPoint(e.clientX, e.clientY);
           const pill = el?.closest("[data-bee-letter]") as HTMLElement | null;
           const letter = pill?.dataset.beeLetter as Letter | undefined;
           if (!letter) return;
           if (dragLetterRef.current === letter) return; // same pill, no-op
           dragLetterRef.current = letter;
-          // Append to whatever's in the input. Replacement-on-drag would
-          // be a different UX choice; appending keeps tap+drag composable
-          // (tap A, then drag B-C-D, gives "ABCD").
           let appended = false;
           setCurrentWord((cw) => {
             if (cw.length >= 15) return cw;
             appended = true;
             return cw + letter;
           });
-          if (!appended) return;
-          playPlace();
-          // Record the pill's centre as a new trail point. Container-
-          // relative coordinates so the SVG (also positioned inside the
-          // container) renders the line in the right place.
-          const containerEl = hexContainerRef.current;
-          // pill non-null is implied by `letter` having been read from it,
-          // but TS doesn't track that — narrow explicitly.
-          if (containerEl && pill) {
-            const pillRect = pill.getBoundingClientRect();
-            const containerRect = containerEl.getBoundingClientRect();
-            const px = pillRect.left + pillRect.width / 2 - containerRect.left;
-            const py = pillRect.top + pillRect.height / 2 - containerRect.top;
-            setTrailPoints((prev) => [...prev, { x: px, y: py }]);
-          }
+          if (appended) playPlace();
         }}
         onPointerUp={(e) => {
           dragActiveRef.current = false;

@@ -136,6 +136,31 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await shot(page, "07b-bee-typing", vpName);
     });
 
+    test("Spelling Bee slide trail visible during drag", async ({ page }) => {
+      await gotoHome(page);
+      await page.getByRole("button", { name: /spelling bee/i }).click();
+      const hex = page.getByLabel(/letter hex/i);
+      await expect(hex).toBeVisible({ timeout: 10_000 });
+      await page.waitForTimeout(400);
+
+      const box = await hex.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+
+      // Slow drag across the hex: press the upper-left area, slide
+      // through the centre, finish at the lower-right. The polyline
+      // overlay should be visibly drawn under the finger while we hold.
+      const start = { x: box.x + 70, y: box.y + 110 };
+      const end = { x: box.x + 240, y: box.y + 210 };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(start.x + 30, start.y + 20, { steps: 4 });
+      await page.mouse.move(end.x, end.y, { steps: 12 });
+      // Capture while the trail is visible (still holding pointer down).
+      await shot(page, "07c-bee-slide-trail", vpName);
+      await page.mouse.up();
+    });
+
     test("Resign confirm modal + GameEnd screen", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
