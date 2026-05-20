@@ -61,18 +61,18 @@ export function NewGameScreen(): JSX.Element {
 
       <div
         style={{
-          // Pinned to the viewport — page itself doesn't scroll. The
-          // inner sections were tightened so the entire form (header,
-          // Players, Opponent, Difficulty, Board, Start) fits inside one
-          // iPad-landscape screen. Tag stack: 100dvh + overflow: hidden
-          // on the outer + tighter gap/padding inside.
-          height: "100dvh",
-          maxHeight: "100dvh",
-          overflow: "hidden",
+          // Sized so the form (header → Players → Opponent → Difficulty
+          // → Board → Start) fits inside one iPad-landscape screen on
+          // its own — but no overflow:hidden / height-pin. iOS Safari
+          // refuses to bring up the keyboard when the focused input is
+          // inside a pinned overflow:hidden ancestor (because it can't
+          // scroll the input above the keyboard), so we let the page
+          // scroll naturally when the keyboard appears.
+          minHeight: "100dvh",
           display: "flex",
           flexDirection: "column",
-          gap: tokens.space.x4,
-          padding: `${tokens.space.x12}px ${tokens.space.x6}px ${tokens.space.x4}px`,
+          gap: tokens.space.x3,
+          padding: `${tokens.space.x10}px ${tokens.space.x6}px ${tokens.space.x4}px`,
           maxWidth: 720,
           margin: "0 auto",
           width: "100%",

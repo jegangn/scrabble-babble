@@ -1,3 +1,4 @@
+import { useId, useRef } from "react";
 import type { CSSProperties, ChangeEvent } from "react";
 import { tokens } from "../tokens.js";
 
@@ -21,10 +22,14 @@ export interface NameInputProps {
 /**
  * Card-styled name input — avatar circle (first letter of name) +
  * uppercase caption + inline text input. The whole row is the input;
- * tapping anywhere on the avatar / label focuses the text field below.
+ * tapping anywhere focuses the text field.
  *
- * The avatar updates live as the user types so the visual cue stays in
- * sync with the actual name. Falls back to "?" when the name is empty.
+ * iPad Safari quirk: implicit label↔input association (input wrapped
+ * by label) sometimes fails to bring up the on-screen keyboard when
+ * the tap lands on the label/avatar (not on the input itself). We use
+ * an EXPLICIT htmlFor/id association via useId() AND a useRef-driven
+ * pointerDown handler that calls .focus() inside the user gesture —
+ * both belt-and-braces fixes for the same quirk.
  */
 export function NameInput({
   label,
@@ -38,6 +43,8 @@ export function NameInput({
 }: NameInputProps): JSX.Element {
   const { color, radius, shadow, space, font, size, weight } = tokens;
   const initial = value.trim().charAt(0).toUpperCase() || "?";
+  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>): void => {
     // 16-char cap matches the validation rule in the spec.
@@ -46,6 +53,17 @@ export function NameInput({
 
   return (
     <label
+      htmlFor={inputId}
+      onPointerDown={(e) => {
+        if (disabled) return;
+        // If the tap didn't land on the input itself, focus it
+        // synchronously inside the user gesture so iOS Safari shows
+        // the keyboard. Don't preventDefault — let the native input
+        // tap path do its work when the tap is already on the input.
+        if (e.target !== inputRef.current) {
+          inputRef.current?.focus();
+        }
+      }}
       style={{
         display: "grid",
         gridTemplateColumns: "auto 1fr",
@@ -94,7 +112,10 @@ export function NameInput({
           {you && " · You"}
         </span>
         <input
+          id={inputId}
+          ref={inputRef}
           type="text"
+          inputMode="text"
           value={value}
           onChange={handleChange}
           disabled={disabled}
@@ -113,8 +134,13 @@ export function NameInput({
             fontSize: size.body,
             fontWeight: weight.med,
             color: color.ink,
-            marginTop: 2,
-            padding: 0,
+            // Vertical padding gives the input a larger tap target so
+            // a direct tap reliably lands on the input element itself
+            // (rather than the label text above it) — important on
+            // iPad Safari where implicit-label focus + keyboard is
+            // unreliable.
+            padding: "6px 0",
+            margin: 0,
             width: "100%",
             cursor: disabled ? "not-allowed" : "text",
           }}
