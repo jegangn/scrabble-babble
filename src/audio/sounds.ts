@@ -147,10 +147,13 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
     {
       id: "thud",
       label: "Thud",
-      description: "Two-layer warm bass — the original",
+      description: "Two-layer warm bass — the default",
       impl: (ac, m) => {
-        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.45 * m });
-        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.36 * m });
+        // Pulled down from 0.45/0.36 → 0.32/0.28 (-9.9 / -11.1 dB) as part
+        // of the hierarchy rebalance. Tile place is an input cue — it
+        // should be felt, not be the loudest sound in the app.
+        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.32 * m });
+        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.28 * m });
       },
     },
     {
@@ -238,8 +241,12 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
     {
       id: "arpeggio",
       label: "Arpeggio",
-      description: "C5 → E5 → G5 — the original",
+      description: "C5 → E5 → G5 — the default",
       impl: (ac, m) => {
+        // Lifted from 0.18 → 0.45 per note (-14.9 → -6.9 dB). Word success
+        // is the most consequential sound in the app — it's the reward
+        // for a valid play. Triangle waves are harmonically richer than
+        // sine, so 0.45 here feels slightly fuller than 0.45 on a sine.
         const notes = [523.25, 659.25, 783.99];
         notes.forEach((freq, i) =>
           tone(ac, {
@@ -247,7 +254,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
             type: "triangle",
             startOffset: i * 0.08,
             duration: 0.22,
-            gainPeak: 0.18 * m,
+            gainPeak: 0.45 * m,
           }),
         );
       },
@@ -293,14 +300,18 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
     {
       id: "minor",
       label: "Minor third",
-      description: "G4 → E♭4 — the original",
+      description: "G4 → E♭4 — the default",
       impl: (ac, m) => {
+        // Lifted from 0.18/0.20 → 0.32/0.36 (-9.9 / -8.9 dB). Word error
+        // shares the outcome tier with success — the warning needs to be
+        // heard. Kept slightly under success and the second note slightly
+        // louder than the first so the descending minor third still reads.
         tone(ac, {
           freq: 392,
           type: "triangle",
           attack: 0.015,
           duration: 0.16,
-          gainPeak: 0.18 * m,
+          gainPeak: 0.32 * m,
         });
         tone(ac, {
           freq: 311,
@@ -308,7 +319,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
           startOffset: 0.11,
           attack: 0.015,
           duration: 0.26,
-          gainPeak: 0.2 * m,
+          gainPeak: 0.36 * m,
         });
       },
     },
