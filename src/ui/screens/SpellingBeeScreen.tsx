@@ -18,6 +18,7 @@ import {
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
+import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
 
@@ -254,13 +255,11 @@ export function SpellingBeeScreen(): JSX.Element | null {
   return (
     <div
       className="flex h-full w-full flex-col items-center p-4"
-      style={{ background: ACCENT.surface, gap: 14 }}
+      style={{ background: ACCENT.surface, gap: 14, position: "relative" }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center w-full max-w-2xl">
-        <button type="button" onClick={goHome} style={btnStyle("ghost")}>
-          ← Home
-        </button>
+      <BackToHomeButton onClick={goHome} />
+      {/* Header — back-button moved to the shared top-left pill. */}
+      <div className="flex justify-center items-center w-full max-w-2xl" style={{ gap: 32 }}>
         <div style={{ fontSize: "0.95em", opacity: 0.7 }}>{dateKey}</div>
         <div
           style={{
@@ -536,15 +535,33 @@ export function SpellingBeeScreen(): JSX.Element | null {
                       background: isYou ? `${ACCENT.primary}22` : "transparent",
                       fontWeight: isYou ? 700 : 500,
                       fontSize: "0.95em",
+                      gap: 8,
                     }}
                   >
-                    <span style={{ display: "flex", gap: 8, overflow: "hidden" }}>
+                    <span style={{ display: "flex", gap: 8, overflow: "hidden", minWidth: 0, flex: 1 }}>
                       <span style={{ opacity: 0.5, minWidth: 18 }}>{i + 1}.</span>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {entry.name}
                       </span>
                     </span>
-                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{entry.score}</span>
+                    {/* Date set — matches the Tumbler leaderboard format.
+                        For the Bee daily board every date will be today's,
+                        but keeping the same column makes the two screens
+                        visually consistent. */}
+                    <span
+                      style={{
+                        opacity: 0.55,
+                        fontSize: "0.85em",
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatDate(entry.timestamp)}
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums", minWidth: 32, textAlign: "right" }}>
+                      {entry.score}
+                    </span>
                   </li>
                 );
               })}
@@ -591,6 +608,14 @@ const flashStyle: React.CSSProperties = {
   fontSize: "0.95em",
   display: "inline-block",
 };
+
+/** Format an epoch timestamp as dd/MM/yyyy (local), per project defaults. */
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
 
 function btnStyle(
   variant: "primary" | "secondary" | "ghost",

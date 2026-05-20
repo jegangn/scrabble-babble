@@ -3,6 +3,7 @@ import type { Difficulty } from "../../engine/ai/bot.js";
 import type { Variant } from "../../engine/types.js";
 import type { Opponent } from "../../store/gameStore.js";
 import { useGameStore } from "../../store/gameStore.js";
+import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { ACCENT } from "../theme.js";
 
 export function NewGameScreen(): JSX.Element {
@@ -40,7 +41,11 @@ export function NewGameScreen(): JSX.Element {
     // Player 2 input and the form gets ~90 px taller — on 800 px viewports
     // (Tab S8) that was clipping the Start button. Anchoring to the top
     // and allowing scroll is robust on any landscape size.
-    <div className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto">
+    <div
+      className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto"
+      style={{ position: "relative" }}
+    >
+      <BackToHomeButton onClick={goHome} />
       <h2 style={{ fontSize: "1.8em", fontWeight: 700, color: ACCENT.primary, margin: 0 }}>
         New game
       </h2>
@@ -140,10 +145,10 @@ export function NewGameScreen(): JSX.Element {
           </fieldset>
         )}
 
+        {/* Bottom "Back" button removed — the top-left ← Home pill is the
+            single canonical exit path now, consistent with every other
+            screen. Start gets the full width so it's harder to miss. */}
         <div className="flex gap-3 mt-2">
-          <button type="button" onClick={goHome} style={btnStyle("secondary")}>
-            Back
-          </button>
           <button type="button" onClick={onStart} style={btnStyle("primary")}>
             Start
           </button>

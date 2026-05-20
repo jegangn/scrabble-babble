@@ -10,6 +10,7 @@ import { createPrng } from "../../engine/prng.js";
 import type { Letter } from "../../engine/types.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
+import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
 
@@ -160,21 +161,15 @@ export function TumblerScreen(): JSX.Element | null {
   return (
     <div
       className="flex h-full w-full flex-col items-center p-4"
-      style={{ background: ACCENT.surface, gap: 14 }}
+      style={{ background: ACCENT.surface, gap: 14, position: "relative" }}
     >
-      {/* Header: timer + score + back */}
+      <BackToHomeButton onClick={goHome} />
+      {/* Header: timer + score. Back-button moved to the top-left
+          floating pill (shared component) for consistency across screens. */}
       <div
-        className="flex justify-between items-center w-full max-w-2xl"
-        style={{ minHeight: 56 }}
+        className="flex justify-center items-center w-full max-w-2xl"
+        style={{ minHeight: 56, gap: 32 }}
       >
-        <button
-          type="button"
-          onClick={goHome}
-          style={btnStyle("ghost")}
-          aria-label="Back to home"
-        >
-          ← Home
-        </button>
         {/*
           aria-live=polite so a screen reader can hear the countdown without
           interrupting other speech; we flip to assertive at 0 so "Time's up!"

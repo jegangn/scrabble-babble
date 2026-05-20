@@ -8,6 +8,7 @@ import {
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
+import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { ACCENT } from "../theme.js";
 
 export function TumblerEndScreen(): JSX.Element | null {
@@ -55,7 +56,11 @@ export function TumblerEndScreen(): JSX.Element | null {
   const sortedWords = [...screen.foundWords].sort((a, b) => scoreTumblerWord(b) - scoreTumblerWord(a));
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto">
+    <div
+      className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto"
+      style={{ position: "relative" }}
+    >
+      <BackToHomeButton onClick={goHome} />
       <h2 style={{ fontSize: "2em", fontWeight: 700, color: ACCENT.primary, margin: 0 }}>
         Time's up!
       </h2>
@@ -160,15 +165,32 @@ export function TumblerEndScreen(): JSX.Element | null {
                       background: isYou ? `${ACCENT.primary}22` : "transparent",
                       fontWeight: isYou ? 700 : 500,
                       fontSize: "0.95em",
+                      gap: 8,
                     }}
                   >
-                    <span style={{ display: "flex", gap: 8, overflow: "hidden" }}>
+                    <span style={{ display: "flex", gap: 8, overflow: "hidden", minWidth: 0, flex: 1 }}>
                       <span style={{ opacity: 0.5, minWidth: 18 }}>{i + 1}.</span>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {entry.name}
                       </span>
                     </span>
-                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{entry.score}</span>
+                    {/* Date when the score was set. dd/MM/yyyy per project
+                        defaults; helps users see how stale a top score is
+                        (this is an all-time leaderboard so dates vary). */}
+                    <span
+                      style={{
+                        opacity: 0.55,
+                        fontSize: "0.85em",
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatDate(entry.timestamp)}
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums", minWidth: 32, textAlign: "right" }}>
+                      {entry.score}
+                    </span>
                   </li>
                 );
               })}
@@ -177,10 +199,9 @@ export function TumblerEndScreen(): JSX.Element | null {
         </div>
       </div>
 
+      {/* Bottom Home button removed — the top-left pill is the single
+          back-to-home entry point now. Play again gets the full width. */}
       <div className="flex gap-3 w-full max-w-md">
-        <button type="button" onClick={goHome} style={btnStyle("secondary")}>
-          Home
-        </button>
         <button
           type="button"
           onClick={() => setScreen({ kind: "tumbler" })}
@@ -191,6 +212,18 @@ export function TumblerEndScreen(): JSX.Element | null {
       </div>
     </div>
   );
+}
+
+/**
+ * Format an epoch timestamp as dd/MM/yyyy in local time, per project
+ * defaults (CLAUDE.md). Used on the leaderboard so the user can see how
+ * old each top score is.
+ */
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
 function btnStyle(variant: "primary" | "secondary"): React.CSSProperties {

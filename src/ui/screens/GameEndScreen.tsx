@@ -1,5 +1,6 @@
 import { useGameStore } from "../../store/gameStore.js";
 import type { GameState, Variant } from "../../engine/types.js";
+import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { ACCENT } from "../theme.js";
 
 function variantLabel(variant: Variant): string {
@@ -73,7 +74,11 @@ export function GameEndScreen(): JSX.Element | null {
       : "Hot-seat";
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 p-6">
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-5 p-6"
+      style={{ position: "relative" }}
+    >
+      <BackToHomeButton onClick={goHome} />
       <h2 style={{ fontSize: "2.4em", fontWeight: 700, color: ACCENT.primary }}>
         Game over
       </h2>
@@ -121,10 +126,8 @@ export function GameEndScreen(): JSX.Element | null {
         <StatRow label="Mode" value={difficultyLabel} />
       </div>
 
+      {/* Home button removed — the top-left pill handles it. */}
       <div className="flex gap-3 w-full max-w-md mt-3">
-        <button type="button" onClick={goHome} style={btnStyle("secondary")}>
-          Home
-        </button>
         <button
           type="button"
           onClick={() =>

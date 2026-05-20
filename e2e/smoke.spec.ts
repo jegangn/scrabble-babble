@@ -152,6 +152,7 @@ test("Spelling Bee rejects too-short and missing-center words", async ({ page })
 test("home -> bee -> home navigation works", async ({ page }) => {
   await page.getByRole("button", { name: /Spelling Bee/ }).click();
   await expect(page.getByLabel(/Letter hex/)).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: /Home/ }).click();
+  // Back-to-home pill has aria-label "Back to home" (lowercase).
+  await page.getByRole("button", { name: /back to home/i }).click();
   await expect(page.getByRole("heading", { name: /Scrabble Babble/ })).toBeVisible();
 });
