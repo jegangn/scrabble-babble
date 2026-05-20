@@ -467,13 +467,16 @@ function ImportPanel({ onImport }: ImportPanelProps): JSX.Element {
 }
 
 /**
- * Format the volume multiplier as a percentage with a small dB readout.
- * 0 reads as "Mute" since −∞ dB isn't a useful number to show.
+ * Format the volume multiplier relative to the tuned default. The slider is
+ * a master scale on top of each preset's baked-in gainPeak, so 1.0× IS the
+ * default — not "maximum". Showing "Default" at 1.0 and signed dB offsets
+ * either side makes the model match what the user is actually doing.
  */
 function formatVolume(v: number): string {
   if (v <= 0.001) return "Mute";
-  const pct = Math.round(v * 100);
-  const db = (20 * Math.log10(v)).toFixed(1);
-  const sign = parseFloat(db) >= 0 ? "+" : "";
-  return `${pct}% · ${sign}${db} dB`;
+  // Slider step is 0.05; anything within half a step of 1.0 reads as Default.
+  if (Math.abs(v - 1) < 0.025) return "Default";
+  const db = 20 * Math.log10(v);
+  if (db < 0) return `Quieter · ${db.toFixed(1)} dB`;
+  return `Louder · +${db.toFixed(1)} dB`;
 }
