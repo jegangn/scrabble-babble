@@ -243,8 +243,8 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Arpeggio",
       description: "C5 → E5 → G5 — the default",
       impl: (ac, m) => {
-        // 0.36 each → -8.87 dB. Dropped 2 dB from the prior 0.45 / -6.9 dB
-        // — outcome sounds were a touch hot relative to gameplay cues.
+        // 0.23 per note → -12.77 dB. Dropped 4 dB from 0.36 / -8.87 dB —
+        // outcome cue sits well under gameplay sounds now.
         const notes = [523.25, 659.25, 783.99];
         notes.forEach((freq, i) =>
           tone(ac, {
@@ -252,7 +252,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
             type: "triangle",
             startOffset: i * 0.08,
             duration: 0.22,
-            gainPeak: 0.36 * m,
+            gainPeak: 0.23 * m,
           }),
         );
       },
@@ -300,15 +300,14 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Minor third",
       description: "G4 → E♭4 — the default",
       impl: (ac, m) => {
-        // 0.25 / 0.29 → -12.04 / -10.75 dB. Dropped 2 dB from 0.32/0.36
-        // — paired with the matching cut on success so the outcome tier
-        // sits more politely against gameplay cues.
+        // 0.20 / 0.23 → -13.98 / -12.77 dB. Dropped a further 2 dB from
+        // 0.25/0.29 so the warning sits politely under gameplay cues.
         tone(ac, {
           freq: 392,
           type: "triangle",
           attack: 0.015,
           duration: 0.16,
-          gainPeak: 0.25 * m,
+          gainPeak: 0.20 * m,
         });
         tone(ac, {
           freq: 311,
@@ -316,7 +315,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
           startOffset: 0.11,
           attack: 0.015,
           duration: 0.26,
-          gainPeak: 0.29 * m,
+          gainPeak: 0.23 * m,
         });
       },
     },
