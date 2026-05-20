@@ -398,131 +398,99 @@ export function SpellingBeeScreen(): JSX.Element | null {
       `}</style>
 
       <div
+        // Single centered column — keeps the hex in the visual middle
+        // of the iPad where the dominant hand naturally rests. Tight
+        // vertical rhythm so the action row stays in the viewport on
+        // 820 px iPads; leaderboard / found-list scroll into view.
         style={{
-          flex: 1,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-          gap: space.x10,
-          padding: `${space.x16 + 16}px ${space.x10}px ${space.x6}px`,
-          maxWidth: 1240,
+          height: "100dvh",
+          maxHeight: "100dvh",
+          overflowY: "auto",
+          overflowX: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: space.x3,
+          padding: `${space.x16}px ${space.x6}px ${space.x4}px`,
+          maxWidth: 720,
           margin: "0 auto",
           width: "100%",
-          alignContent: "start",
         }}
       >
-        {/* Left — header + hex + actions */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: space.x4,
-            alignItems: "center",
-          }}
-        >
-          <header
+        {/* Header — centred tagline + h1; date + score in a separate
+            line below so they're not crowded by the title. */}
+        <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space.x2 }}>
+          <Tagline>Daily puzzle · {formatHeaderDate(dateKey)}</Tagline>
+          <h1
             style={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
-              flexWrap: "wrap",
-              gap: space.x4,
+              fontFamily: font.serif,
+              fontWeight: weight.heavy,
+              fontSize: size.h1,
+              margin: 0,
+              letterSpacing: "-0.02em",
+              color: color.brown,
             }}
           >
-            <div>
-              <Tagline>Daily puzzle</Tagline>
-              <h1
-                style={{
-                  fontFamily: font.serif,
-                  fontWeight: weight.heavy,
-                  fontSize: size.h1,
-                  margin: `${space.x2}px 0 0`,
-                  letterSpacing: "-0.02em",
-                  color: color.brown,
-                }}
-              >
-                Spelling Bee
-              </h1>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                gap: 4,
-              }}
-            >
+            Spelling Bee
+          </h1>
+          <span
+            style={{
+              fontFamily: font.serif,
+              fontWeight: weight.bold,
+              fontSize: size.h3,
+              color: color.brown,
+              fontVariantNumeric: "tabular-nums",
+              marginTop: space.x1,
+            }}
+          >
+            {score}
+            {totalWords !== null && (
               <span
                 style={{
-                  fontSize: size.caption,
+                  fontSize: size.body,
                   color: color.inkSoft,
-                  textTransform: "uppercase",
-                  letterSpacing: ".12em",
+                  marginLeft: 8,
                   fontWeight: weight.med,
                 }}
               >
-                {formatHeaderDate(dateKey)}
+                · {foundWords.length}/{totalWords}
               </span>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontWeight: weight.bold,
-                  fontSize: size.h3,
-                  color: color.brown,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {score}
-                {totalWords !== null && (
-                  <span
-                    style={{
-                      fontSize: size.body,
-                      color: color.inkSoft,
-                      marginLeft: 8,
-                      fontWeight: weight.med,
-                    }}
-                  >
-                    · {foundWords.length}/{totalWords}
-                  </span>
-                )}
-              </span>
-            </div>
-          </header>
+            )}
+          </span>
+        </header>
 
-          <div style={{ width: "100%" }}>
-            <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={48} />
-          </div>
+        <div style={{ width: "100%", maxWidth: 480 }}>
+          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={48} />
+        </div>
 
-          <div style={{ minHeight: 36 }} aria-live="polite">
-            {flash && <FlashToast flash={flash} />}
-          </div>
+        <div style={{ minHeight: 36 }} aria-live="polite">
+          {flash && <FlashToast flash={flash} />}
+        </div>
 
-          {/* Hex — pills positioned absolutely; pointer handlers on the
-              container. Dashed ring guide is purely decorative.
-              On narrow viewports we scale the entire hex via a CSS
-              transform applied through a `.bee-hex-scale-wrap` wrapper
-              (see media queries above the screen body). getBoundingClientRect
-              returns post-transform coords, so the slide-trail math
-              tracks the finger correctly at any zoom level. */}
+        {/* Hex — centred. The .bee-hex-scale-wrap responds to a CSS
+            transform on narrow viewports so the 360 px hex still fits
+            inside a 480 px phone-portrait body. getBoundingClientRect
+            returns post-transform coords so the slide-trail math still
+            tracks the finger correctly at any scale. */}
+        <div
+          className="bee-hex-scale-wrap"
+          style={{ width: HEX_BOX, height: HEX_BOX, flexShrink: 0 }}
+        >
           <div
-            className="bee-hex-scale-wrap"
-            style={{ width: HEX_BOX, height: HEX_BOX, flexShrink: 0 }}
+            ref={hexContainerRef}
+            style={{
+              position: "relative",
+              width: HEX_BOX,
+              height: HEX_BOX,
+              touchAction: "none",
+            }}
+            aria-label="Letter hex"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
+            onClickCapture={onClickCapture}
           >
-            <div
-              ref={hexContainerRef}
-              style={{
-                position: "relative",
-                width: HEX_BOX,
-                height: HEX_BOX,
-                touchAction: "none",
-              }}
-              aria-label="Letter hex"
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerCancel}
-              onClickCapture={onClickCapture}
-            >
             {/* Decorative ring guide */}
             <div
               aria-hidden
@@ -606,58 +574,65 @@ export function SpellingBeeScreen(): JSX.Element | null {
                 </div>
               );
             })}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: space.x3,
-              width: "100%",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <Button
-              kind="secondary"
-              onClick={() => {
-                playUiTap();
-                deleteLetter();
-              }}
-              disabled={currentWord.length === 0}
-              icon={<span>⌫</span>}
-              muted
-            >
-              Delete
-            </Button>
-            <Button
-              kind="secondary"
-              onClick={() => {
-                playUiTap();
-                shuffleOuter();
-              }}
-              icon={<span>⇅</span>}
-              muted
-            >
-              Shuffle
-            </Button>
-            <Button
-              kind="primary"
-              onClick={submit}
-              disabled={currentWord.length === 0}
-              muted
-            >
-              Submit
-            </Button>
           </div>
         </div>
 
-        {/* Right — found words + leaderboard */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: space.x4 }}>
+        {/* Action row — centred Delete / Shuffle / Submit. */}
+        <div
+          style={{
+            display: "flex",
+            gap: space.x3,
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            kind="secondary"
+            onClick={() => {
+              playUiTap();
+              deleteLetter();
+            }}
+            disabled={currentWord.length === 0}
+            icon={<span>⌫</span>}
+            muted
+          >
+            Delete
+          </Button>
+          <Button
+            kind="secondary"
+            onClick={() => {
+              playUiTap();
+              shuffleOuter();
+            }}
+            icon={<span>⇅</span>}
+            muted
+          >
+            Shuffle
+          </Button>
+          <Button
+            kind="primary"
+            onClick={submit}
+            disabled={currentWord.length === 0}
+            muted
+          >
+            Submit
+          </Button>
+        </div>
+
+        {/* Bottom — found words + today's leaderboard, full column width. */}
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: space.x3,
+            marginTop: space.x2,
+          }}
+        >
           <FoundList
             title="Found"
             count={foundWords.length}
-            columns={2}
+            columns={3}
             words={[...foundWords].sort()}
           />
 
@@ -732,7 +707,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
               </ol>
             )}
           </div>
-        </aside>
+        </div>
       </div>
     </Surface>
   );

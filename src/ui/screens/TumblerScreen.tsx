@@ -243,181 +243,149 @@ export function TumblerScreen(): JSX.Element | null {
       )}
 
       <div
-        // Pin the screen body to the viewport so the action row at the
-        // bottom of the left column never falls off the edge — the rack
-        // tiles and Submit are essential touch targets, not optional
-        // scroll-into-view content.
-        // Top padding clears the BackPill (top:24 + height 44 = 68 bottom)
-        // and the UserChip with a little safety margin.
+        // Single centered column — keeps the rack + action row in the
+        // middle of the screen where the hands naturally rest on an
+        // iPad. The viewport-height pin + overflow-y on the body lets
+        // the leaderboard / found list grow without pushing controls
+        // off the bottom.
         style={{
           height: "100dvh",
           maxHeight: "100dvh",
-          overflow: "hidden",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: space.x8,
-          padding: `${space.x16 + 16}px ${space.x10}px ${space.x4}px`,
-          maxWidth: 1240,
+          overflowY: "auto",
+          overflowX: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: space.x4,
+          padding: `${space.x16 + 16}px ${space.x6}px ${space.x6}px`,
+          maxWidth: 720,
           margin: "0 auto",
           width: "100%",
-          alignContent: "start",
         }}
       >
-        {/* Left — play area. Pinned height so the action row stays in
-            view; the rack + buttons live at the bottom via margin-top:
-            auto on their wrapper. */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: space.x4,
-            minHeight: 0,
-            overflow: "hidden",
-          }}
-        >
-          <header
+        {/* Header — centred tagline + h1 above the timer/score row. */}
+        <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space.x2 }}>
+          <Tagline>Solo mode · 60-second sprint</Tagline>
+          <h1
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
-              flexWrap: "wrap",
-              gap: space.x4,
+              fontFamily: font.serif,
+              fontWeight: weight.heavy,
+              fontSize: size.h1,
+              margin: 0,
+              letterSpacing: "-0.02em",
+              color: color.brown,
             }}
           >
-            <div>
-              <Tagline>Solo mode</Tagline>
-              <h1
-                style={{
-                  fontFamily: font.serif,
-                  fontWeight: weight.heavy,
-                  fontSize: size.h1,
-                  margin: `${space.x2}px 0 0`,
-                  letterSpacing: "-0.02em",
-                  color: color.brown,
-                }}
-              >
-                Tumbler
-              </h1>
-            </div>
-            <div style={{ display: "flex", gap: space.x3, alignItems: "center" }}>
-              <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} />
-              <BigNumber value={score} label="Score" tone="brown" />
-              {started && (
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  onClick={() => {
-                    playUiTap();
-                    restartGame();
-                  }}
-                  muted
-                  ariaLabel="Restart round"
-                >
-                  ↻ Restart
-                </Button>
-              )}
-            </div>
-          </header>
+            Tumbler
+          </h1>
+        </header>
 
+        {/* Timer + score, side-by-side. Restart only appears mid-round
+            so the pre-game state stays uncluttered. */}
+        <div style={{ display: "flex", gap: space.x3, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+          <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} />
+          <BigNumber value={score} label="Score" tone="brown" />
+          {started && (
+            <Button
+              kind="ghost"
+              size="sm"
+              onClick={() => {
+                playUiTap();
+                restartGame();
+              }}
+              muted
+              ariaLabel="Restart round"
+            >
+              ↻ Restart
+            </Button>
+          )}
+        </div>
+
+        {/* Current word — full width of the centred column. */}
+        <div style={{ width: "100%", maxWidth: 480 }}>
           <CurrentWord
             word={input}
             hint={started ? "Tap a letter to extend the word" : "Tap a letter to start"}
           />
-
-          <div
-            style={{ minHeight: 36, display: "flex", justifyContent: "center" }}
-            aria-live="polite"
-          >
-            {flash && <FlashToast flash={flash} />}
-          </div>
-
-          {/* Rack — using Tile primitives directly because Tumbler is
-              tap-only (no drag/drop) and the engine Rack expects engine
-              Tile objects, not raw letters. marginTop: auto anchors the
-              rack + action row to the bottom of the play column. */}
-          <div style={{ display: "flex", flexDirection: "column", gap: space.x3, marginTop: "auto" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-              }}
-            >
-              <Tagline>Your tiles · tap to compose</Tagline>
-              <span style={{ fontSize: size.caption, color: color.inkSoft }}>
-                Score grows with word length
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                justifyContent: "center",
-                gap: space.x3,
-                padding: `${space.x3}px ${space.x4}px`,
-                background: color.brown,
-                borderRadius: tokens.radius.card,
-                boxShadow: `inset 0 2px 6px rgba(0,0,0,.25), ${tokens.shadow.card}`,
-              }}
-            >
-              {rackOrder.map((rackIndex) => {
-                const letter = rack[rackIndex]!;
-                return (
-                  <button
-                    key={rackIndex}
-                    type="button"
-                    onClick={() => appendLetter(letter)}
-                    disabled={timeLeftMs <= 0}
-                    aria-label={`Letter ${letter}`}
-                    style={{
-                      appearance: "none",
-                      font: "inherit",
-                      background: "transparent",
-                      border: "none",
-                      padding: 0,
-                      cursor: timeLeftMs <= 0 ? "not-allowed" : "pointer",
-                      touchAction: "manipulation",
-                    }}
-                  >
-                    <Tile letter={letter} size={RACK_TILE_SIZE} variant="cream" />
-                  </button>
-                );
-              })}
-            </div>
-            {/* Action row — 3 buttons per the handoff: Shuffle / Clear /
-                Submit. The mid-round Restart lives next to the score
-                BigNumber when `started` so users don't lose their place
-                if they hit it accidentally — see the header below. */}
-            <div style={{ display: "flex", gap: space.x3, flexWrap: "wrap" }}>
-              <Button kind="secondary" onClick={shuffleRack} icon={<span>⇅</span>} muted>
-                Shuffle
-              </Button>
-              <Button kind="ghost" onClick={clearWord} disabled={input.length === 0} muted>
-                ↺ Clear
-              </Button>
-              <div style={{ flex: 1, minWidth: space.x4 }} />
-              <Button
-                kind="primary"
-                onClick={handleSubmit}
-                disabled={timeLeftMs <= 0 || input.length === 0}
-                muted
-              >
-                Submit
-              </Button>
-            </div>
-          </div>
         </div>
 
-        {/* Right — found words + personal best (during play) OR leaderboard
-            (pre-game). overflow-y: auto so a long word list never pushes
-            the column off the bottom of the screen. */}
-        <aside
+        {/* Flash toast — reserves vertical space so the layout doesn't
+            jump when a success / error pill appears + disappears. */}
+        <div
+          style={{ minHeight: 36, display: "flex", justifyContent: "center" }}
+          aria-live="polite"
+        >
+          {flash && <FlashToast flash={flash} />}
+        </div>
+
+        {/* Rack — centred brown felt strip. Tap-only (no drag); engine
+            Rack isn't used because it expects engine Tile objects, but
+            the same visual idiom is preserved. */}
+        <div
           style={{
             display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: space.x3,
+            padding: `${space.x3}px ${space.x4}px`,
+            background: color.brown,
+            borderRadius: tokens.radius.card,
+            boxShadow: `inset 0 2px 6px rgba(0,0,0,.25), ${tokens.shadow.card}`,
+          }}
+        >
+          {rackOrder.map((rackIndex) => {
+            const letter = rack[rackIndex]!;
+            return (
+              <button
+                key={rackIndex}
+                type="button"
+                onClick={() => appendLetter(letter)}
+                disabled={timeLeftMs <= 0}
+                aria-label={`Letter ${letter}`}
+                style={{
+                  appearance: "none",
+                  font: "inherit",
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: timeLeftMs <= 0 ? "not-allowed" : "pointer",
+                  touchAction: "manipulation",
+                }}
+              >
+                <Tile letter={letter} size={RACK_TILE_SIZE} variant="cream" />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Action row — Shuffle / Clear / Submit, centred. */}
+        <div style={{ display: "flex", gap: space.x3, justifyContent: "center", flexWrap: "wrap" }}>
+          <Button kind="secondary" onClick={shuffleRack} icon={<span>⇅</span>} muted>
+            Shuffle
+          </Button>
+          <Button kind="ghost" onClick={clearWord} disabled={input.length === 0} muted>
+            ↺ Clear
+          </Button>
+          <Button
+            kind="primary"
+            onClick={handleSubmit}
+            disabled={timeLeftMs <= 0 || input.length === 0}
+            muted
+          >
+            Submit
+          </Button>
+        </div>
+
+        {/* Bottom — found words (during play) OR leaderboard (pre-game),
+            plus the persistent personal-best card. Width-constrained
+            so the cards don't span the full 720 px column. */}
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
             flexDirection: "column",
-            gap: space.x4,
-            minHeight: 0,
-            overflowY: "auto",
+            gap: space.x3,
+            marginTop: space.x2,
           }}
         >
           {started ? (
@@ -432,7 +400,7 @@ export function TumblerScreen(): JSX.Element | null {
           )}
 
           <PersonalBestCard best={personalBest} current={score} started={started} />
-        </aside>
+        </div>
       </div>
     </Surface>
   );

@@ -15,7 +15,6 @@ import type { Letter, Position } from "../../engine/types.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { applyPendingToBoard, pendingKeys, pendingToMove } from "../../store/pending.js";
 import { tokens } from "../tokens.js";
-import { ActionBar } from "../components/ActionBar.js";
 import { BackPill } from "../components/BackPill.js";
 import { BlankLetterPicker } from "../components/BlankLetterPicker.js";
 import { Board } from "../components/Board.js";
@@ -347,16 +346,18 @@ export function GameScreen(): JSX.Element | null {
         style={{
           position: "relative",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: "row",
           width: "100%",
-          // Pin to viewport height so the bottom strip can't be pushed
-          // off-screen by an overly tall board. `100dvh` accounts for the
-          // dynamic browser chrome on iOS; the older `100vh` would have
-          // included the bottom safari toolbar's area on iPad.
+          // Pin to the viewport so the sidebar never falls off the
+          // bottom of the screen — every control must stay in view.
           height: "100dvh",
           maxHeight: "100dvh",
           background: color.cream,
           overflow: "hidden",
+          // Generous padding so BackPill (top-left) + UserChip
+          // (top-right) clear the board / sidebar content below.
+          padding: `${space.x16 + 16}px ${space.x6}px ${space.x4}px`,
+          gap: space.x6,
         }}
       >
         {/* Decorative paper grain — matches every other screen. */}
@@ -379,263 +380,257 @@ export function GameScreen(): JSX.Element | null {
           <UserChip
             name={currentUser}
             onClick={() => {
-              // Tapping the chip on the in-game screen has no place to go
-              // (changing name mid-game would be confusing). For now we
-              // re-show the prompt on Home only; here it's a no-op visual.
+              // No-op on the in-game screen — changing names mid-game
+              // would be confusing. The chip is visual identity only.
               setCurrentUser(currentUser);
             }}
           />
         )}
 
-        {/* Top: board + sidebar. flex: 1 + min-height: 0 lets the inner
-            content shrink if the rack/action bar at the bottom claims
-            space; without min-height: 0 the auto rows would push the
-            action bar below the viewport on shorter iPads. */}
+        {/* Board — fills the available vertical space. The board's outer
+            wrapper is a perfectly-square box sized to whichever of
+            (column-width, available-height) is smaller, so the board is
+            always as big as the iPad will allow without overflowing. */}
         <div
-          className="gs-main-grid"
+          className="gs-board-wrap"
           style={{
             flex: 1,
-            minHeight: 0,
+            minWidth: 0,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
             position: "relative",
             zIndex: 1,
-            display: "grid",
-            gridTemplateColumns: "minmax(0, auto) 320px",
-            gap: space.x6,
-            padding: `${space.x16 + 16}px ${space.x8}px ${space.x3}px`,
-            alignItems: "start",
-            overflow: "hidden",
           }}
         >
-          {/* Board column — keeps its container query so tile letters scale
-              with the rendered cell size. The board is sized to whichever
-              of viewport-height-derived or column-width is smaller; the
-              `calc(100dvh - 300px)` reservation keeps room for the top
-              padding (~48px) + bottom strip (~180px) + safety margin. */}
           <div
-            className="gs-board-wrap"
             style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "flex-start",
+              // height: 100% of the available column → maximised vertical
+              // use. aspect-ratio: 1 forces the width to match the
+              // rendered height. The cqi-based font scaling in BoardCell
+              // tracks the actual rendered cell size for tile + label
+              // readability at any board edge.
               height: "100%",
-              minHeight: 0,
+              maxHeight: "100%",
+              aspectRatio: "1",
+              maxWidth: "100%",
+              containerType: "size",
+              containerName: "board",
             }}
           >
-            <div
-              style={{
-                // Reserve ~340 px for top BackPill/UserChip clearance
-                // (~80) + bottom strip (rack ~120 + action bar ~80 +
-                // padding ~40 ≈ 240). The actual rendered height stays
-                // 100% of column when the column is narrower.
-                width: "min(calc(100dvh - 340px), 100%)",
-                height: "min(calc(100dvh - 340px), 100%)",
-                maxWidth: "100%",
-                aspectRatio: "1",
-                containerType: "size",
-                containerName: "board",
-              }}
-            >
-              <Board board={board} pendingKeys={keys} onCellTap={stableOnCellTap} />
-            </div>
+            <Board board={board} pendingKeys={keys} onCellTap={stableOnCellTap} />
+          </div>
+        </div>
+
+        {/* Sidebar — column on the right with scoreboard, rack, action
+            stack, and contextual cards. Width chosen so the 7-tile rack
+            wraps to 4 + 3 (instead of 3 + 3 + 1, which would push the
+            Resign button past the viewport bottom on iPad). */}
+        <aside
+          style={{
+            position: "relative",
+            zIndex: 1,
+            flexShrink: 0,
+            width: 360,
+            display: "flex",
+            flexDirection: "column",
+            gap: space.x3,
+            height: "100%",
+            minHeight: 0,
+            overflowY: "auto",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+            }}
+          >
+            <Tagline>{variantLabel}</Tagline>
+            <TilesLeft count={game.bag.length} />
           </div>
 
-          {/* Sidebar — scrollable if the player has many history entries
-              or a tall pending-word preview; keeps the bottom strip
-              anchored regardless. */}
-          <aside
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: space.x3,
-              paddingTop: space.x2,
-              height: "100%",
-              minHeight: 0,
-              overflowY: "auto",
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
+            {game.players.map((p, i) => (
+              <PlayerCard
+                key={i}
+                name={p.name}
+                score={p.score}
+                active={i === game.turn}
+                isAI={aiPlayerIndex === i}
+              />
+            ))}
+          </div>
+
+          {lastMove && (
             <div
               style={{
+                padding: `${space.x3}px ${space.x4}px`,
+                background: color.paper,
+                border: `1.5px solid ${color.stroke}`,
+                borderRadius: radius.card,
+                boxShadow: shadow.card,
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
+                flexDirection: "column",
+                gap: 4,
               }}
             >
-              <Tagline>Match · {variantLabel}</Tagline>
-              <TilesLeft count={game.bag.length} />
+              <span
+                style={{
+                  fontSize: size.micro + 1,
+                  color: color.inkSoft,
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  fontWeight: weight.med,
+                }}
+              >
+                Last · {lastMove.name}
+              </span>
+              <span
+                style={{
+                  fontSize: size.body,
+                  color: color.ink,
+                  fontFamily: font.serif,
+                  fontWeight: weight.bold,
+                }}
+              >
+                {lastMove.word} · +{lastMove.score}
+              </span>
             </div>
+          )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: space.x3 }}>
-              {game.players.map((p, i) => (
-                <PlayerCard
-                  key={i}
-                  name={p.name}
-                  score={p.score}
-                  active={i === game.turn}
-                  isAI={aiPlayerIndex === i}
-                />
-              ))}
-            </div>
-
-            {lastMove && (
+          {pendingPreview && (
+            <div
+              style={{
+                padding: `${space.x3}px ${space.x4}px`,
+                background: color.successBg,
+                border: `1.5px solid ${color.success}`,
+                borderRadius: radius.card,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: size.micro + 1,
+                  color: color.success,
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  fontWeight: weight.med,
+                }}
+              >
+                Pending
+              </span>
               <div
                 style={{
-                  padding: `${space.x3}px ${space.x4}px`,
-                  background: color.paper,
-                  border: `1.5px solid ${color.stroke}`,
-                  borderRadius: radius.card,
-                  boxShadow: shadow.card,
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
                 }}
               >
                 <span
                   style={{
-                    fontSize: size.micro + 1,
-                    color: color.inkSoft,
-                    letterSpacing: ".08em",
-                    textTransform: "uppercase",
-                    fontWeight: weight.med,
-                  }}
-                >
-                  Last move · {lastMove.name}
-                </span>
-                <span
-                  style={{
-                    fontSize: size.body,
+                    fontSize: size.bodyLg,
                     color: color.ink,
                     fontFamily: font.serif,
                     fontWeight: weight.bold,
                   }}
                 >
-                  {lastMove.word} · +{lastMove.score}
+                  {pendingPreview.word.toUpperCase()}
                 </span>
-              </div>
-            )}
-
-            {pendingPreview && (
-              <div
-                style={{
-                  padding: `${space.x3}px ${space.x4}px`,
-                  background: color.successBg,
-                  border: `1.5px solid ${color.success}`,
-                  borderRadius: radius.card,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                }}
-              >
                 <span
                   style={{
-                    fontSize: size.micro + 1,
-                    color: color.success,
-                    letterSpacing: ".08em",
-                    textTransform: "uppercase",
+                    fontSize: size.body,
+                    color: pendingPreview.score === null ? color.inkSoft : color.success,
                     fontWeight: weight.med,
                   }}
                 >
-                  Pending
+                  {pendingPreview.score === null ? "Composing…" : `+${pendingPreview.score}`}
                 </span>
-                <div
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <Toast kind="error" title={error} />
+            </div>
+          )}
+
+          {/* Rack — slots into the sidebar, wraps to two rows of 4 + 3
+              tiles inside a 320 px column. Brown felt + inset shadow
+              preserved from the design-system migration. */}
+          <Rack
+            rack={player.rack}
+            rackOrder={rackOrder}
+            usedIndices={usedRackIndices}
+            onTileTap={onRackTap}
+            selectedIndex={selectedRackIndex}
+          />
+
+          {/* Action stack — Submit is the prominent primary anchor;
+              Recall + Shuffle + Swap + Pass fill a tidy 2-column grid;
+              Resign is the destructive trailing action. Vertical layout
+              keeps the board the dominant element on the screen. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x2, marginTop: space.x2 }}>
+            <Button
+              kind="primary"
+              size="lg"
+              full
+              onClick={submitMove}
+              disabled={pending.length === 0}
+              muted
+            >
+              Submit
+              {pending.length > 0 && (
+                <span
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
+                    marginLeft: 8,
+                    fontSize: size.caption,
+                    fontWeight: weight.med,
+                    opacity: 0.85,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: size.bodyLg,
-                      color: color.ink,
-                      fontFamily: font.serif,
-                      fontWeight: weight.bold,
-                    }}
-                  >
-                    {pendingPreview.word.toUpperCase()}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: size.body,
-                      color: pendingPreview.score === null ? color.inkSoft : color.success,
-                      fontWeight: weight.med,
-                    }}
-                  >
-                    {pendingPreview.score === null ? "Composing…" : `+${pendingPreview.score}`}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <Toast kind="error" title={error} />
-              </div>
-            )}
-          </aside>
-        </div>
-
-        {/* Bottom: rack + action bar. flexShrink: 0 anchors this to the
-            bottom regardless of board content; auto-height keeps each
-            row natural-sized without forcing a fixed strip. */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            flexShrink: 0,
-            padding: `${space.x3}px ${space.x8}px ${space.x4}px`,
-            display: "flex",
-            flexDirection: "column",
-            gap: space.x3,
-            borderTop: `1px solid ${color.creamDark}`,
-            background: `color-mix(in oklab, ${color.cream} 60%, ${color.paper})`,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: space.x6,
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-            }}
-          >
-            <Rack
-              rack={player.rack}
-              rackOrder={rackOrder}
-              usedIndices={usedRackIndices}
-              onTileTap={onRackTap}
-              selectedIndex={selectedRackIndex}
-            />
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                alignItems: "flex-end",
-              }}
-            >
-              <Tagline style={{ margin: 0, fontSize: size.micro + 1 }}>Your rack</Tagline>
-              <span style={{ fontSize: size.caption, color: color.inkSoft }}>
-                Tap a tile, then tap a square
-              </span>
+                  · {pending.length} tile{pending.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </Button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: space.x2 }}>
+              <Button
+                kind="secondary"
+                size="sm"
+                onClick={() => {
+                  recallPending();
+                  setSelectedRackIndex(null);
+                }}
+                disabled={pending.length === 0}
+                icon={<span>↺</span>}
+              >
+                Recall
+              </Button>
+              <Button kind="secondary" size="sm" onClick={shuffleRack} icon={<span>⇅</span>}>
+                Shuffle
+              </Button>
+              <Button
+                kind="secondary"
+                size="sm"
+                onClick={() => setSwapping(true)}
+                disabled={!canSwap}
+                icon={<span>⇌</span>}
+              >
+                Swap
+              </Button>
+              <Button kind="secondary" size="sm" onClick={pass}>
+                Pass
+              </Button>
             </div>
+            <Button kind="destructive" size="sm" full onClick={() => setConfirmResign(true)}>
+              Resign
+            </Button>
           </div>
-          <ActionBar
-            canSubmit={pending.length > 0}
-            hasPending={pending.length > 0}
-            placedCount={pending.length}
-            canSwap={canSwap}
-            onSubmit={submitMove}
-            onRecall={() => {
-              recallPending();
-              setSelectedRackIndex(null);
-            }}
-            onShuffle={shuffleRack}
-            onSwap={() => setSwapping(true)}
-            onPass={pass}
-            onResign={() => setConfirmResign(true)}
-          />
-        </div>
+        </aside>
       </div>
 
       {/* Modals + overlays */}
