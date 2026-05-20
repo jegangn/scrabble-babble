@@ -149,11 +149,10 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Thud",
       description: "Two-layer warm bass — the default",
       impl: (ac, m) => {
-        // 0.38 / 0.33 (-8.4 / -9.6 dB) — a ~1.5 dB bump on the prior
-        // 0.32/0.28 so the place cue actually carries on iPad speakers
-        // without crowding the outcome tier (success / error).
-        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.38 * m });
-        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.33 * m });
+        // 0.54 / 0.47 (-5.4 / -6.6 dB) — +3 dB from the prior 0.38/0.33
+        // so the place cue lands with real weight on iPad speakers.
+        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.54 * m });
+        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.47 * m });
       },
     },
     {
@@ -243,8 +242,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Arpeggio",
       description: "C5 → E5 → G5 — the default",
       impl: (ac, m) => {
-        // 0.23 per note → -12.77 dB. Dropped 4 dB from 0.36 / -8.87 dB —
-        // outcome cue sits well under gameplay sounds now.
+        // 0.19 per note → -14.42 dB. Dropped a further 1.5 dB from 0.23.
         const notes = [523.25, 659.25, 783.99];
         notes.forEach((freq, i) =>
           tone(ac, {
@@ -252,7 +250,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
             type: "triangle",
             startOffset: i * 0.08,
             duration: 0.22,
-            gainPeak: 0.23 * m,
+            gainPeak: 0.19 * m,
           }),
         );
       },
@@ -300,14 +298,14 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Minor third",
       description: "G4 → E♭4 — the default",
       impl: (ac, m) => {
-        // 0.20 / 0.23 → -13.98 / -12.77 dB. Dropped a further 2 dB from
-        // 0.25/0.29 so the warning sits politely under gameplay cues.
+        // 0.17 / 0.19 → -15.39 / -14.42 dB. Dropped a further 1.5 dB from
+        // 0.20/0.23 so the warning sits politely under gameplay cues.
         tone(ac, {
           freq: 392,
           type: "triangle",
           attack: 0.015,
           duration: 0.16,
-          gainPeak: 0.20 * m,
+          gainPeak: 0.17 * m,
         });
         tone(ac, {
           freq: 311,
@@ -315,7 +313,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
           startOffset: 0.11,
           attack: 0.015,
           duration: 0.26,
-          gainPeak: 0.23 * m,
+          gainPeak: 0.19 * m,
         });
       },
     },
