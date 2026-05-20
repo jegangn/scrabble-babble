@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { playUiTap } from "../../audio/sounds.js";
-import { Modal } from "./Modal.js";
-import { ACCENT } from "../theme.js";
+import { tokens } from "../tokens.js";
+import { Button } from "./Button.js";
+import { ModalFrame } from "./ModalFrame.js";
 
 export interface UserNamePromptProps {
   /** Pre-fill for the "Change user" case. Empty string for first-launch. */
@@ -19,10 +20,15 @@ export interface UserNamePromptProps {
 }
 
 /**
- * Friendly name-prompt dialog. Used both for first-launch (mandatory) and
- * for the "Change user" flow on Home (cancellable). Autofocuses the input
- * and submits on Enter, since the iPad on-screen keyboard makes tapping
- * a small Submit button less convenient.
+ * Name-prompt dialog — first-launch greeting + "Change user" flow.
+ *
+ * Single text input with a live-updating avatar circle (first letter of
+ * the name being typed) so the visual cue stays in sync with what the
+ * user is actually entering. Autofocuses + selects on mount so the
+ * iPad on-screen keyboard appears immediately.
+ *
+ * Submit on Enter; Save button is disabled while the input is empty.
+ * First-launch flow omits onCancel — the user must enter something.
  */
 export function UserNamePrompt({
   initialName = "",
@@ -33,10 +39,8 @@ export function UserNamePrompt({
   const [name, setName] = useState(initialName);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus the input on mount so the on-screen keyboard appears immediately
-  // and the user can start typing without an extra tap. Delay slightly so
-  // the modal's mount animation completes before iOS Safari scrolls into
-  // view (avoids a layout jump).
+  // Focus + select shortly after mount so the modal's mount animation
+  // completes before iOS Safari scrolls the input into view.
   useEffect(() => {
     const t = window.setTimeout(() => {
       inputRef.current?.focus();
@@ -45,90 +49,108 @@ export function UserNamePrompt({
     return () => window.clearTimeout(t);
   }, []);
 
-  const submit = () => {
-    const trimmed = name.trim();
-    if (trimmed.length === 0) return; // require at least one char
+  const trimmed = name.trim();
+  const canSubmit = trimmed.length > 0;
+
+  const submit = (): void => {
+    if (!canSubmit) return;
     playUiTap();
     onSubmit(trimmed);
   };
 
-  const cancel = () => {
+  const cancel = (): void => {
     playUiTap();
     onCancel?.();
   };
 
-  return (
-    <Modal
-      title={title ?? "Welcome — what's your name?"}
-      // exactOptionalPropertyTypes: spread the prop only when defined; passing
-      // `undefined` to a required-but-optional prop is rejected by TS.
-      {...(onCancel ? { onClose: onCancel } : {})}
-    >
-      <p style={{ marginBottom: 12, opacity: 0.75 }}>
-        We'll use this on leaderboards in Tumbler and Spelling Bee. You can
-        change it any time from the top-right of the home screen.
-      </p>
-      <input
-        ref={inputRef}
-        value={name}
-        onChange={(e) => setName(e.target.value.slice(0, 24))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        placeholder="Your name"
-        maxLength={24}
-        autoCapitalize="words"
-        autoCorrect="off"
-        spellCheck={false}
-        style={{
-          width: "100%",
-          padding: "12px 14px",
-          fontSize: "1.1em",
-          borderRadius: 8,
-          border: `2px solid ${ACCENT.primary}`,
-          background: "white",
-          color: ACCENT.text,
-          minHeight: 48,
-          boxSizing: "border-box",
-        }}
-      />
-      <div className="flex gap-3 mt-4">
-        {onCancel && (
-          <button
-            type="button"
-            onClick={cancel}
-            style={btnStyle("secondary")}
-          >
-            Cancel
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={submit}
-          disabled={name.trim().length === 0}
-          style={{ ...btnStyle("primary"), opacity: name.trim().length === 0 ? 0.4 : 1 }}
-        >
-          Save
-        </button>
-      </div>
-    </Modal>
-  );
-}
+  const { color, radius, space, font, size, weight } = tokens;
+  const initial = trimmed.charAt(0).toUpperCase() || "?";
 
-function btnStyle(variant: "primary" | "secondary"): React.CSSProperties {
-  return {
-    flex: 1,
-    background: variant === "primary" ? ACCENT.primary : "white",
-    color: variant === "primary" ? "white" : ACCENT.text,
-    border: variant === "primary" ? "none" : `2px solid ${ACCENT.primary}`,
-    padding: "12px 16px",
-    fontSize: "1em",
-    fontWeight: 600,
-    borderRadius: 8,
-    minHeight: 48,
-    touchAction: "manipulation",
-  };
+  return (
+    <ModalFrame
+      title={title ?? "Welcome — what's your name?"}
+      sub="Used on leaderboards in Tumbler + Spelling Bee. You can change it any time from the home screen."
+      {...(onCancel ? { onClose: onCancel } : {})}
+      footer={
+        <>
+          {onCancel && (
+            <Button kind="ghost" onClick={cancel}>
+              Cancel
+            </Button>
+          )}
+          <Button kind="primary" onClick={submit} disabled={!canSubmit}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "auto 1fr",
+          alignItems: "center",
+          gap: space.x4,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            background: color.brownTint,
+            color: color.brown,
+            display: "grid",
+            placeItems: "center",
+            fontFamily: font.serif,
+            fontWeight: weight.bold,
+            fontSize: 24,
+            flexShrink: 0,
+          }}
+        >
+          {initial}
+        </span>
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value.slice(0, 24))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder="Your name"
+          maxLength={24}
+          autoCapitalize="words"
+          autoCorrect="off"
+          spellCheck={false}
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            fontSize: size.bodyLg,
+            fontWeight: weight.med,
+            borderRadius: radius.card,
+            border: `2px solid ${color.stroke}`,
+            background: color.paper,
+            color: color.ink,
+            minHeight: 52,
+            boxSizing: "border-box",
+            outline: "none",
+            // Moss focus halo — gives the input the "active card" feel
+            // without a separate focus state in JS.
+            transition: "border-color 200ms ease, box-shadow 200ms ease",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = color.brown;
+            e.currentTarget.style.boxShadow = `0 0 0 4px color-mix(in oklab, ${color.success} 25%, transparent)`;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = color.stroke;
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        />
+      </div>
+    </ModalFrame>
+  );
 }

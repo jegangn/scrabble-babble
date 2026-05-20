@@ -1,7 +1,9 @@
 import type { Letter } from "../../engine/types.js";
 import { playUiTap } from "../../audio/sounds.js";
-import { ACCENT } from "../theme.js";
-import { Modal } from "./Modal.js";
+import { tokens } from "../tokens.js";
+import { Button } from "./Button.js";
+import { ModalFrame } from "./ModalFrame.js";
+import { Tile } from "./Tile.js";
 
 const LETTERS: ReadonlyArray<Letter> = [
   "A","B","C","D","E","F","G","H","I","J","K","L","M",
@@ -13,49 +15,65 @@ export interface BlankLetterPickerProps {
   readonly onCancel: () => void;
 }
 
-export function BlankLetterPicker({ onPick, onCancel }: BlankLetterPickerProps): JSX.Element {
-  const pick = (l: Letter) => {
+/**
+ * Blank-tile letter picker — opens when a blank tile is placed on the
+ * board and needs a chosen letter. Renders each letter as a small cream
+ * tile in a 7-column grid (matches the handoff's 7×4 layout for the
+ * Latin alphabet, with the last row showing 5 letters + a Cancel slot).
+ *
+ * Backdrop-tap is deliberately disabled: a stray tap would silently
+ * discard the placed blank (cancelBlankPicker removes the pending
+ * placement) with no feedback. Force the user to click Cancel
+ * explicitly so the action is always intentional.
+ */
+export function BlankLetterPicker({
+  onPick,
+  onCancel,
+}: BlankLetterPickerProps): JSX.Element {
+  const pick = (l: Letter): void => {
     playUiTap();
     onPick(l);
   };
-  const cancel = () => {
-    playUiTap();
-    onCancel();
-  };
-  // NOTE: deliberately NOT passing onClose to Modal. A stray backdrop-tap on
-  // iPad would silently discard the placed blank (cancelBlankPicker removes the
-  // pending placement) with no feedback. Force the user to click Cancel
-  // explicitly so the action is always intentional.
+
   return (
-    <Modal title="Pick a letter for the blank">
-      <div className="grid grid-cols-7 gap-2">
+    <ModalFrame
+      title="Pick a letter for your blank"
+      sub="The blank takes this letter for the rest of the game."
+      // No onClose — backdrop dismissal would silently discard the placement.
+      footer={
+        <Button kind="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      }
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: tokens.space.x2,
+        }}
+      >
         {LETTERS.map((l) => (
           <button
             key={l}
             type="button"
             onClick={() => pick(l)}
-            className="rounded-md font-bold"
+            aria-label={`Letter ${l}`}
             style={{
-              background: "white",
-              color: ACCENT.text,
-              border: `2px solid ${ACCENT.primary}`,
-              minHeight: 48,
-              fontSize: "1.2em",
+              appearance: "none",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
               touchAction: "manipulation",
+              display: "grid",
+              placeItems: "center",
             }}
           >
-            {l}
+            <Tile letter={l} size={56} variant="cream" showValue={false} />
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        onClick={cancel}
-        className="mt-4 w-full rounded-md font-semibold"
-        style={{ background: ACCENT.primary, color: "white", minHeight: 48 }}
-      >
-        Cancel
-      </button>
-    </Modal>
+    </ModalFrame>
   );
 }
