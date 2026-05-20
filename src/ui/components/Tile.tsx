@@ -1,80 +1,163 @@
-import { TILE } from "../theme.js";
+import type { CSSProperties } from "react";
 import type { PlacedTile, Tile as TileT } from "../../engine/types.js";
+import { tokens } from "../tokens.js";
+
+/**
+ * Visual style of the tile face.
+ *
+ * - `cream`  — default Scrabble tile. The 165° three-stop gradient gives
+ *              the characteristic bevelled look.
+ * - `brown`  — inverted variant used in the home-screen hero and a few
+ *              accent spots.
+ * - `ghost`  — outlined transparent variant used in Swap-picker to show
+ *              the deselected state without losing the tile silhouette.
+ * - `blank`  — softer cream gradient for the visible "blank" tile face
+ *              before the user has picked a letter.
+ */
+export type TileVariant = "cream" | "brown" | "ghost" | "blank";
 
 export interface TileProps {
-  readonly tile: PlacedTile | TileT;
-  readonly pending?: boolean;
+  /**
+   * Engine tile (letter or blank). Preferred form — the display letter and
+   * point value are derived from it. Either this or `letter` must be set.
+   */
+  readonly tile?: PlacedTile | TileT;
+  /** Raw letter override. Used when there's no engine tile, e.g. on the menu hero. */
+  readonly letter?: string;
+  /** Tile face style. Defaults to `cream`. */
+  readonly variant?: TileVariant;
+  /** Edge length in px. Defaults to 64 (the iPad rack-tile minimum). */
   readonly size?: number;
+  /** Show the point-value subscript. Defaults to true (off for menu hero). */
+  readonly showValue?: boolean;
+  /**
+   * Render the moss-ring "placed-but-uncommitted" treatment. Used for
+   * tiles on the board that haven't been submitted yet.
+   */
+  readonly placed?: boolean;
+  /**
+   * Back-compat alias for `placed`. The old prop was `pending`; new code
+   * should use `placed` to match the handoff naming. Either prop works.
+   */
+  readonly pending?: boolean;
+  readonly style?: CSSProperties;
 }
 
-export function Tile({ tile, pending = false, size }: TileProps): JSX.Element {
-  let displayLetter = "?";
-  let displayValue = 0;
-  if (tile.kind === "letter") {
-    displayLetter = tile.letter;
-    displayValue = tile.value;
-  } else if ("letter" in tile) {
-    displayLetter = tile.letter;
-    displayValue = 0;
-  } else {
-    displayLetter = "_";
-    displayValue = 0;
+/** Engine-tile → display tuple. */
+function deriveFromTile(t: PlacedTile | TileT): { letter: string; value: number | null } {
+  if (t.kind === "letter") return { letter: t.letter, value: t.value };
+  // Blank tile — `letter` is set once the user picks one on the board.
+  if ("letter" in t && typeof t.letter === "string") {
+    return { letter: t.letter, value: null }; // blanks score 0; hide digit
   }
-  const style: React.CSSProperties = {
-    background: pending ? TILE.bgPending : TILE.bg,
-    border: `2px solid ${TILE.border}`,
-    color: TILE.letter,
-    boxShadow: "0 1px 0 rgba(0,0,0,.2)",
-  };
-  if (size) {
-    style.width = size;
-    style.height = size;
+  return { letter: "", value: null };
+}
+
+/**
+ * Scrabble tile — the workhorse component used on the board, in racks,
+ * in pickers, and in the menu hero.
+ *
+ * The proportions follow the handoff: letter sized at 0.58× tile edge,
+ * point-value subscript at 0.24× with an 11 px floor (per the design
+ * "type values stay readable" rule). The letter is nudged up 3 % so its
+ * baseline doesn't collide with the corner digit on letters with low-
+ * right ink (N, R, B, W).
+ */
+export function Tile({
+  tile,
+  letter,
+  variant = "cream",
+  size = 64,
+  showValue = true,
+  placed = false,
+  pending = false,
+  style,
+}: TileProps): JSX.Element {
+  // Either `placed` or `pending` triggers the moss ring — kept for
+  // back-compat with the older API used by BoardCell / GameScreen.
+  const isPlaced = placed || pending;
+  // Resolve letter + value from whichever input the caller used.
+  let displayLetter = letter ?? "";
+  let displayValue: number | null = null;
+  if (tile) {
+    const d = deriveFromTile(tile);
+    displayLetter = d.letter;
+    displayValue = d.value;
   }
-  // LAYOUT NOTE: a 1.4em letter centered in a ~48 px board cell extends to
-  // within 2–3 px of every edge. Letters with low-right ink (N's leg, W's
-  // peaks, B's bowl, R's tail) used to overlap the value digit in the
-  // bottom-right corner. Two changes keep them visually separated:
-  //
-  //   1. The letter is shifted up ~12 % via translateY so its visual centre
-  //      is at ~40 % of the cell height, leaving the bottom 30 % clear.
-  //   2. The value sits in its own absolute box with percentage-based
-  //      offsets, so it scales with the cell rather than being fixed to a
-  //      3 px corner that gets covered when the cell is large.
-  //
-  // The size+weight bump on the value also makes it readable for the
-  // older target user without distracting from the main letter.
+
+  const fontPx = Math.round(size * 0.58);
+  const ptPx = Math.max(11, Math.round(size * 0.24));
+  // Scale the corner radius with the tile so small tiles (footer mark)
+  // stay proportionate. Clamped to 6 px so micro tiles aren't fully round.
+  const rad = Math.max(6, Math.round(size * 0.13));
+
+  const background = (() => {
+    switch (variant) {
+      case "brown":
+        return tokens.tileGradient.brown;
+      case "ghost":
+        return "transparent";
+      case "blank":
+        return "linear-gradient(165deg, #FAF1DC 0%, #EFE0BE 100%)";
+      case "cream":
+      default:
+        return tokens.tileGradient.cream;
+    }
+  })();
+
+  // Three layered shadows imply physical depth without a backdrop-filter.
+  // The `placed` ring overrides the variant shadow because it's the
+  // most important signal — "this tile is uncommitted".
+  const boxShadow = isPlaced
+    ? `0 0 0 2px ${tokens.color.success} inset, ${tokens.shadow.tile}`
+    : variant === "brown"
+      ? tokens.shadow.tileBrown
+      : variant === "ghost"
+        ? `inset 0 0 0 1.5px ${tokens.color.brown}`
+        : tokens.shadow.tile;
+
+  const ink =
+    variant === "brown"
+      ? tokens.color.cream
+      : variant === "ghost"
+        ? tokens.color.brown
+        : tokens.color.ink;
+
   return (
     <div
-      className="relative flex items-center justify-center rounded-md select-none font-bold w-full h-full"
-      style={style}
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        borderRadius: rad,
+        background,
+        color: ink,
+        boxShadow,
+        fontFamily: tokens.font.serif,
+        fontWeight: tokens.weight.bold,
+        display: "grid",
+        placeItems: "center",
+        userSelect: "none",
+        flexShrink: 0,
+        ...style,
+      }}
     >
-      <span
-        style={{
-          fontSize: "1.3em",
-          lineHeight: 1,
-          // -14 % shift instead of -12 %: letters with low-right ink (N, A,
-          // W, B, R) still had their descending strokes brushing the digit
-          // even after the first fix.
-          transform: "translateY(-14%)",
-        }}
-      >
+      <span style={{ fontSize: fontPx, lineHeight: 1, transform: "translateY(-3%)" }}>
         {displayLetter}
       </span>
-      {tile.kind === "letter" && (
-        // Digit pulled deeper into the corner (right 4 %, bottom 4 %) so it
-        // sits OUTSIDE the letter's bounding box, not under its right leg.
-        // A subtle white text-shadow gives a tiny "halo" so any remaining
-        // sub-pixel overlap with the letter still reads clearly.
+      {showValue && displayValue !== null && (
         <span
-          className="absolute"
           style={{
-            right: "4%",
-            bottom: "4%",
-            fontSize: "0.55em",
+            position: "absolute",
+            right: "12%",
+            bottom: "8%",
+            fontFamily: tokens.font.sans,
+            fontWeight: tokens.weight.med,
+            fontSize: ptPx,
             lineHeight: 1,
-            color: TILE.value,
-            fontWeight: 700,
-            textShadow: "0 0 2px rgba(255,244,220,0.9)",
+            // Slightly more opaque on brown so the cream digit reads;
+            // darker on cream so the brown digit reads.
+            opacity: variant === "brown" ? 0.9 : 0.82,
           }}
         >
           {displayValue}
