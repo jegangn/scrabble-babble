@@ -3,14 +3,12 @@ import { tokens } from "../tokens.js";
 import { Tile } from "../components/Tile.js";
 
 /**
- * Loading splash, lifted verbatim from
- * design_handoff_scrabble_system/Loading screen.html:
+ * Loading splash:
  *
  *   1. Cream-paper page with the dot-grain background that every other
  *      surface uses.
  *   2. The SCRABBLE / BABBLE hero in cream + brown Tile components,
- *      each tile staggered into a "drop-in" animation so the title
- *      assembles itself in front of the user.
+ *      rendered statically (no per-tile entry animation).
  *   3. A three-dot pulsing progress indicator below the hero with the
  *      "Loading dictionary" tagline.
  *
@@ -19,9 +17,6 @@ import { Tile } from "../components/Tile.js";
  * mounts the home screen. The aria-live region updates its text from
  * "Loading dictionary" to "Loaded — opening Scrabble Babble" so screen
  * readers announce the transition rather than seeing a silent swap.
- *
- * Honors prefers-reduced-motion: animations + fade are skipped, the
- * splash is plain static cream-paper with the same hero.
  */
 
 const TOP_ROW = ["S", "C", "R", "A", "B", "B", "L", "E"] as const;
@@ -35,12 +30,6 @@ const VALUES: Record<string, number> = {
   M: 4, N: 2, O: 1, P: 4, Q: 10, R: 1, S: 1, T: 1, U: 2, V: 5, W: 4,
   X: 8, Y: 3, Z: 10,
 };
-
-// Per-tile stagger schedule from the spec: SCRABBLE rolls in first
-// at 70 ms intervals, BABBLE follows 110 ms after the last cream tile
-// (490 + 110 = 600 ms) at the same cadence.
-const TILE_STEP_MS = 70;
-const SECOND_ROW_OFFSET_MS = 600;
 
 export function LoadingScreen(): JSX.Element {
   const { color } = tokens;
@@ -70,24 +59,15 @@ export function LoadingScreen(): JSX.Element {
         backgroundPosition: tokens.grain.position,
       }}
     >
-      {/* Keyframes live inside the splash so we don't pollute the global
-          stylesheet. Scoped by class names prefixed "ls-". */}
+      {/* Only the loading-bar (pulsing dots) animates — the SCRABBLE /
+          BABBLE hero renders statically. Scoped via the "ls-dot" class. */}
       <style>{`
-        @keyframes ls-tile-drop {
-          0%   { opacity: 0; transform: translateY(-18px) rotate(-3deg) scale(.95); }
-          60%  { opacity: 1; transform: translateY(2px) rotate(.5deg) scale(1.02); }
-          100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
-        }
         @keyframes ls-dot-pulse {
           0%, 60%, 100% { opacity: .25; transform: translateY(0); }
           30%           { opacity: 1;   transform: translateY(-3px); }
         }
-        @keyframes ls-fade-in {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
         @media (prefers-reduced-motion: reduce) {
-          .ls-tile, .ls-status, .ls-dot { animation: none !important; opacity: 1 !important; }
+          .ls-dot { animation: none !important; opacity: 1 !important; }
         }
       `}</style>
 
@@ -110,22 +90,17 @@ export function LoadingScreen(): JSX.Element {
             gap: 8,
           }}
         >
-          <HeroRow letters={TOP_ROW} variant="cream" startMs={0} />
-          <HeroRow letters={BOTTOM_ROW} variant="brown" startMs={SECOND_ROW_OFFSET_MS} />
+          <HeroRow letters={TOP_ROW} variant="cream" />
+          <HeroRow letters={BOTTOM_ROW} variant="brown" />
         </div>
 
-        {/* Status block — three pulsing brown dots + the tagline.
-            Wrapped in its own fade-in so it slides in after the hero
-            has finished assembling (1100 ms per spec). */}
+        {/* Status block — three pulsing brown dots + the tagline. */}
         <div
-          className="ls-status"
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: 18,
-            opacity: 0,
-            animation: "ls-fade-in 400ms ease 1100ms forwards",
           }}
         >
           <div aria-hidden style={{ display: "flex", gap: 10 }}>
@@ -155,30 +130,14 @@ export function LoadingScreen(): JSX.Element {
 interface HeroRowProps {
   readonly letters: ReadonlyArray<string>;
   readonly variant: "cream" | "brown";
-  readonly startMs: number;
 }
 
-/**
- * One row of staggered tiles. Each tile's `animation` is set inline so
- * the per-tile delay falls out of `startMs + i × TILE_STEP_MS`. We pass
- * `animation` via the Tile component's `style` prop — Tile spreads
- * the caller's style last, so this overrides any default.
- */
-function HeroRow({ letters, variant, startMs }: HeroRowProps): JSX.Element {
+/** One row of static tiles — no entry animation. */
+function HeroRow({ letters, variant }: HeroRowProps): JSX.Element {
   return (
     <div style={{ display: "flex", gap: 6 }}>
       {letters.map((letter, i) => (
-        <div
-          key={i}
-          className="ls-tile"
-          style={{
-            animation: `ls-tile-drop 600ms cubic-bezier(.4, 1.4, .5, 1) ${
-              startMs + i * TILE_STEP_MS
-            }ms backwards`,
-          }}
-        >
-          <Tile letter={letter} value={VALUES[letter]} variant={variant} size={66} />
-        </div>
+        <Tile key={i} letter={letter} value={VALUES[letter]} variant={variant} size={66} />
       ))}
     </div>
   );
