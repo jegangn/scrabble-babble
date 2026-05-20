@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { BoardCell as BoardCellT, Position } from "../../engine/types.js";
 import { PREMIUM_COLORS, BOARD } from "../theme.js";
 import { Tile } from "./Tile.js";
@@ -21,14 +21,28 @@ function BoardCellInner({
 }: BoardCellProps): JSX.Element {
   const premium = PREMIUM_COLORS[cell.premium];
   const empty = cell.tile === null;
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `cell-${position.row}-${position.col}`,
     data: { kind: "cell", position },
     disabled: !empty,
   });
+  // Pending tiles (placed-but-not-submitted) are draggable: the user can
+  // move a misplaced tile to a different cell instead of having to recall
+  // it to the rack first. Non-pending committed tiles are NOT draggable —
+  // they're locked into the board.
+  const {
+    setNodeRef: setDragRef,
+    attributes: dragAttributes,
+    listeners: dragListeners,
+    isDragging,
+  } = useDraggable({
+    id: `pending-${position.row}-${position.col}`,
+    data: { kind: "pending-board", position },
+    disabled: !isPending,
+  });
   return (
     <button
-      ref={setNodeRef}
+      ref={setDropRef}
       type="button"
       onClick={onTap ? () => onTap(position) : undefined}
       className="relative flex items-center justify-center"
@@ -57,9 +71,27 @@ function BoardCellInner({
             {premium.label}
           </span>
         )
+      ) : isPending ? (
+        // Pending tile: wrap in the draggable handle. Ghost to 40 % opacity
+        // while dragging — the moving tile is rendered by GameScreen's
+        // <DragOverlay>, mirroring the rack-tile drag pattern.
+        <div
+          ref={setDragRef}
+          {...dragAttributes}
+          {...dragListeners}
+          className="absolute inset-[2px]"
+          style={{
+            cursor: isDragging ? "grabbing" : "grab",
+            opacity: isDragging ? 0.4 : 1,
+            touchAction: "none",
+            transition: "opacity 120ms ease",
+          }}
+        >
+          <Tile tile={cell.tile!} pending />
+        </div>
       ) : (
         <div className="absolute inset-[2px]">
-          <Tile tile={cell.tile!} pending={isPending} />
+          <Tile tile={cell.tile!} pending={false} />
         </div>
       )}
     </button>

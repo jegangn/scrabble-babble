@@ -131,6 +131,12 @@ export interface StoreState {
 
   // Drag/drop actions
   placeFromRack: (rackIndex: number, position: Position) => void;
+  /**
+   * Move a pending tile already on the board to a different empty cell.
+   * Used when the user drags a misplaced pending tile to a better spot
+   * instead of recalling it to the rack first.
+   */
+  movePending: (from: Position, to: Position) => void;
   recallOne: (position: Position) => void;
   setBlankLetter: (letter: Letter) => void;
   cancelBlankPicker: () => void;
@@ -472,6 +478,36 @@ export const useGameStore = create<StoreState>((set, get) => ({
     // Soft "clack" feedback when the tile lands on the cell. Fired AFTER
     // the state set so we never play a sound for a placement that gets
     // rejected by the guards above.
+    playPlace();
+  },
+
+  movePending: (from, to) => {
+    const { game, pending } = get();
+    if (!game) return;
+    // Find the pending entry being moved. If `from` doesn't match a
+    // pending tile, this is a stale event — bail.
+    const idx = pending.findIndex(
+      (p) => p.position.row === from.row && p.position.col === from.col,
+    );
+    if (idx === -1) return;
+    // Reject moves to the SAME cell (UI no-op), to an occupied COMMITTED
+    // cell, or to another PENDING cell. The first two are obvious; the
+    // third prevents stacking two pending tiles on one cell.
+    if (from.row === to.row && from.col === to.col) return;
+    if (isOccupied(game.board, to)) return;
+    if (pending.some((p, i) => i !== idx && p.position.row === to.row && p.position.col === to.col)) {
+      return;
+    }
+    // Splice the moved entry to its new position; keep its tile + rackIndex.
+    const existing = pending[idx]!;
+    const next = [
+      ...pending.slice(0, idx),
+      { ...existing, position: to },
+      ...pending.slice(idx + 1),
+    ];
+    set({ pending: next, error: null });
+    // Same "soft clack" as a fresh placement — it's a placement, just
+    // with a re-used rack tile.
     playPlace();
   },
 

@@ -21,7 +21,7 @@ import { Modal } from "../components/Modal.js";
 import { ThinkingOverlay } from "../components/ThinkingOverlay.js";
 import { Tile } from "../components/Tile.js";
 import { ACCENT } from "../theme.js";
-import type { Position } from "../../engine/types.js";
+import type { Letter, Position } from "../../engine/types.js";
 
 export function GameScreen(): JSX.Element | null {
   const game = useGameStore((s) => s.game);
@@ -33,6 +33,7 @@ export function GameScreen(): JSX.Element | null {
   const opponent = useGameStore((s) => s.settings.opponent);
   const thinking = useGameStore((s) => s.thinking);
   const placeFromRack = useGameStore((s) => s.placeFromRack);
+  const movePending = useGameStore((s) => s.movePending);
   const recallOne = useGameStore((s) => s.recallOne);
   const setBlankLetter = useGameStore((s) => s.setBlankLetter);
   const cancelBlankPicker = useGameStore((s) => s.cancelBlankPicker);
@@ -49,12 +50,17 @@ export function GameScreen(): JSX.Element | null {
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
-  // Tracks which rack slot is currently being dragged so the <DragOverlay>
-  // can render a moving tile that follows the cursor. Without this overlay
-  // the original tile sat at its rack slot with opacity 0 — the user saw
-  // *nothing* moving with their finger. With it, the overlay is mounted
-  // at <body> level (escapes overflow clipping) and slides smoothly.
-  const [activeDragRackIndex, setActiveDragRackIndex] = useState<number | null>(null);
+  // Tracks the in-flight drag (if any) so the <DragOverlay> can render
+  // a moving tile that follows the cursor. Two sources:
+  //   - rack:          dragging a fresh tile from the rack onto the board
+  //   - pending-board: re-positioning an already-placed pending tile
+  // Without this overlay the original tile sat at its source with opacity 0
+  // and the user saw *nothing* moving with their finger.
+  const [activeDrag, setActiveDrag] = useState<
+    | { kind: "rack"; rackIndex: number }
+    | { kind: "pending-board"; position: Position }
+    | null
+  >(null);
 
   // Tracks whether the most recent drop landed on a valid board cell. We
   // mutate this synchronously in onDragEnd (BEFORE the setState that clears
@@ -115,23 +121,36 @@ export function GameScreen(): JSX.Element | null {
   );
 
   const onDragStart = (event: DragStartEvent) => {
-    const data = event.active.data.current as { kind: string; rackIndex?: number } | undefined;
-    if (data?.kind === "rack" && typeof data.rackIndex === "number") {
-      setActiveDragRackIndex(data.rackIndex);
+    const data = event.active.data.current as
+      | { kind: "rack"; rackIndex: number }
+      | { kind: "pending-board"; position: Position }
+      | undefined;
+    if (!data) return;
+    if (data.kind === "rack") {
+      setActiveDrag({ kind: "rack", rackIndex: data.rackIndex });
+    } else if (data.kind === "pending-board") {
+      setActiveDrag({ kind: "pending-board", position: data.position });
     }
   };
 
   const onDragEnd = (event: DragEndEvent) => {
-    const data = event.active.data.current as { kind: string; rackIndex?: number } | undefined;
+    const data = event.active.data.current as
+      | { kind: "rack"; rackIndex: number }
+      | { kind: "pending-board"; position: Position }
+      | undefined;
     const over = event.over?.data.current as { kind: string; position?: Position } | undefined;
-    const wasSuccessful =
-      data?.kind === "rack" && over?.kind === "cell" && !!over.position;
+    const droppedOnCell = over?.kind === "cell" && !!over.position;
     // Set BEFORE clearing the active drag, so the re-render's <DragOverlay>
     // already sees the updated `dropAnimation` prop.
-    dropSuccessfulRef.current = wasSuccessful;
-    setActiveDragRackIndex(null);
-    if (wasSuccessful && typeof data?.rackIndex === "number" && over?.position) {
+    dropSuccessfulRef.current = droppedOnCell;
+    setActiveDrag(null);
+    if (!data || !droppedOnCell || !over?.position) return;
+    if (data.kind === "rack") {
       placeFromRack(data.rackIndex, over.position);
+    } else if (data.kind === "pending-board") {
+      // Re-positioning an already-placed pending tile. The store action
+      // refuses no-op moves (same cell) so we don't have to gate here.
+      movePending(data.position, over.position);
     }
   };
 
@@ -139,7 +158,7 @@ export function GameScreen(): JSX.Element | null {
     // A cancelled drag (e.g. user dragged out of bounds then released) is a
     // failure case — animate the snap-back so the user sees the tile return.
     dropSuccessfulRef.current = false;
-    setActiveDragRackIndex(null);
+    setActiveDrag(null);
   };
 
   // NOTE: these useMemo calls were previously placed *after* `if (!game) return
@@ -184,12 +203,27 @@ export function GameScreen(): JSX.Element | null {
   };
 
   // Resolve the actual tile object for the in-flight drag (if any) so the
-  // overlay can render it. Reading from game.players[turn].rack keeps the
-  // overlay in sync with the source of truth, no separate copy needed.
-  const activeDragTile =
-    activeDragRackIndex !== null && game
-      ? game.players[game.turn]!.rack[activeDragRackIndex] ?? null
-      : null;
+  // overlay can render it. Two sources to look up:
+  //   - rack drag:          game.players[turn].rack[rackIndex]
+  //   - pending-board drag: the matching pending placement's tile
+  // Either resolves to a Tile-shaped object the <Tile> component can render.
+  type AnyDragTile =
+    | { kind: "letter"; letter: Letter; value: number }
+    | { kind: "blank"; value: 0 }
+    | { kind: "blank"; letter: Letter; value: 0 };
+  let activeDragTile: AnyDragTile | null = null;
+  if (activeDrag && game) {
+    if (activeDrag.kind === "rack") {
+      activeDragTile = game.players[game.turn]!.rack[activeDrag.rackIndex] ?? null;
+    } else {
+      const found = pending.find(
+        (p) =>
+          p.position.row === activeDrag.position.row &&
+          p.position.col === activeDrag.position.col,
+      );
+      activeDragTile = found?.tile ?? null;
+    }
+  }
 
   return (
     <DndContext
