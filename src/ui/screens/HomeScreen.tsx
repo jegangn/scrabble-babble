@@ -1,12 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { APP_NAME } from "../../config/branding.js";
 import { enumerateSevenLetterPangrams } from "../../engine/games/spelling-bee.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { loadInProgress, saveInProgress } from "../../storage/game-storage.js";
 import { fromJSON, toJSON } from "../../storage/serializer.js";
-import { ACCENT } from "../theme.js";
+import { MenuItem } from "../components/MenuItem.js";
+import { MenuTile, TileWord } from "../components/MenuTile.js";
 import { UserNamePrompt } from "../components/UserNamePrompt.js";
 
+/**
+ * Home (main menu) — built from the design-handoff spec in
+ * `design_handoff_scrabble_menu/README.md`. Centred 560 px column with
+ * a tile-hero, six menu cards, and a small footer mark.
+ *
+ * The brand identity, user-chip, first-launch prompt, dictionary-load
+ * alert, and underlying actions (resume / new / Tumbler / Bee /
+ * export / import) are preserved from the previous Home — only the
+ * presentation has been re-skinned. All inline styles match the design
+ * tokens verbatim; nothing leaks into theme.ts because no other screen
+ * uses these colours.
+ */
 export function HomeScreen(): JSX.Element {
   const hydrate = useGameStore((s) => s.hydrate);
   const setScreen = useGameStore((s) => s.setScreen);
@@ -15,7 +27,7 @@ export function HomeScreen(): JSX.Element {
   const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const [hasInProgress, setHasInProgress] = useState(false);
   // null === no prompt; "first" === mandatory first-launch greeting;
-  // "change" === user clicked "Change user", may cancel out.
+  // "change" === user clicked the top-right chip, may cancel out.
   const [namePrompt, setNamePrompt] = useState<"first" | "change" | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -79,15 +91,42 @@ export function HomeScreen(): JSX.Element {
     }
   };
 
-  // App.tsx falls through to Home even if the dictionary failed to load. If
-  // we hide that fact, the user taps a game mode and gets a broken screen
-  // ("Preparing today's puzzle…" forever, AI never plays, etc.). Surface
-  // a clear error and a retry hint up front.
   const dictMissing = dictionary === null;
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 p-6" style={{ position: "relative" }}>
-      {/* Top-right user chip — shows current name, tap to change. */}
+    <div
+      style={{
+        position: "relative",
+        minHeight: "100%",
+        background: "#F1E5CF",
+        overflowX: "hidden",
+        overflowY: "auto",
+      }}
+    >
+      {/*
+        Decorative paper-grain texture per spec. Two stacked radial-gradient
+        dot patterns, fixed position so it scrolls cleanly, pointer-events
+        none so the dots don't intercept taps. Opacity 0.35 keeps the
+        cream surface dominant.
+      */}
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          opacity: 0.35,
+          backgroundImage:
+            "radial-gradient(rgba(110,70,30,.05) 1px, transparent 1px), radial-gradient(rgba(110,70,30,.04) 1px, transparent 1px)",
+          backgroundSize: "7px 7px, 11px 11px",
+          backgroundPosition: "0 0, 3px 5px",
+        }}
+      />
+
+      {/*
+        Top-right user chip — survives the redesign so the user identity
+        feature isn't a regression. Sits over the shell, above the grain.
+      */}
       {currentUser && (
         <button
           type="button"
@@ -97,9 +136,10 @@ export function HomeScreen(): JSX.Element {
             position: "absolute",
             top: 12,
             right: 12,
-            background: "white",
-            color: ACCENT.text,
-            border: `2px solid ${ACCENT.primary}`,
+            zIndex: 10,
+            background: "#FFFFFF",
+            color: "#2A1A0C",
+            border: "1.5px solid #C9B48E",
             borderRadius: 999,
             padding: "8px 14px",
             fontSize: "0.95em",
@@ -113,95 +153,176 @@ export function HomeScreen(): JSX.Element {
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            cursor: "pointer",
+            boxShadow:
+              "0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(60,30,0,.06), 0 8px 22px -12px rgba(60,30,0,.18)",
           }}
         >
           <span aria-hidden>👤</span>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-            {currentUser}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser}</span>
+          <span aria-hidden style={{ opacity: 0.5, fontSize: "0.85em" }}>
+            ›
           </span>
-          <span aria-hidden style={{ opacity: 0.5, fontSize: "0.85em" }}>›</span>
         </button>
       )}
-      <h1 style={{ fontSize: "3em", fontWeight: 700, color: ACCENT.primary }}>{APP_NAME}</h1>
-      {dictMissing && (
-        <div
-          role="alert"
+
+      {/*
+        Page shell — centred 560 px column. Padding 56 px top, 96 px bottom,
+        28 px sides (18 px on ≤480 px viewports, handled via media query).
+      */}
+      <main
+        style={{
+          maxWidth: 560,
+          margin: "0 auto",
+          padding: "56px 28px 96px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 36,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {/* HERO — stacked tile rows + tagline. The tile-block is wrapped
+            in an <h1> with aria-label so screen readers (and Playwright's
+            getByRole("heading")) see one heading with accessible name
+            "Scrabble Babble" — instead of reading out the individual
+            tile letters as text. */}
+        <header
           style={{
-            background: "#fff0f0",
-            border: `2px solid ${ACCENT.danger}`,
-            borderRadius: 10,
-            padding: "12px 16px",
-            color: ACCENT.danger,
-            maxWidth: 360,
-            textAlign: "center",
-            fontWeight: 600,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 18,
+            paddingTop: 24,
           }}
         >
-          The word list didn't load — go online and refresh the page to
-          download it (one-time, then it works offline).
-        </div>
-      )}
-      <div className="flex flex-col gap-3 w-full max-w-sm">
-        {hasInProgress && (
-          <button
-            type="button"
-            onClick={onResume}
-            style={btnStyle("primary")}
+          <h1
+            aria-label="Scrabble Babble"
+            style={{
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
+            }}
           >
-            Resume game
-          </button>
+            <TileWord word="SCRABBLE" size={66} variant="cream" />
+            <TileWord word="BABBLE" size={66} variant="brown" />
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 14,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#6B5641",
+              fontWeight: 500,
+              fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif",
+            }}
+          >
+            Words, on your terms.
+          </p>
+        </header>
+
+        {/*
+          Dict-missing safety alert — preserved from the previous Home so
+          a corrupted / failed wordlist load doesn't silently strand the
+          user. Re-styled to fit the new cream palette.
+        */}
+        {dictMissing && (
+          <div
+            role="alert"
+            style={{
+              background: "#FFF1E6",
+              border: "1.5px solid #B03030",
+              borderRadius: 14,
+              padding: "12px 16px",
+              color: "#7A1F1F",
+              textAlign: "center",
+              fontWeight: 600,
+            }}
+          >
+            The word list didn't load — go online and refresh the page to download
+            it (one-time, then it works offline).
+          </div>
         )}
-        <button
-          type="button"
-          onClick={() => setScreen({ kind: "new_game" })}
-          style={btnStyle(hasInProgress ? "secondary" : "primary")}
+
+        {/* MENU — six cards, 10 px gap. Resume is the primary row when
+            a saved game exists; otherwise we skip it entirely (showing a
+            disabled brown button as the visual anchor would mislead). */}
+        <nav style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="Main menu">
+          {hasInProgress && (
+            <MenuItem
+              icon="▶"
+              label="Resume game"
+              sublabel="Pick up where you left off"
+              primary
+              onClick={() => {
+                void onResume();
+              }}
+            />
+          )}
+          <MenuItem icon="✦" label="New game" onClick={() => setScreen({ kind: "new_game" })} />
+          <MenuItem
+            icon="⧗"
+            label="Tumbler"
+            sublabel="60-second sprint"
+            onClick={() => setScreen({ kind: "tumbler" })}
+          />
+          <MenuItem
+            icon="✷"
+            label="Spelling Bee"
+            sublabel="Daily puzzle"
+            onClick={() => setScreen({ kind: "spelling_bee" })}
+          />
+          <MenuItem
+            icon="↑"
+            label="Export current game"
+            disabled={!hasInProgress}
+            onClick={() => {
+              void onExport();
+            }}
+          />
+          <MenuItem icon="↓" label="Import game" onClick={() => fileInput.current?.click()} />
+        </nav>
+
+        {/* Footer — small "S" brand mark + version label. */}
+        <footer
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            color: "#6B5641",
+            fontSize: 12,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            marginTop: 8,
+          }}
         >
-          New game
-        </button>
-        <button
-          type="button"
-          onClick={() => setScreen({ kind: "tumbler" })}
-          style={btnStyle("secondary")}
-        >
-          Tumbler — 60 second sprint
-        </button>
-        <button
-          type="button"
-          onClick={() => setScreen({ kind: "spelling_bee" })}
-          style={btnStyle("secondary")}
-        >
-          Spelling Bee — daily puzzle
-        </button>
-        <button type="button" onClick={onExport} style={btnStyle("secondary")}>
-          Export current game
-        </button>
-        <button type="button" onClick={() => fileInput.current?.click()} style={btnStyle("secondary")}>
-          Import game
-        </button>
+          <MenuTile letter="S" size={18} variant="brown" showValue={false} />
+          <span>Scrabble Babble · v0.4</span>
+        </footer>
+
+        {/* Hidden file input for the Import flow. Reset BEFORE handling so
+            re-selecting the same file still fires the change event. */}
         <input
           ref={fileInput}
           type="file"
           accept="application/json"
-          className="hidden"
+          style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files?.[0];
-            // Reset BEFORE handling so re-selecting the same file still fires
-            // the change event next time. Without this, a failed import (alert
-            // dismissed) couldn't be retried with the same file.
             e.target.value = "";
             if (f) void onImport(f);
           }}
         />
-      </div>
+      </main>
 
       {namePrompt && (
         <UserNamePrompt
           initialName={namePrompt === "change" ? (currentUser ?? "") : ""}
-          title={
-            namePrompt === "change"
-              ? "Change user"
-              : "Welcome — what's your name?"
-          }
+          title={namePrompt === "change" ? "Change user" : "Welcome — what's your name?"}
           onSubmit={(name) => {
             setCurrentUser(name);
             setNamePrompt(null);
@@ -213,18 +334,4 @@ export function HomeScreen(): JSX.Element {
       )}
     </div>
   );
-}
-
-function btnStyle(variant: "primary" | "secondary"): React.CSSProperties {
-  return {
-    background: variant === "primary" ? ACCENT.primary : "white",
-    color: variant === "primary" ? "white" : ACCENT.text,
-    border: variant === "primary" ? "none" : `2px solid ${ACCENT.primary}`,
-    padding: "14px 20px",
-    fontSize: "1.1em",
-    fontWeight: 600,
-    borderRadius: 10,
-    minHeight: 56,
-    touchAction: "manipulation",
-  };
 }

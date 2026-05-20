@@ -18,12 +18,17 @@ export default defineConfig({
       },
       manifest: {
         name: "Scrabble Babble",
-        short_name: "Scrabble Babble",
+        // short_name follows the design-handoff spec — chosen for the
+        // home-screen icon label where space is tight.
+        short_name: "Scrabble",
         description: "Private Scrabble-style PWA gift.",
         display: "standalone",
         orientation: "landscape-primary",
-        background_color: "#f5ede2",
-        theme_color: "#7c4a2a",
+        // background_color + theme_color now match the new HomeScreen
+        // cream palette (was the older warm-brown). Keeps the install /
+        // splash screen visually consistent with the redesign.
+        background_color: "#F1E5CF",
+        theme_color: "#F1E5CF",
         start_url: "./",
         scope: "./",
         icons: [
