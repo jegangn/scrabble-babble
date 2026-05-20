@@ -43,6 +43,93 @@ export interface TileProps {
   readonly style?: CSSProperties;
 }
 
+// ─── Spec fonts ────────────────────────────────────────────────────
+//
+// Imported via the Google Fonts <link> in index.html (Domine 700 +
+// Atkinson Hyperlegible 700). Keep the system fallbacks so the tile
+// still reads as the spec intends if the font hasn't loaded yet.
+const FONT_LETTER =
+  '"Domine", "Iowan Old Style", "Apple Garamond", Georgia, serif';
+const FONT_VALUE =
+  '"Atkinson Hyperlegible", ui-sans-serif, -apple-system, system-ui, sans-serif';
+
+// ─── Spec backgrounds ──────────────────────────────────────────────
+//
+// Three layers stacked top-to-bottom (the spec's exact strings):
+//   1) faint 92° repeating linear — wood-grain noise
+//   2) radial highlight at 28% / 18%
+//   3) 165° three-stop linear — the body gradient
+//
+// At s-32 the grain layer is dropped (looks busy at thumbnail scale).
+// At s-24 the radial is dropped too — pure linear gradient.
+const BG_CREAM_FULL =
+  "repeating-linear-gradient(92deg, rgba(120,80,40,.022) 0px, rgba(120,80,40,.022) 1px, transparent 1px, transparent 3px), " +
+  "radial-gradient(ellipse at 28% 18%, rgba(255,250,235,.55), transparent 60%), " +
+  "linear-gradient(165deg, #F8EBD0 0%, #EBD7AE 60%, #DCBE91 100%)";
+
+const BG_CREAM_LIGHT =
+  "radial-gradient(ellipse at 28% 18%, rgba(255,250,235,.35), transparent 60%), " +
+  "linear-gradient(165deg, #F8EBD0 0%, #EBD7AE 60%, #E2C896 100%)";
+
+const BG_CREAM_TINY =
+  "linear-gradient(165deg, #F4E5C5 0%, #E2C896 100%)";
+
+const BG_BROWN_FULL =
+  "repeating-linear-gradient(92deg, rgba(0,0,0,.04) 0px, rgba(0,0,0,.04) 1px, transparent 1px, transparent 3px), " +
+  "radial-gradient(ellipse at 28% 18%, rgba(255,210,160,.20), transparent 60%), " +
+  "linear-gradient(165deg, #8A5934 0%, #6F4423 60%, #4E2E13 100%)";
+
+const BG_BROWN_LIGHT =
+  "linear-gradient(165deg, #7E5230 0%, #6F4423 60%, #5A3818 100%)";
+
+const BG_BROWN_TINY =
+  "linear-gradient(165deg, #7A4F2C 0%, #5A3818 100%)";
+
+// ─── Spec shadows ──────────────────────────────────────────────────
+//
+// Eight-layer 3D stack for the large sizes; halved for s-32; minimal
+// for s-24. The "placed-but-uncommitted" ring sits ON TOP of the
+// regular shadow so the ring stays visible at any size.
+const SHADOW_CREAM_FULL =
+  "inset 0 2px 1px rgba(255,255,255,.75), " +
+  "inset 2px 0 1.5px rgba(255,250,235,.4), " +
+  "inset 0 -4px 3px rgba(120,80,40,.45), " +
+  "inset -2px 0 2px rgba(120,80,40,.20), " +
+  "0 1px 0 rgba(255,250,235,.4), " +
+  "0 3px 0 rgba(108,68,38,.55), " +
+  "0 6px 10px -2px rgba(60,30,0,.35), " +
+  "0 14px 22px -8px rgba(60,30,0,.30)";
+
+const SHADOW_CREAM_LIGHT =
+  "inset 0 1px 0 rgba(255,255,255,.55), " +
+  "inset 0 -1px 0 rgba(120,80,40,.25), " +
+  "0 1px 2px rgba(60,30,0,.18)";
+
+const SHADOW_CREAM_TINY =
+  "inset 0 1px 0 rgba(255,255,255,.45), " +
+  "inset 0 -1px 0 rgba(120,80,40,.20), " +
+  "0 1px 1px rgba(60,30,0,.15)";
+
+const SHADOW_BROWN_FULL =
+  "inset 0 2px 1px rgba(255,210,160,.32), " +
+  "inset 2px 0 1.5px rgba(255,210,160,.10), " +
+  "inset 0 -4px 3px rgba(0,0,0,.45), " +
+  "inset -2px 0 2px rgba(0,0,0,.18), " +
+  "0 1px 0 rgba(255,220,180,.18), " +
+  "0 3px 0 rgba(30,14,0,.55), " +
+  "0 6px 10px -2px rgba(0,0,0,.40), " +
+  "0 14px 22px -8px rgba(0,0,0,.32)";
+
+const SHADOW_BROWN_LIGHT =
+  "inset 0 1px 0 rgba(255,210,160,.25), " +
+  "inset 0 -1px 0 rgba(0,0,0,.30), " +
+  "0 1px 2px rgba(0,0,0,.22)";
+
+const SHADOW_BROWN_TINY =
+  "inset 0 1px 0 rgba(255,210,160,.20), " +
+  "inset 0 -1px 0 rgba(0,0,0,.25), " +
+  "0 1px 1px rgba(0,0,0,.18)";
+
 /** Engine-tile → display tuple. */
 function deriveFromTile(t: PlacedTile | TileT): { letter: string; value: number | null } {
   if (t.kind === "letter") return { letter: t.letter, value: t.value };
@@ -54,14 +141,33 @@ function deriveFromTile(t: PlacedTile | TileT): { letter: string; value: number 
 }
 
 /**
+ * Spec tier — which of the five fixed treatments to apply. The spec
+ * defines visuals at exactly 96 / 72 / 52 / 32 / 24 px; callers pass
+ * arbitrary widths, so we snap to the nearest tier for the background
+ * and shadow treatment while keeping the requested size as the actual
+ * px width/height.
+ */
+type Tier = "s96" | "s72" | "s52" | "s32" | "s24";
+
+function tierFor(size: number): Tier {
+  if (size >= 84) return "s96";
+  if (size >= 62) return "s72";
+  if (size >= 42) return "s52";
+  if (size >= 28) return "s32";
+  return "s24";
+}
+
+/**
  * Scrabble tile — the workhorse component used on the board, in racks,
- * in pickers, and in the menu hero.
+ * in pickers, and in the menu hero. Final-spec rebuild (Option B ·
+ * Domine letter + Atkinson Hyperlegible digit, 3D dimensional treatment
+ * for the rack/board sizes and a lighter treatment for thumbnails).
  *
- * The proportions follow the handoff: letter sized at 0.58× tile edge,
- * point-value subscript at 0.24× with an 11 px floor (per the design
- * "type values stay readable" rule). The letter is nudged up 3 % so its
- * baseline doesn't collide with the corner digit on letters with low-
- * right ink (N, R, B, W).
+ * Letter centring is pure CSS grid (`display: grid; place-items: center`)
+ * with the letter as a plain (non-positioned, non-transformed) child.
+ * The score digit lives in a fixed corner zone (right 9 % / bottom 7 %)
+ * the letter cannot reach — capped at 0.55 × width so even W and M
+ * clear the corner.
  */
 export function Tile({
   tile,
@@ -76,6 +182,7 @@ export function Tile({
   // Either `placed` or `pending` triggers the moss ring — kept for
   // back-compat with the older API used by BoardCell / GameScreen.
   const isPlaced = placed || pending;
+
   // Resolve letter + value from whichever input the caller used.
   let displayLetter = letter ?? "";
   let displayValue: number | null = null;
@@ -85,43 +192,77 @@ export function Tile({
     displayValue = d.value;
   }
 
-  const fontPx = Math.round(size * 0.58);
-  const ptPx = Math.max(11, Math.round(size * 0.24));
-  // Scale the corner radius with the tile so small tiles (footer mark)
-  // stay proportionate. Clamped to 6 px so micro tiles aren't fully round.
-  const rad = Math.max(6, Math.round(size * 0.13));
+  // Spec ratios — letter 0.55 × width, digit 0.17 × width, radius 0.14 × width.
+  // The letter is `min`-capped so widest glyphs (W, M) never reach the
+  // digit corner; matches the spec's explicit font-size table.
+  const letterPx = Math.max(10, Math.round(size * 0.55));
+  const valuePx = Math.max(7, Math.round(size * 0.17));
+  const radiusPx = Math.max(4, Math.round(size * 0.14));
 
-  const background = (() => {
-    switch (variant) {
-      case "brown":
-        return tokens.tileGradient.brown;
-      case "ghost":
-        return "transparent";
-      case "blank":
-        return "linear-gradient(165deg, #FAF1DC 0%, #EFE0BE 100%)";
-      case "cream":
-      default:
-        return tokens.tileGradient.cream;
-    }
-  })();
+  const tier = tierFor(size);
+  const isBrown = variant === "brown";
 
-  // Three layered shadows imply physical depth without a backdrop-filter.
-  // The `placed` ring overrides the variant shadow because it's the
-  // most important signal — "this tile is uncommitted".
-  const boxShadow = isPlaced
-    ? `0 0 0 2px ${tokens.color.success} inset, ${tokens.shadow.tile}`
-    : variant === "brown"
-      ? tokens.shadow.tileBrown
-      : variant === "ghost"
-        ? `inset 0 0 0 1.5px ${tokens.color.brown}`
-        : tokens.shadow.tile;
+  // Pick background + shadow for the variant × tier matrix. Ghost and
+  // blank stay outside the spec tiers — they have their own role
+  // (deselected state in pickers, blank-tile face) and the spec doesn't
+  // cover them.
+  let background: string;
+  let boxShadow: string;
+  if (variant === "ghost") {
+    background = "transparent";
+    boxShadow = `inset 0 0 0 1.5px ${tokens.color.brown}`;
+  } else if (variant === "blank") {
+    background = "linear-gradient(165deg, #FAF1DC 0%, #EFE0BE 100%)";
+    boxShadow = SHADOW_CREAM_LIGHT;
+  } else if (isBrown) {
+    background =
+      tier === "s24" ? BG_BROWN_TINY : tier === "s32" ? BG_BROWN_LIGHT : BG_BROWN_FULL;
+    boxShadow =
+      tier === "s24" ? SHADOW_BROWN_TINY : tier === "s32" ? SHADOW_BROWN_LIGHT : SHADOW_BROWN_FULL;
+  } else {
+    background =
+      tier === "s24" ? BG_CREAM_TINY : tier === "s32" ? BG_CREAM_LIGHT : BG_CREAM_FULL;
+    boxShadow =
+      tier === "s24" ? SHADOW_CREAM_TINY : tier === "s32" ? SHADOW_CREAM_LIGHT : SHADOW_CREAM_FULL;
+  }
 
-  const ink =
-    variant === "brown"
-      ? tokens.color.cream
-      : variant === "ghost"
-        ? tokens.color.brown
-        : tokens.color.ink;
+  // Placed-but-uncommitted — moss inset ring layered ON TOP of the
+  // existing shadow so the ring reads at every tier. The spec's exact
+  // ring rule: `inset 0 0 0 2px var(--success)`.
+  if (isPlaced) {
+    boxShadow = `inset 0 0 0 2px ${tokens.color.success}, ${boxShadow}`;
+  }
+
+  const ink = isBrown
+    ? tokens.color.cream
+    : variant === "ghost"
+      ? tokens.color.brown
+      : tokens.color.ink;
+
+  // Letter engraving — dual text-shadow at full/light tiers, stripped
+  // at s-32 / s-24 (at 14-18 px it just blurs the glyph).
+  const letterTextShadow =
+    tier === "s24" || tier === "s32"
+      ? "none"
+      : isBrown
+        ? "0 1px 0 rgba(255,220,180,.20), 0 -1px 0 rgba(0,0,0,.45)"
+        : "0 1px 0 rgba(255,250,235,.55), 0 -1px 0 rgba(0,0,0,.08)";
+
+  const letterStroke =
+    tier === "s24" || tier === "s32"
+      ? "0.4px"
+      : isBrown
+        ? "0.5px"
+        : "0.6px";
+
+  // Score digit ink — brand brown on cream, cream on brown.
+  const valueColor = isBrown ? tokens.color.cream : tokens.color.brown;
+  const valueShadow =
+    tier === "s24" || tier === "s32"
+      ? "none"
+      : isBrown
+        ? "0 1px 0 rgba(0,0,0,.35)"
+        : "0 1px 0 rgba(255,250,235,.5)";
 
   return (
     <div
@@ -129,12 +270,10 @@ export function Tile({
         position: "relative",
         width: size,
         height: size,
-        borderRadius: rad,
+        borderRadius: radiusPx,
         background,
         color: ink,
         boxShadow,
-        fontFamily: tokens.font.serif,
-        fontWeight: tokens.weight.bold,
         display: "grid",
         placeItems: "center",
         userSelect: "none",
@@ -142,22 +281,41 @@ export function Tile({
         ...style,
       }}
     >
-      <span style={{ fontSize: fontPx, lineHeight: 1, transform: "translateY(-3%)" }}>
+      <span
+        className="l"
+        style={{
+          fontFamily: FONT_LETTER,
+          fontWeight: 700,
+          fontSize: letterPx,
+          letterSpacing: "-0.01em",
+          lineHeight: 1,
+          fontFeatureSettings: '"lnum", "kern"',
+          WebkitFontSmoothing: "antialiased",
+          WebkitTextStroke: `${letterStroke} currentColor`,
+          paintOrder: "stroke fill",
+          textShadow: letterTextShadow,
+          pointerEvents: "none",
+        }}
+      >
         {displayLetter}
       </span>
-      {showValue && displayValue !== null && (
+      {/* Score digit — hidden at s-24 per spec (display: none). At every
+          other size it sits at right 9% / bottom 7%. */}
+      {showValue && displayValue !== null && tier !== "s24" && (
         <span
+          className="v"
           style={{
             position: "absolute",
-            right: "12%",
-            bottom: "8%",
-            fontFamily: tokens.font.sans,
-            fontWeight: tokens.weight.med,
-            fontSize: ptPx,
+            right: "9%",
+            bottom: "7%",
+            fontFamily: FONT_VALUE,
+            fontWeight: 700,
+            fontSize: valuePx,
             lineHeight: 1,
-            // Slightly more opaque on brown so the cream digit reads;
-            // darker on cream so the brown digit reads.
-            opacity: variant === "brown" ? 0.9 : 0.82,
+            color: valueColor,
+            fontVariantNumeric: "tabular-nums",
+            textShadow: valueShadow,
+            pointerEvents: "none",
           }}
         >
           {displayValue}
