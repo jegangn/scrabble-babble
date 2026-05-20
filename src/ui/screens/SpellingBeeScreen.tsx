@@ -376,6 +376,27 @@ export function SpellingBeeScreen(): JSX.Element | null {
         <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
       )}
 
+      {/* Portrait-phone reflow: scale the hex container down so the 360 px
+          spec still fits inside a 480 px viewport (after 32 px of side padding,
+          available width is ~416 px). 0.78× scale brings it to ~281 px on-screen.
+          getBoundingClientRect() returns post-transform coords so the slide-
+          trail math tracks the finger correctly at any scale. */}
+      <style>{`
+        @media (max-width: 520px) {
+          .bee-hex-scale-wrap {
+            transform: scale(0.78);
+            transform-origin: top center;
+            margin-bottom: -80px;
+          }
+        }
+        @media (max-width: 380px) {
+          .bee-hex-scale-wrap {
+            transform: scale(0.65);
+            margin-bottom: -130px;
+          }
+        }
+      `}</style>
+
       <div
         style={{
           flex: 1,
@@ -477,23 +498,31 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </div>
 
           {/* Hex — pills positioned absolutely; pointer handlers on the
-              container. Dashed ring guide is purely decorative. */}
+              container. Dashed ring guide is purely decorative.
+              On narrow viewports we scale the entire hex via a CSS
+              transform applied through a `.bee-hex-scale-wrap` wrapper
+              (see media queries above the screen body). getBoundingClientRect
+              returns post-transform coords, so the slide-trail math
+              tracks the finger correctly at any zoom level. */}
           <div
-            ref={hexContainerRef}
-            style={{
-              position: "relative",
-              width: HEX_BOX,
-              height: HEX_BOX,
-              flexShrink: 0,
-              touchAction: "none",
-            }}
-            aria-label="Letter hex"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
-            onClickCapture={onClickCapture}
+            className="bee-hex-scale-wrap"
+            style={{ width: HEX_BOX, height: HEX_BOX, flexShrink: 0 }}
           >
+            <div
+              ref={hexContainerRef}
+              style={{
+                position: "relative",
+                width: HEX_BOX,
+                height: HEX_BOX,
+                touchAction: "none",
+              }}
+              aria-label="Letter hex"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
+              onClickCapture={onClickCapture}
+            >
             {/* Decorative ring guide */}
             <div
               aria-hidden
@@ -577,6 +606,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
                 </div>
               );
             })}
+            </div>
           </div>
 
           <div

@@ -298,9 +298,22 @@ export function GameScreen(): JSX.Element | null {
       onDragCancel={onDragCancel}
     >
       <style>{`
-        @media (orientation: portrait) {
+        /* Tablet portrait (iPad in portrait, Tab S8) — let the game render
+           with a stacked layout instead of blocking. The grid below uses
+           auto-fit to collapse from board+sidebar to a vertical stack. */
+        @media (orientation: portrait) and (max-width: 600px) {
           .gs-portrait-warning { display: flex !important; }
           .gs-game-body { display: none; }
+        }
+        /* Tablet portrait reflow — single column, board centred at top,
+           sidebar below it. Rack + actions remain a sticky bottom strip. */
+        @media (orientation: portrait) and (min-width: 601px) {
+          .gs-main-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .gs-board-wrap {
+            max-width: min(70vh, 100%);
+          }
         }
       `}</style>
 
@@ -372,6 +385,7 @@ export function GameScreen(): JSX.Element | null {
 
         {/* Top: board + sidebar */}
         <div
+          className="gs-main-grid"
           style={{
             flex: 1,
             position: "relative",
@@ -386,6 +400,7 @@ export function GameScreen(): JSX.Element | null {
           {/* Board column — keeps its container query so tile letters scale
               with the rendered cell size. */}
           <div
+            className="gs-board-wrap"
             style={{
               display: "flex",
               justifyContent: "center",
