@@ -3,16 +3,23 @@
  * no bundle bloat — each sound is generated on-the-fly from oscillators with
  * short ADSR envelopes. The total cost is a few hundred bytes of code.
  *
- * Three sounds:
- *   - playPlace  : soft warm thud when a tile lands on a board cell
- *   - playSuccess: rising 3-note arpeggio for a valid word
- *   - playError  : descending 2-note buzz for an invalid word
+ * Five sound categories — each with several presets the user can pick from
+ * in the in-app Sound settings modal:
+ *   - uiTap   : the quiet "tick" on most buttons
+ *   - place   : warm thud when a tile lands on a board cell
+ *   - recall  : reverse-thud when a tile lifts off the board
+ *   - success : valid-word arpeggio
+ *   - error   : invalid / duplicate-word cue
  *
  * Lifecycle: the AudioContext is created lazily on first play call. Some
  * browsers (iOS Safari especially) block context creation until the first
  * user gesture; that's fine — every place this is called from IS a user
  * gesture (drag-drop, tap, submit). All errors are swallowed: sound is a
  * nice-to-have, never a blocker.
+ *
+ * Volume model: each sound has a per-key master multiplier (0 → silent,
+ * 1 → default, up to 1.5 → boosted). Final per-tone gain is capped at 0.9
+ * to keep aggressive presets from clipping.
  */
 
 let ctx: AudioContext | null = null;
@@ -46,9 +53,10 @@ function getCtx(): AudioContext | null {
 }
 
 /**
- * Schedule one ADSR-shaped oscillator note. Returns when nothing — fire and
- * forget. `gainPeak` is intentionally conservative (≤0.3) so the cues are
- * soft, not jarring, on a quiet room iPad.
+ * Schedule one ADSR-shaped oscillator note. Returns nothing — fire and
+ * forget. The `gainPeak` multiplier is clamped to 0.9 so very loud presets
+ * combined with the user's max-volume setting don't push past the
+ * clipping threshold.
  */
 function tone(
   ac: AudioContext,
@@ -69,132 +77,383 @@ function tone(
     gainPeak = 0.2,
     attack = 0.005,
   } = options;
+  const peak = Math.max(0.0001, Math.min(0.9, gainPeak));
   const t0 = ac.currentTime + startOffset;
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.frequency.value = freq;
   osc.type = type;
   gain.gain.setValueAtTime(0, t0);
-  gain.gain.linearRampToValueAtTime(gainPeak, t0 + attack);
-  // Exponential decay reads more "natural" to the ear than linear.
+  gain.gain.linearRampToValueAtTime(peak, t0 + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
   osc.connect(gain).connect(ac.destination);
   osc.start(t0);
   osc.stop(t0 + duration + 0.02);
 }
 
-/**
- * Soft warm thud — a low sine wave with a quick decay. Plays when:
- *  - A tile lands on a board cell (Scrabble tap-to-place / drag-drop)
- *  - An alphabet tile is selected in Tumbler or Spelling Bee
- *
- * Gain peaks tuned over multiple release rounds:
- *   0.22 / 0.18  → too quiet for iPad room noise (original)
- *   0.32 / 0.26  → still too quiet at moderate device volume (release 1)
- *   0.45 / 0.36  → comfortably audible without startling (current)
- *
- * Still safely under 0.5 so a quiet room doesn't get a sharp pop.
- */
-export function playPlace(): void {
+// ─── Preset catalogue ──────────────────────────────────────────────
+
+/** The five sound categories the app fires. */
+export type SoundKey = "uiTap" | "place" | "recall" | "success" | "error";
+
+/** Implementation: schedule oscillator(s) on the given AudioContext, scaled
+    by the per-sound master volume. */
+type PresetImpl = (ac: AudioContext, master: number) => void;
+
+export interface PresetMeta {
+  /** Stable ID — persisted to IndexedDB. Never rename without a migration. */
+  readonly id: string;
+  /** UI label shown in the Sound settings picker. */
+  readonly label: string;
+  /** Short description shown under the label. */
+  readonly description: string;
+  readonly impl: PresetImpl;
+}
+
+/** Four presets per sound — see {@link PresetMeta}. */
+export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
+  uiTap: [
+    {
+      id: "tick",
+      label: "Tick",
+      description: "Quick high sine — the original",
+      impl: (ac, m) =>
+        tone(ac, { freq: 720, type: "sine", duration: 0.06, gainPeak: 0.12 * m }),
+    },
+    {
+      id: "pop",
+      label: "Pop",
+      description: "Punchy mid triangle",
+      impl: (ac, m) =>
+        tone(ac, { freq: 440, type: "triangle", duration: 0.05, gainPeak: 0.18 * m }),
+    },
+    {
+      id: "chime",
+      label: "Chime",
+      description: "Bell-bright sine",
+      impl: (ac, m) =>
+        tone(ac, { freq: 1500, type: "sine", duration: 0.12, gainPeak: 0.1 * m }),
+    },
+    {
+      id: "soft",
+      label: "Soft",
+      description: "Warm low confirm",
+      impl: (ac, m) =>
+        tone(ac, { freq: 280, type: "sine", duration: 0.1, gainPeak: 0.14 * m }),
+    },
+  ],
+
+  place: [
+    {
+      id: "thud",
+      label: "Thud",
+      description: "Two-layer warm bass — the original",
+      impl: (ac, m) => {
+        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.45 * m });
+        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.36 * m });
+      },
+    },
+    {
+      id: "wood",
+      label: "Wood",
+      description: "Single low triangle — wood-block feel",
+      impl: (ac, m) =>
+        tone(ac, { freq: 140, type: "triangle", duration: 0.1, gainPeak: 0.4 * m }),
+    },
+    {
+      id: "tap",
+      label: "Tap",
+      description: "Soft mid sine",
+      impl: (ac, m) =>
+        tone(ac, { freq: 280, type: "sine", duration: 0.06, gainPeak: 0.3 * m }),
+    },
+    {
+      id: "click",
+      label: "Click",
+      description: "Crisp short square",
+      impl: (ac, m) =>
+        tone(ac, { freq: 600, type: "square", duration: 0.03, gainPeak: 0.18 * m }),
+    },
+  ],
+
+  recall: [
+    {
+      id: "sweep",
+      label: "Sweep",
+      description: "Upward sweep — the original",
+      impl: (ac, m) => {
+        tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.22 * m });
+        tone(ac, {
+          freq: 360,
+          type: "sine",
+          startOffset: 0.04,
+          duration: 0.08,
+          gainPeak: 0.2 * m,
+        });
+      },
+    },
+    {
+      id: "whoosh",
+      label: "Whoosh",
+      description: "Downward sweep — lifted away",
+      impl: (ac, m) => {
+        tone(ac, { freq: 400, type: "sine", duration: 0.07, gainPeak: 0.22 * m });
+        tone(ac, {
+          freq: 200,
+          type: "sine",
+          startOffset: 0.04,
+          duration: 0.08,
+          gainPeak: 0.2 * m,
+        });
+      },
+    },
+    {
+      id: "lift",
+      label: "Lift",
+      description: "Two-tone perfect fifth",
+      impl: (ac, m) => {
+        tone(ac, { freq: 300, type: "triangle", duration: 0.07, gainPeak: 0.2 * m });
+        tone(ac, {
+          freq: 450,
+          type: "triangle",
+          startOffset: 0.07,
+          duration: 0.09,
+          gainPeak: 0.18 * m,
+        });
+      },
+    },
+    {
+      id: "pop-back",
+      label: "Pop back",
+      description: "Single quick low tone",
+      impl: (ac, m) =>
+        tone(ac, { freq: 180, type: "sine", duration: 0.05, gainPeak: 0.28 * m }),
+    },
+  ],
+
+  success: [
+    {
+      id: "arpeggio",
+      label: "Arpeggio",
+      description: "C5 → E5 → G5 — the original",
+      impl: (ac, m) => {
+        const notes = [523.25, 659.25, 783.99];
+        notes.forEach((freq, i) =>
+          tone(ac, {
+            freq,
+            type: "triangle",
+            startOffset: i * 0.08,
+            duration: 0.22,
+            gainPeak: 0.18 * m,
+          }),
+        );
+      },
+    },
+    {
+      id: "chord",
+      label: "Chord",
+      description: "C-major triad, played together",
+      impl: (ac, m) => {
+        const notes = [523.25, 659.25, 783.99];
+        notes.forEach((freq) =>
+          tone(ac, { freq, type: "triangle", duration: 0.35, gainPeak: 0.13 * m }),
+        );
+      },
+    },
+    {
+      id: "ascend",
+      label: "Ascend",
+      description: "C5 → G5 ascending fifth",
+      impl: (ac, m) => {
+        tone(ac, { freq: 523.25, type: "triangle", duration: 0.16, gainPeak: 0.18 * m });
+        tone(ac, {
+          freq: 783.99,
+          type: "triangle",
+          startOffset: 0.12,
+          duration: 0.26,
+          gainPeak: 0.18 * m,
+        });
+      },
+    },
+    {
+      id: "bell",
+      label: "Bell",
+      description: "Long G5 with E5 overtone — chime",
+      impl: (ac, m) => {
+        tone(ac, { freq: 783.99, type: "sine", duration: 0.4, gainPeak: 0.18 * m });
+        tone(ac, { freq: 1567.98, type: "sine", duration: 0.35, gainPeak: 0.08 * m });
+      },
+    },
+  ],
+
+  error: [
+    {
+      id: "minor",
+      label: "Minor third",
+      description: "G4 → E♭4 — the original",
+      impl: (ac, m) => {
+        tone(ac, {
+          freq: 392,
+          type: "triangle",
+          attack: 0.015,
+          duration: 0.16,
+          gainPeak: 0.18 * m,
+        });
+        tone(ac, {
+          freq: 311,
+          type: "triangle",
+          startOffset: 0.11,
+          attack: 0.015,
+          duration: 0.26,
+          gainPeak: 0.2 * m,
+        });
+      },
+    },
+    {
+      id: "descend",
+      label: "Descend",
+      description: "G4 → D4 perfect fourth",
+      impl: (ac, m) => {
+        tone(ac, {
+          freq: 392,
+          type: "triangle",
+          attack: 0.015,
+          duration: 0.14,
+          gainPeak: 0.18 * m,
+        });
+        tone(ac, {
+          freq: 293.66,
+          type: "triangle",
+          startOffset: 0.1,
+          attack: 0.015,
+          duration: 0.24,
+          gainPeak: 0.2 * m,
+        });
+      },
+    },
+    {
+      id: "buzz",
+      label: "Buzz",
+      description: "Soft low sawtooth",
+      impl: (ac, m) =>
+        tone(ac, {
+          freq: 200,
+          type: "sawtooth",
+          attack: 0.02,
+          duration: 0.2,
+          gainPeak: 0.12 * m,
+        }),
+    },
+    {
+      id: "low",
+      label: "Low note",
+      description: "Single muted C4",
+      impl: (ac, m) =>
+        tone(ac, {
+          freq: 261.63,
+          type: "triangle",
+          attack: 0.02,
+          duration: 0.24,
+          gainPeak: 0.2 * m,
+        }),
+    },
+  ],
+};
+
+// ─── Active config ─────────────────────────────────────────────────
+
+export interface AudioConfig {
+  readonly presets: Readonly<Record<SoundKey, string>>;
+  readonly volumes: Readonly<Record<SoundKey, number>>;
+}
+
+/** Factory defaults — each key picks the first preset (the originals). */
+export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
+  presets: {
+    uiTap: "tick",
+    place: "thud",
+    recall: "sweep",
+    success: "arpeggio",
+    error: "minor",
+  },
+  volumes: { uiTap: 1, place: 1, recall: 1, success: 1, error: 1 },
+};
+
+let activeConfig: AudioConfig = DEFAULT_AUDIO_CONFIG;
+
+/** Replace the live audio config. Persisting is the caller's job. */
+export function setAudioConfig(next: AudioConfig): void {
+  activeConfig = {
+    presets: { ...next.presets },
+    volumes: { ...next.volumes },
+  };
+}
+
+/** Get a snapshot of the live audio config. */
+export function getAudioConfig(): AudioConfig {
+  return {
+    presets: { ...activeConfig.presets },
+    volumes: { ...activeConfig.volumes },
+  };
+}
+
+/** All sound keys in display order, for the Settings modal to iterate. */
+export const SOUND_KEYS: ReadonlyArray<SoundKey> = [
+  "uiTap",
+  "place",
+  "recall",
+  "success",
+  "error",
+];
+
+/** Friendly human labels for the Settings modal. */
+export const SOUND_LABELS: Readonly<Record<SoundKey, string>> = {
+  uiTap: "Button tap",
+  place: "Tile place",
+  recall: "Tile recall",
+  success: "Word found",
+  error: "Word invalid",
+};
+
+function play(key: SoundKey): void {
   const ac = getCtx();
   if (!ac) return;
-  tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.45 });
-  tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.36 });
+  const master = Math.max(0, activeConfig.volumes[key] ?? 1);
+  if (master === 0) return;
+  const presetId = activeConfig.presets[key];
+  const preset =
+    PRESETS[key].find((p) => p.id === presetId) ?? PRESETS[key][0]!;
+  preset.impl(ac, master);
+}
+
+/** Preview a specific preset/volume without changing the active config —
+    used by the Settings modal so the user can try presets before committing. */
+export function previewPreset(key: SoundKey, presetId: string, volume = 1): void {
+  const ac = getCtx();
+  if (!ac) return;
+  const m = Math.max(0, volume);
+  if (m === 0) return;
+  const preset = PRESETS[key].find((p) => p.id === presetId) ?? PRESETS[key][0]!;
+  preset.impl(ac, m);
 }
 
 /**
- * Soft brief "tick" for plain UI buttons (navigation, modal Cancel/
- * Confirm, menu items, action-bar buttons that don't trigger a game
- * outcome). Single short sine tone with a soft attack — feels like a
- * gentle confirm without competing with the heavier place/recall thuds.
- *
- * Distinct from playPlace() (which is a tile thud — wood-on-wood feel)
- * so the audio language matches the visual: UI taps get a quick high
- * "tick", tile actions get the warm low thud.
+ * Soft warm thud — tile on board (Scrabble) / letter selected
+ * (Tumbler, Bee). Active preset + master volume come from {@link activeConfig}.
  */
-export function playUiTap(): void {
-  const ac = getCtx();
-  if (!ac) return;
-  tone(ac, {
-    freq: 720,
-    type: "sine",
-    attack: 0.005,
-    duration: 0.06,
-    gainPeak: 0.12,
-  });
-}
+export const playPlace = (): void => play("place");
 
-/**
- * Soft reverse-thud — a brief upward sine sweep — when a tile is recalled
- * from the board back to the rack. Distinct from the place sound (which is
- * downward / heavier) so the user can tell place from recall by ear alone.
- */
-export function playRecall(): void {
-  const ac = getCtx();
-  if (!ac) return;
-  // Quick frequency sweep from 220 Hz up to 360 Hz over 100 ms. Implemented
-  // as two short overlapping notes since `tone()` doesn't expose frequency
-  // automation — the ear hears it as a brief "thwip" rather than a thud.
-  tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.22 });
-  tone(ac, {
-    freq: 360,
-    type: "sine",
-    startOffset: 0.04,
-    duration: 0.08,
-    gainPeak: 0.2,
-  });
-}
+/** Soft brief tick on plain UI buttons (Button component fires this). */
+export const playUiTap = (): void => play("uiTap");
 
-/**
- * Pleasant rising 3-note arpeggio (C5 → E5 → G5, a major triad) — plays on
- * a successfully submitted word. Triangle waves give a soft music-box feel
- * rather than a harsh sine beep.
- */
-export function playSuccess(): void {
-  const ac = getCtx();
-  if (!ac) return;
-  const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
-  notes.forEach((freq, i) => {
-    tone(ac, {
-      freq,
-      type: "triangle",
-      startOffset: i * 0.08,
-      duration: 0.22,
-      gainPeak: 0.18,
-    });
-  });
-}
+/** Reverse-thud / sweep when a tile is pulled back to the rack. */
+export const playRecall = (): void => play("recall");
 
-/**
- * Gentle "that wasn't right" cue — a descending minor third (G4 → E♭4)
- * on triangle waves. Soft attacks (~15 ms) keep the onset from punching;
- * triangle waves have only odd harmonics and no edge, so the result reads
- * as a quiet flute-ish "uh-uh" rather than a buzz.
- *
- * Earlier versions used sawtooth waves which gave the error a sharp,
- * abrasive timbre — fine for a desktop alarm, too harsh for a calm
- * iPad word-game. The minor-third descent still telegraphs "no" musically
- * without setting off the user.
- */
-export function playError(): void {
-  const ac = getCtx();
-  if (!ac) return;
-  tone(ac, {
-    freq: 392, // G4
-    type: "triangle",
-    attack: 0.015,
-    duration: 0.16,
-    gainPeak: 0.18,
-  });
-  tone(ac, {
-    freq: 311, // E♭4 — a minor third below G4
-    type: "triangle",
-    startOffset: 0.11,
-    attack: 0.015,
-    duration: 0.26,
-    gainPeak: 0.2,
-  });
-}
+/** Rising arpeggio on a valid submitted word. */
+export const playSuccess = (): void => play("success");
+
+/** Descending minor third when a submitted word fails validation. */
+export const playError = (): void => play("error");
 
 /** Test/escape hatch: globally disable audio (no-op the play* functions). */
 export function setMuted(value: boolean): void {

@@ -7,6 +7,7 @@ import { playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { MenuItem } from "../components/MenuItem.js";
 import { MenuTile, TileWord } from "../components/MenuTile.js";
+import { SettingsModal } from "../components/SettingsModal.js";
 import { UserNamePrompt } from "../components/UserNamePrompt.js";
 
 /**
@@ -31,6 +32,7 @@ export function HomeScreen(): JSX.Element {
   // null === no prompt; "first" === mandatory first-launch greeting;
   // "change" === user clicked the top-right chip, may cancel out.
   const [namePrompt, setNamePrompt] = useState<"first" | "change" | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -279,14 +281,11 @@ export function HomeScreen(): JSX.Element {
             onClick={() => setScreen({ kind: "spelling_bee" })}
           />
           <MenuItem
-            icon="↑"
-            label="Export data"
-            disabled={!hasInProgress}
-            onClick={() => {
-              void onExport();
-            }}
+            icon="⚙"
+            label="Settings"
+            sublabel="Sounds, export, import"
+            onClick={() => setSettingsOpen(true)}
           />
-          <MenuItem icon="↓" label="Import data" onClick={() => fileInput.current?.click()} />
         </nav>
 
         {/* Footer — small "S" brand mark + version label. */}
@@ -321,6 +320,17 @@ export function HomeScreen(): JSX.Element {
           }}
         />
       </main>
+
+      {settingsOpen && (
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          onExport={() => {
+            void onExport();
+          }}
+          onImport={() => fileInput.current?.click()}
+          exportDisabled={!hasInProgress}
+        />
+      )}
 
       {namePrompt && (
         <UserNamePrompt

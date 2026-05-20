@@ -1,12 +1,15 @@
 import type { Difficulty } from "../engine/ai/bot.js";
 import { migrateLegacyDifficulty } from "../engine/ai/bot.js";
 import type { Variant } from "../engine/types.js";
+import type { AudioConfig, SoundKey } from "../audio/sounds.js";
+import { DEFAULT_AUDIO_CONFIG, PRESETS, SOUND_KEYS } from "../audio/sounds.js";
 import { open } from "./db.js";
 
 const PLAYER_NAMES_KEY = "player_names";
 const OPPONENT_KEY = "opponent";
 const VARIANT_KEY = "variant";
 const CURRENT_USER_KEY = "current_user";
+const AUDIO_KEY = "audio_settings";
 
 /** Persisted opponent shape. Mirrors `Opponent` in gameStore. */
 export type PersistedOpponent =
@@ -124,5 +127,49 @@ export async function setCurrentUser(name: string): Promise<void> {
   if (trimmed.length === 0) return;
   const db = await open();
   await db.put("settings", { key: CURRENT_USER_KEY, value: trimmed });
+  db.close();
+}
+
+// ─── Audio settings ────────────────────────────────────────────────
+
+/** Sanitise a persisted audio entry against the current preset catalogue. */
+function sanitiseAudio(raw: unknown): AudioConfig {
+  if (typeof raw !== "object" || raw === null) return DEFAULT_AUDIO_CONFIG;
+  const r = raw as { presets?: unknown; volumes?: unknown };
+  const presets: Record<SoundKey, string> = { ...DEFAULT_AUDIO_CONFIG.presets };
+  const volumes: Record<SoundKey, number> = { ...DEFAULT_AUDIO_CONFIG.volumes };
+  if (typeof r.presets === "object" && r.presets !== null) {
+    const p = r.presets as Record<string, unknown>;
+    for (const k of SOUND_KEYS) {
+      const id = p[k];
+      if (typeof id === "string" && PRESETS[k].some((preset) => preset.id === id)) {
+        presets[k] = id;
+      }
+    }
+  }
+  if (typeof r.volumes === "object" && r.volumes !== null) {
+    const v = r.volumes as Record<string, unknown>;
+    for (const k of SOUND_KEYS) {
+      const vol = v[k];
+      if (typeof vol === "number" && Number.isFinite(vol)) {
+        volumes[k] = Math.max(0, Math.min(1.5, vol));
+      }
+    }
+  }
+  return { presets, volumes };
+}
+
+/** Retrieve saved audio settings; falls back to factory defaults. */
+export async function getAudioSettings(): Promise<AudioConfig> {
+  const db = await open();
+  const entry = await db.get("settings", AUDIO_KEY);
+  db.close();
+  return sanitiseAudio(entry?.value);
+}
+
+/** Persist the user's audio choices. */
+export async function setAudioSettings(config: AudioConfig): Promise<void> {
+  const db = await open();
+  await db.put("settings", { key: AUDIO_KEY, value: config });
   db.close();
 }

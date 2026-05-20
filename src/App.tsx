@@ -3,11 +3,13 @@ import { useGameStore } from "./store/gameStore.js";
 import { loadDictionary } from "./data/load-dictionary.js";
 import { loadInProgress } from "./storage/game-storage.js";
 import {
+  getAudioSettings,
   getCurrentUser,
   getOpponent,
   getPlayerNames,
   getVariant,
 } from "./storage/settings-storage.js";
+import { setAudioConfig } from "./audio/sounds.js";
 import { LoadingScreen } from "./ui/screens/LoadingScreen.js";
 import { HomeScreen } from "./ui/screens/HomeScreen.js";
 import { NewGameScreen } from "./ui/screens/NewGameScreen.js";
@@ -27,6 +29,16 @@ export function App(): JSX.Element {
   const setVariant = useGameStore((s) => s.setVariant);
   const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const game = useGameStore((s) => s.game);
+
+  // Audio settings get their own fast-path effect: the main load Promise.all
+  // is gated by the dictionary download, but sound config is local-only and
+  // should apply the moment the user can interact with anything.
+  useEffect(() => {
+    void (async () => {
+      const audio = await getAudioSettings().catch(() => null);
+      if (audio) setAudioConfig(audio);
+    })();
+  }, []);
 
   useEffect(() => {
     void (async () => {
