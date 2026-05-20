@@ -24,6 +24,12 @@ export interface TileProps {
   readonly tile?: PlacedTile | TileT;
   /** Raw letter override. Used when there's no engine tile, e.g. on the menu hero. */
   readonly letter?: string;
+  /**
+   * Explicit point value for the score digit. Used by callers (MenuTile)
+   * that supply a raw letter and have their own letter→value lookup.
+   * Ignored when an engine `tile` is provided — that derives its own value.
+   */
+  readonly value?: number | undefined;
   /** Tile face style. Defaults to `cream`. */
   readonly variant?: TileVariant;
   /** Edge length in px. Defaults to 64 (the iPad rack-tile minimum). */
@@ -48,9 +54,9 @@ export interface TileProps {
 // Imported via the Google Fonts <link> in index.html (Domine 700 +
 // Atkinson Hyperlegible 700). Keep the system fallbacks so the tile
 // still reads as the spec intends if the font hasn't loaded yet.
-const FONT_LETTER =
+export const FONT_LETTER =
   '"Domine", "Iowan Old Style", "Apple Garamond", Georgia, serif';
-const FONT_VALUE =
+export const FONT_VALUE =
   '"Atkinson Hyperlegible", ui-sans-serif, -apple-system, system-ui, sans-serif';
 
 // ─── Spec backgrounds ──────────────────────────────────────────────
@@ -62,27 +68,27 @@ const FONT_VALUE =
 //
 // At s-32 the grain layer is dropped (looks busy at thumbnail scale).
 // At s-24 the radial is dropped too — pure linear gradient.
-const BG_CREAM_FULL =
+export const BG_CREAM_FULL =
   "repeating-linear-gradient(92deg, rgba(120,80,40,.022) 0px, rgba(120,80,40,.022) 1px, transparent 1px, transparent 3px), " +
   "radial-gradient(ellipse at 28% 18%, rgba(255,250,235,.55), transparent 60%), " +
   "linear-gradient(165deg, #F8EBD0 0%, #EBD7AE 60%, #DCBE91 100%)";
 
-const BG_CREAM_LIGHT =
+export const BG_CREAM_LIGHT =
   "radial-gradient(ellipse at 28% 18%, rgba(255,250,235,.35), transparent 60%), " +
   "linear-gradient(165deg, #F8EBD0 0%, #EBD7AE 60%, #E2C896 100%)";
 
-const BG_CREAM_TINY =
+export const BG_CREAM_TINY =
   "linear-gradient(165deg, #F4E5C5 0%, #E2C896 100%)";
 
-const BG_BROWN_FULL =
+export const BG_BROWN_FULL =
   "repeating-linear-gradient(92deg, rgba(0,0,0,.04) 0px, rgba(0,0,0,.04) 1px, transparent 1px, transparent 3px), " +
   "radial-gradient(ellipse at 28% 18%, rgba(255,210,160,.20), transparent 60%), " +
   "linear-gradient(165deg, #8A5934 0%, #6F4423 60%, #4E2E13 100%)";
 
-const BG_BROWN_LIGHT =
+export const BG_BROWN_LIGHT =
   "linear-gradient(165deg, #7E5230 0%, #6F4423 60%, #5A3818 100%)";
 
-const BG_BROWN_TINY =
+export const BG_BROWN_TINY =
   "linear-gradient(165deg, #7A4F2C 0%, #5A3818 100%)";
 
 // ─── Spec shadows ──────────────────────────────────────────────────
@@ -90,7 +96,7 @@ const BG_BROWN_TINY =
 // Eight-layer 3D stack for the large sizes; halved for s-32; minimal
 // for s-24. The "placed-but-uncommitted" ring sits ON TOP of the
 // regular shadow so the ring stays visible at any size.
-const SHADOW_CREAM_FULL =
+export const SHADOW_CREAM_FULL =
   "inset 0 2px 1px rgba(255,255,255,.75), " +
   "inset 2px 0 1.5px rgba(255,250,235,.4), " +
   "inset 0 -4px 3px rgba(120,80,40,.45), " +
@@ -100,17 +106,17 @@ const SHADOW_CREAM_FULL =
   "0 6px 10px -2px rgba(60,30,0,.35), " +
   "0 14px 22px -8px rgba(60,30,0,.30)";
 
-const SHADOW_CREAM_LIGHT =
+export const SHADOW_CREAM_LIGHT =
   "inset 0 1px 0 rgba(255,255,255,.55), " +
   "inset 0 -1px 0 rgba(120,80,40,.25), " +
   "0 1px 2px rgba(60,30,0,.18)";
 
-const SHADOW_CREAM_TINY =
+export const SHADOW_CREAM_TINY =
   "inset 0 1px 0 rgba(255,255,255,.45), " +
   "inset 0 -1px 0 rgba(120,80,40,.20), " +
   "0 1px 1px rgba(60,30,0,.15)";
 
-const SHADOW_BROWN_FULL =
+export const SHADOW_BROWN_FULL =
   "inset 0 2px 1px rgba(255,210,160,.32), " +
   "inset 2px 0 1.5px rgba(255,210,160,.10), " +
   "inset 0 -4px 3px rgba(0,0,0,.45), " +
@@ -120,12 +126,12 @@ const SHADOW_BROWN_FULL =
   "0 6px 10px -2px rgba(0,0,0,.40), " +
   "0 14px 22px -8px rgba(0,0,0,.32)";
 
-const SHADOW_BROWN_LIGHT =
+export const SHADOW_BROWN_LIGHT =
   "inset 0 1px 0 rgba(255,210,160,.25), " +
   "inset 0 -1px 0 rgba(0,0,0,.30), " +
   "0 1px 2px rgba(0,0,0,.22)";
 
-const SHADOW_BROWN_TINY =
+export const SHADOW_BROWN_TINY =
   "inset 0 1px 0 rgba(255,210,160,.20), " +
   "inset 0 -1px 0 rgba(0,0,0,.25), " +
   "0 1px 1px rgba(0,0,0,.18)";
@@ -172,6 +178,7 @@ function tierFor(size: number): Tier {
 export function Tile({
   tile,
   letter,
+  value,
   variant = "cream",
   size = 64,
   showValue = true,
@@ -184,8 +191,9 @@ export function Tile({
   const isPlaced = placed || pending;
 
   // Resolve letter + value from whichever input the caller used.
+  // Priority: engine tile > explicit `value` prop > none.
   let displayLetter = letter ?? "";
-  let displayValue: number | null = null;
+  let displayValue: number | null = value ?? null;
   if (tile) {
     const d = deriveFromTile(tile);
     displayLetter = d.letter;

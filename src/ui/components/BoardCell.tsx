@@ -3,6 +3,12 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { BoardCell as BoardCellT, PlacedTile, Position } from "../../engine/types.js";
 import { tokens } from "../tokens.js";
 import { PREMIUM_COLORS } from "../theme.js";
+import {
+  BG_CREAM_LIGHT,
+  FONT_LETTER,
+  FONT_VALUE,
+  SHADOW_CREAM_LIGHT,
+} from "./Tile.js";
 
 export interface BoardCellProps {
   readonly cell: BoardCellT;
@@ -18,15 +24,17 @@ export interface BoardCellProps {
  * the type scales with the *actual rendered* cell on iPad, iPad Mini,
  * Tab S8, and phone-portrait views without a per-viewport JS measure.
  *
- * Mirrors the handoff Tile spec: 165° cream gradient, three-layered
- * bevel shadow (inset top highlight + inset bottom bevel + warm drop),
- * letter at ~58 % of cell height nudged up 3 % so the bottom-right
- * value digit sits below the letter's baseline.
+ * Typography matches the alphabet-tile final spec (Domine letter +
+ * Atkinson Hyperlegible digit, digit at right 9 % / bottom 7 %,
+ * place-items center with no transform). Background + shadow use the
+ * spec's lighter (s-32) treatment because board cells run small
+ * (~25-55 px on phone → iPad) and the heavy 8-layer treatment looks
+ * over-rendered at that scale.
  *
- * `placed` adds a 2 px moss inset ring — the "uncommitted" treatment.
+ * `placed` adds the moss inset ring — the "uncommitted" treatment.
  */
 function CellTile({ tile, placed }: { readonly tile: PlacedTile; readonly placed: boolean }): JSX.Element {
-  const { color, font, shadow, tileGradient, weight } = tokens;
+  const { color } = tokens;
   // Resolve letter + value. Blank tiles render the chosen letter (set
   // when the user picks one) but always show value 0 (suppressed).
   const isLetter = tile.kind === "letter";
@@ -37,6 +45,10 @@ function CellTile({ tile, placed }: { readonly tile: PlacedTile; readonly placed
       : "";
   const value = isLetter ? tile.value : null;
 
+  // Cell width in cqi: each of 15 cells is ~6.67 % of the board's
+  // inline-size, so spec ratios (letter 0.55 × cell, digit 0.17 × cell)
+  // become ~3.67 cqi and ~1.13 cqi respectively. Clamps keep the type
+  // legible at the extremes (huge external display / tiny phone).
   return (
     <div
       style={{
@@ -46,27 +58,26 @@ function CellTile({ tile, placed }: { readonly tile: PlacedTile; readonly placed
         // to edge. The board's 3px gap + this margin = visible separation.
         inset: "6%",
         borderRadius: "14%",
-        background: tileGradient.cream,
+        background: BG_CREAM_LIGHT,
         color: color.ink,
         boxShadow: placed
-          ? `0 0 0 2px ${color.success} inset, ${shadow.tile}`
-          : shadow.tile,
-        fontFamily: font.serif,
-        fontWeight: weight.bold,
+          ? `inset 0 0 0 2px ${color.success}, ${SHADOW_CREAM_LIGHT}`
+          : SHADOW_CREAM_LIGHT,
         display: "grid",
         placeItems: "center",
         userSelect: "none",
         pointerEvents: "none",
       }}
     >
-      {/* Letter — sized at ~5.4cqi (≈ 58 % of a 9.3cqi cell on a 15×15
-          board). The min(... rem) clamp keeps the type readable at very
-          small viewports without going huge on very wide boards. */}
       <span
         style={{
-          fontSize: "min(5.4cqi, 2.6rem)",
+          fontFamily: FONT_LETTER,
+          fontWeight: 700,
+          fontSize: "min(3.67cqi, 32px)",
+          letterSpacing: "-0.01em",
           lineHeight: 1,
-          transform: "translateY(-4%)",
+          WebkitTextStroke: "0.4px currentColor",
+          paintOrder: "stroke fill",
         }}
       >
         {letter}
@@ -75,15 +86,16 @@ function CellTile({ tile, placed }: { readonly tile: PlacedTile; readonly placed
         <span
           style={{
             position: "absolute",
-            right: "12%",
-            bottom: "8%",
-            fontFamily: font.sans,
-            fontWeight: weight.med,
-            // Point-value subscript at ~2.2cqi, min 9px so it never
-            // disappears on tiny cells.
-            fontSize: "max(9px, 2.2cqi)",
+            right: "9%",
+            bottom: "7%",
+            fontFamily: FONT_VALUE,
+            fontWeight: 700,
+            // Digit floor at 7 px per spec; cap at 12 px so it stays
+            // a quiet subscript even on a very wide board.
+            fontSize: "clamp(7px, 1.13cqi, 12px)",
             lineHeight: 1,
-            opacity: 0.82,
+            color: color.brown,
+            fontVariantNumeric: "tabular-nums",
           }}
         >
           {value}
