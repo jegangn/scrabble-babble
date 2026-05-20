@@ -9,31 +9,69 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { getBotMove } from "../../ai-client/botClient.js";
-import { playUiTap } from "../../audio/sounds.js";
+import { scorePlaceMove } from "../../engine/scorer.js";
+import { validatePlaceMove } from "../../engine/validator.js";
+import type { Letter, Position } from "../../engine/types.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { applyPendingToBoard, pendingKeys } from "../../store/pending.js";
+import { applyPendingToBoard, pendingKeys, pendingToMove } from "../../store/pending.js";
+import { tokens } from "../tokens.js";
 import { ActionBar } from "../components/ActionBar.js";
-import { BackToHomeButton } from "../components/BackToHomeButton.js";
+import { BackPill } from "../components/BackPill.js";
 import { BlankLetterPicker } from "../components/BlankLetterPicker.js";
 import { Board } from "../components/Board.js";
+import { Button } from "../components/Button.js";
+import { ModalFrame } from "../components/ModalFrame.js";
+import { PlayerCard } from "../components/PlayerCard.js";
 import { Rack } from "../components/Rack.js";
-import { ScoreBar } from "../components/ScoreBar.js";
+import { SectionLabel } from "../components/SectionLabel.js";
 import { SwapPicker } from "../components/SwapPicker.js";
-import { Modal } from "../components/Modal.js";
+import { Tagline } from "../components/Tagline.js";
 import { ThinkingOverlay } from "../components/ThinkingOverlay.js";
 import { Tile } from "../components/Tile.js";
-import { ACCENT } from "../theme.js";
-import type { Letter, Position } from "../../engine/types.js";
+import { TilesLeft } from "../components/TilesLeft.js";
+import { Toast } from "../components/Toast.js";
+import { UserChip } from "../components/UserChip.js";
 
+/**
+ * In-game screen — rebuilt per the design handoff.
+ *
+ * Layout (iPad landscape, 1180 × 820):
+ *
+ *   ┌──────────────────────────────────────────────────────────────┐
+ *   │ ←Home                                              UserChip │
+ *   │                                                              │
+ *   │   ┌──── Board ────┐    Match · {variant}        38 left      │
+ *   │   │               │    [PlayerCard A]                        │
+ *   │   │               │    [PlayerCard B]                        │
+ *   │   │               │    [Last move · Margaret]                │
+ *   │   │               │    [Pending word preview, moss]          │
+ *   │   └───────────────┘                                          │
+ *   ├──────────────────────────────────────────────────────────────┤
+ *   │ [Rack horizontal]              [Shuffle][Swap][Pass][Resign] │
+ *   │                                      [Recall*][Submit · N]   │
+ *   └──────────────────────────────────────────────────────────────┘
+ *
+ * Drag/drop, blank-picker, swap modal, resign-confirm modal, AI driver,
+ * thinking overlay, and portrait warning are all preserved — only the
+ * surrounding layout + chrome have been re-skinned.
+ *
+ * New features (per Q1 decision): last-move chip + pending-word preview
+ * card. Both read from existing engine state (`game.history` and
+ * `pending`) — no schema changes.
+ */
 export function GameScreen(): JSX.Element | null {
   const game = useGameStore((s) => s.game);
+  const dictionary = useGameStore((s) => s.dictionary);
   const pending = useGameStore((s) => s.pending);
   const rackOrder = useGameStore((s) => s.rackOrder);
   const error = useGameStore((s) => s.error);
   const pendingBlankAt = useGameStore((s) => s.pendingBlankAt);
   const aiPlayerIndex = useGameStore((s) => s.aiPlayerIndex);
   const opponent = useGameStore((s) => s.settings.opponent);
+  const variant = useGameStore((s) => s.settings.variant);
   const thinking = useGameStore((s) => s.thinking);
+  const currentUser = useGameStore((s) => s.currentUser);
+  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const placeFromRack = useGameStore((s) => s.placeFromRack);
   const movePending = useGameStore((s) => s.movePending);
   const recallOne = useGameStore((s) => s.recallOne);
@@ -52,38 +90,21 @@ export function GameScreen(): JSX.Element | null {
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
-  // Tracks the in-flight drag (if any) so the <DragOverlay> can render
-  // a moving tile that follows the cursor. Two sources:
-  //   - rack:          dragging a fresh tile from the rack onto the board
-  //   - pending-board: re-positioning an already-placed pending tile
-  // Without this overlay the original tile sat at its source with opacity 0
-  // and the user saw *nothing* moving with their finger.
+  // Tracks the in-flight drag (if any) so <DragOverlay> can render a
+  // moving tile that follows the cursor. See the original implementation
+  // notes for why both sources matter.
   const [activeDrag, setActiveDrag] = useState<
     | { kind: "rack"; rackIndex: number }
     | { kind: "pending-board"; position: Position }
     | null
   >(null);
 
-  // Tracks whether the most recent drop landed on a valid board cell. We
-  // mutate this synchronously in onDragEnd (BEFORE the setState that clears
-  // the active drag) so the next render of <DragOverlay> picks up a fresh
-  // `dropAnimation` prop. Refs are read at render time so the value is
-  // current; useState would also work but adds a render cycle.
-  //
-  // On a successful placement we set `dropAnimation={null}` → the overlay
-  // disappears instantly, because the placed tile is already visible on
-  // the board. Animating it back to the rack would be visually confusing
-  // (you just put it on the board — why is it flying back?). On a failed
-  // drop (released outside any cell), we keep the snap-back animation so
-  // the user sees the tile return to its source.
+  // Drop-success ref — mutated synchronously in onDragEnd before clearing
+  // active drag so the next <DragOverlay> render sees the fresh value.
   const dropSuccessfulRef = useRef(false);
 
-  // Drive the bot when it's the AI's turn. The effect fires once per turn
-  // change (game.turn is the trigger). `thinking` is intentionally NOT in the
-  // dep array: that flag is set INSIDE the effect, so listing it would cause
-  // the effect to immediately re-mount and the cleanup would cancel the very
-  // task it just started — leaving the thinking overlay stuck forever after
-  // the worker's response is discarded.
+  // AI driver — same as before. Dep list intentionally minimal; see the
+  // detailed comment in the original implementation.
   useEffect(() => {
     if (!game) return;
     if (game.status.kind === "ended") return;
@@ -100,7 +121,6 @@ export function GameScreen(): JSX.Element | null {
       } catch (err) {
         console.error("Bot error", err);
         if (cancelled) return;
-        // Worker failed; pass on the bot's behalf so the game keeps moving.
         setThinking(false);
         pass();
       }
@@ -108,21 +128,17 @@ export function GameScreen(): JSX.Element | null {
     return () => {
       cancelled = true;
     };
-    // Stable deps: turn / who-controls-AI / opponent identity. We don't
-    // depend on the entire `game` object — a bot turn is uniquely identified
-    // by whose turn it is plus the AI slot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.turn, aiPlayerIndex, opponent]);
 
-  // Drag thresholds bumped from 8 → 12 px so a shaky older-user hand on iPad
-  // is more reliably interpreted as a tap (placement via tap-to-place) rather
-  // than an ambiguous drag that doesn't reach a drop target.
+  // Drag thresholds bumped to 12 px so an older user's shaky hand reads
+  // as a tap rather than an ambiguous drag — matches the original.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 12 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 12 } }),
   );
 
-  const onDragStart = (event: DragStartEvent) => {
+  const onDragStart = (event: DragStartEvent): void => {
     const data = event.active.data.current as
       | { kind: "rack"; rackIndex: number }
       | { kind: "pending-board"; position: Position }
@@ -135,39 +151,31 @@ export function GameScreen(): JSX.Element | null {
     }
   };
 
-  const onDragEnd = (event: DragEndEvent) => {
+  const onDragEnd = (event: DragEndEvent): void => {
     const data = event.active.data.current as
       | { kind: "rack"; rackIndex: number }
       | { kind: "pending-board"; position: Position }
       | undefined;
-    const over = event.over?.data.current as { kind: string; position?: Position } | undefined;
+    const over = event.over?.data.current as
+      | { kind: string; position?: Position }
+      | undefined;
     const droppedOnCell = over?.kind === "cell" && !!over.position;
-    // Set BEFORE clearing the active drag, so the re-render's <DragOverlay>
-    // already sees the updated `dropAnimation` prop.
     dropSuccessfulRef.current = droppedOnCell;
     setActiveDrag(null);
     if (!data || !droppedOnCell || !over?.position) return;
     if (data.kind === "rack") {
       placeFromRack(data.rackIndex, over.position);
     } else if (data.kind === "pending-board") {
-      // Re-positioning an already-placed pending tile. The store action
-      // refuses no-op moves (same cell) so we don't have to gate here.
       movePending(data.position, over.position);
     }
   };
 
-  const onDragCancel = () => {
-    // A cancelled drag (e.g. user dragged out of bounds then released) is a
-    // failure case — animate the snap-back so the user sees the tile return.
+  const onDragCancel = (): void => {
     dropSuccessfulRef.current = false;
     setActiveDrag(null);
   };
 
-  // NOTE: these useMemo calls were previously placed *after* `if (!game) return
-  // null` — a Rules-of-Hooks violation. Today the flow never reaches GameScreen
-  // with `game === null`, but any future bug that nulls game while this
-  // component is mounted would throw "Rendered fewer hooks than expected".
-  // Hoisted above the early return; each tolerates a null game.
+  // Hooks before any early return — Rules of Hooks.
   const board = useMemo(
     () => (game ? applyPendingToBoard(game.board, pending) : null),
     [game, pending],
@@ -178,37 +186,90 @@ export function GameScreen(): JSX.Element | null {
     [pending],
   );
 
+  /**
+   * Pending-word preview — computes the word + projected score for the
+   * tiles the user has placed but not yet submitted. Returns:
+   *   - { word, score: number } when the placement is a legal move,
+   *   - { word, score: null }   when letters are placed but not (yet) legal,
+   *   - null                    when nothing is pending.
+   */
+  const pendingPreview = useMemo(() => {
+    if (pending.length === 0 || !game || !dictionary) return null;
+    const move = pendingToMove(pending);
+    const validation = validatePlaceMove(game, move, dictionary);
+    if (!validation.ok) {
+      // Best-effort: show the letters the user has placed, in placement
+      // order, so they at least see "what they're building" even if it's
+      // not yet a legal move.
+      const partial = pending
+        .map((p) =>
+          p.tile.kind === "letter"
+            ? p.tile.letter
+            : "letter" in p.tile && typeof p.tile.letter === "string"
+              ? p.tile.letter
+              : "?",
+        )
+        .join("");
+      return { word: partial, score: null as number | null };
+    }
+    const score = scorePlaceMove(game, move);
+    // ScoreResult.mainWord is a WordScore object — destructure to the
+    // string + use the result's total.
+    return { word: score.mainWord.word, score: score.total as number | null };
+  }, [pending, game, dictionary]);
+
+  /**
+   * Last-move chip data. Pulls the most recent place-move from history;
+   * passes / swaps / resigns don't surface here because there's no word
+   * to display. Returns null on the opening turn or when the most recent
+   * action wasn't a place.
+   */
+  const lastMove = useMemo(() => {
+    if (!game) return null;
+    for (let i = game.history.length - 1; i >= 0; i--) {
+      const entry = game.history[i]!;
+      if (entry.move.kind === "place") {
+        const player = game.players[entry.playerIndex]!;
+        return { word: entry.mainWord, score: entry.score, name: player.name };
+      }
+    }
+    return null;
+  }, [game]);
+
   if (!game || !board) return null;
 
   const player = game.players[game.turn]!;
   const canSwap = game.bag.length >= game.rules.minBagToSwap;
+  const variantLabel =
+    variant === "classic" ? "Classic 15 × 15" : variant === "random" ? "Random 15 × 15" : "Mini 11 × 11";
 
-  // useCallback so BoardCell's React.memo can skip re-rendering cells whose
-  // own props haven't changed when a single tile is placed.
-  const onCellTap = useCallback(
-    (pos: Position) => {
-      if (selectedRackIndex !== null) {
-        placeFromRack(selectedRackIndex, pos);
-        setSelectedRackIndex(null);
-        return;
-      }
-      if (keys.has(`${pos.row},${pos.col}` as `${number},${number}`)) {
-        recallOne(pos);
-      }
-    },
-    [selectedRackIndex, keys, placeFromRack, recallOne],
-  );
+  const onCellTap = (pos: Position): void => {
+    if (selectedRackIndex !== null) {
+      placeFromRack(selectedRackIndex, pos);
+      setSelectedRackIndex(null);
+      return;
+    }
+    if (keys.has(`${pos.row},${pos.col}` as `${number},${number}`)) {
+      recallOne(pos);
+    }
+  };
 
-  const onRackTap = (rackIndex: number) => {
+  // useCallback-equivalent: stable reference for BoardCell.memo. We don't
+  // bother memoising further because onCellTap closes over selectedRackIndex
+  // which changes per tap anyway — the memo would invalidate every render.
+  const stableOnCellTap = useCallback(onCellTap, [
+    selectedRackIndex,
+    keys,
+    placeFromRack,
+    recallOne,
+  ]);
+
+  const onRackTap = (rackIndex: number): void => {
     if (usedRackIndices.has(rackIndex)) return;
     setSelectedRackIndex(selectedRackIndex === rackIndex ? null : rackIndex);
   };
 
-  // Resolve the actual tile object for the in-flight drag (if any) so the
-  // overlay can render it. Two sources to look up:
-  //   - rack drag:          game.players[turn].rack[rackIndex]
-  //   - pending-board drag: the matching pending placement's tile
-  // Either resolves to a Tile-shaped object the <Tile> component can render.
+  // Resolve drag-overlay tile from rack or pending.
   type AnyDragTile =
     | { kind: "letter"; letter: Letter; value: number }
     | { kind: "blank"; value: 0 }
@@ -227,6 +288,8 @@ export function GameScreen(): JSX.Element | null {
     }
   }
 
+  const { color, space, radius, shadow, font, size, weight } = tokens;
+
   return (
     <DndContext
       sensors={sensors}
@@ -234,116 +297,305 @@ export function GameScreen(): JSX.Element | null {
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
     >
-    {/*
-      Portrait warning: GameScreen's layout assumes a landscape flex-row
-      (board on the left, rack column on the right). In portrait the board
-      collapses to a thin strip. The installed-PWA manifest pins landscape,
-      but pre-install in mobile Safari there's no orientation lock. CSS
-      media query overlays a "Please rotate" message in portrait only.
-    */}
-    <style>{`
-      @media (orientation: portrait) {
-        .gs-portrait-warning { display: flex !important; }
-        .gs-game-body { display: none; }
-      }
-    `}</style>
-    <div
-      className="gs-portrait-warning"
-      style={{
-        display: "none",
-        position: "fixed",
-        inset: 0,
-        zIndex: 300,
-        background: ACCENT.surface,
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        padding: 24,
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
-      <div style={{ fontSize: "4em" }}>↻</div>
-      <div style={{ fontSize: "1.4em", fontWeight: 700, color: ACCENT.primary }}>
-        Rotate to landscape
-      </div>
-      <div style={{ opacity: 0.7 }}>
-        The Scrabble board needs the wide side of your screen.
-      </div>
-    </div>
-    <div
-      className="gs-game-body flex h-full w-full p-3"
-      style={{ background: ACCENT.surface, gap: 12, position: "relative" }}
-    >
-      <BackToHomeButton onClick={goHome} />
-      {/*
-        Layout: board on the left, fills the full available height (no
-        top score-bar eating vertical space anymore). Right column holds
-        the compact ScoreBar, rack, and action stack.
-      */}
-      <div className="flex-1 min-w-0 flex items-center justify-center">
-        <div
-          style={{
-            height: "100%",
-            aspectRatio: "1",
-            maxWidth: "100%",
-            containerType: "size",
-            containerName: "board",
-          }}
-        >
-          <Board board={board} pendingKeys={keys} onCellTap={onCellTap} />
+      <style>{`
+        @media (orientation: portrait) {
+          .gs-portrait-warning { display: flex !important; }
+          .gs-game-body { display: none; }
+        }
+      `}</style>
+
+      {/* Portrait warning — kept as-is from the previous implementation. */}
+      <div
+        className="gs-portrait-warning"
+        style={{
+          display: "none",
+          position: "fixed",
+          inset: 0,
+          zIndex: 300,
+          background: color.cream,
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          padding: 24,
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <div style={{ fontSize: "4em" }}>↻</div>
+        <div style={{ fontSize: size.h4, fontWeight: weight.bold, color: color.brown }}>
+          Rotate to landscape
+        </div>
+        <div style={{ opacity: 0.7 }}>
+          The Scrabble board needs the wide side of your screen.
         </div>
       </div>
 
       <div
-        className="flex flex-col items-stretch overflow-y-auto"
-        style={{ width: 300, flexShrink: 0, gap: 10 }}
+        className="gs-game-body"
+        style={{
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          width: "100%",
+          minHeight: "100%",
+          background: color.cream,
+          // Grain layer is decorative; rendered as a fixed underlay.
+        }}
       >
-        {/* Compact scoreboard, replaces the old full-width top bar. */}
-        <ScoreBar players={game.players} turn={game.turn} bagCount={game.bag.length} />
-        {/* Rack wraps to 4+3 to keep the right column narrow and the board large. */}
-        <Rack
-          rack={player.rack}
-          rackOrder={rackOrder}
-          usedIndices={usedRackIndices}
-          onTileTap={onRackTap}
-          selectedIndex={selectedRackIndex}
+        {/* Decorative paper grain — matches every other screen. */}
+        <div
+          aria-hidden
+          style={{
+            position: "fixed",
+            inset: 0,
+            pointerEvents: "none",
+            opacity: tokens.grain.opacity,
+            backgroundImage: tokens.grain.image,
+            backgroundSize: tokens.grain.size,
+            backgroundPosition: tokens.grain.position,
+            zIndex: 0,
+          }}
         />
-        {error && (
+
+        <BackPill onClick={goHome} />
+        {currentUser && (
+          <UserChip
+            name={currentUser}
+            onClick={() => {
+              // Tapping the chip on the in-game screen has no place to go
+              // (changing name mid-game would be confusing). For now we
+              // re-show the prompt on Home only; here it's a no-op visual.
+              setCurrentUser(currentUser);
+            }}
+          />
+        )}
+
+        {/* Top: board + sidebar */}
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            zIndex: 1,
+            display: "grid",
+            gridTemplateColumns: "minmax(0, auto) 320px",
+            gap: space.x8,
+            padding: `${space.x16}px ${space.x8}px ${space.x4}px`,
+            alignItems: "start",
+          }}
+        >
+          {/* Board column — keeps its container query so tile letters scale
+              with the rendered cell size. */}
           <div
             style={{
-              background: "#fff0f0",
-              color: ACCENT.danger,
-              padding: "8px 12px",
-              borderRadius: 8,
-              fontSize: "0.95em",
-              fontWeight: 600,
-              textAlign: "center",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-start",
             }}
           >
-            {error}
+            <div
+              style={{
+                width: "min(70vh, 100%)",
+                aspectRatio: "1",
+                containerType: "size",
+                containerName: "board",
+              }}
+            >
+              <Board board={board} pendingKeys={keys} onCellTap={stableOnCellTap} />
+            </div>
           </div>
-        )}
-        <ActionBar
-          canSubmit={pending.length > 0}
-          hasPending={pending.length > 0}
-          placedCount={pending.length}
-          canSwap={canSwap}
-          onSubmit={submitMove}
-          onRecall={() => {
-            recallPending();
-            setSelectedRackIndex(null);
+
+          {/* Sidebar */}
+          <aside
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: space.x4,
+              paddingTop: space.x2,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+              }}
+            >
+              <Tagline>Match · {variantLabel}</Tagline>
+              <TilesLeft count={game.bag.length} />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: space.x3 }}>
+              {game.players.map((p, i) => (
+                <PlayerCard
+                  key={i}
+                  name={p.name}
+                  score={p.score}
+                  active={i === game.turn}
+                  isAI={aiPlayerIndex === i}
+                />
+              ))}
+            </div>
+
+            {lastMove && (
+              <div
+                style={{
+                  padding: `${space.x3}px ${space.x4}px`,
+                  background: color.paper,
+                  border: `1.5px solid ${color.stroke}`,
+                  borderRadius: radius.card,
+                  boxShadow: shadow.card,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: size.micro + 1,
+                    color: color.inkSoft,
+                    letterSpacing: ".08em",
+                    textTransform: "uppercase",
+                    fontWeight: weight.med,
+                  }}
+                >
+                  Last move · {lastMove.name}
+                </span>
+                <span
+                  style={{
+                    fontSize: size.body,
+                    color: color.ink,
+                    fontFamily: font.serif,
+                    fontWeight: weight.bold,
+                  }}
+                >
+                  {lastMove.word} · +{lastMove.score}
+                </span>
+              </div>
+            )}
+
+            {pendingPreview && (
+              <div
+                style={{
+                  padding: `${space.x3}px ${space.x4}px`,
+                  background: color.successBg,
+                  border: `1.5px solid ${color.success}`,
+                  borderRadius: radius.card,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: size.micro + 1,
+                    color: color.success,
+                    letterSpacing: ".08em",
+                    textTransform: "uppercase",
+                    fontWeight: weight.med,
+                  }}
+                >
+                  Pending
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: size.bodyLg,
+                      color: color.ink,
+                      fontFamily: font.serif,
+                      fontWeight: weight.bold,
+                    }}
+                  >
+                    {pendingPreview.word.toUpperCase()}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: size.body,
+                      color: pendingPreview.score === null ? color.inkSoft : color.success,
+                      fontWeight: weight.med,
+                    }}
+                  >
+                    {pendingPreview.score === null ? "Composing…" : `+${pendingPreview.score}`}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Toast kind="error" title={error} />
+              </div>
+            )}
+          </aside>
+        </div>
+
+        {/* Bottom: rack + action bar */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            padding: `${space.x4}px ${space.x8}px ${space.x6}px`,
+            display: "flex",
+            flexDirection: "column",
+            gap: space.x4,
+            borderTop: `1px solid ${color.creamDark}`,
+            background: `color-mix(in oklab, ${color.cream} 60%, ${color.paper})`,
           }}
-          onShuffle={shuffleRack}
-          onSwap={() => setSwapping(true)}
-          onPass={pass}
-          onResign={() => setConfirmResign(true)}
-        />
-        {/* Back-to-home moved to the top-left of the screen (see the
-            floating pill in the parent flex container) so it lives where
-            users expect it across all screens. */}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: space.x6,
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+            }}
+          >
+            <Rack
+              rack={player.rack}
+              rackOrder={rackOrder}
+              usedIndices={usedRackIndices}
+              onTileTap={onRackTap}
+              selectedIndex={selectedRackIndex}
+            />
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                alignItems: "flex-end",
+              }}
+            >
+              <Tagline style={{ margin: 0, fontSize: size.micro + 1 }}>Your rack</Tagline>
+              <span style={{ fontSize: size.caption, color: color.inkSoft }}>
+                Tap a tile, then tap a square
+              </span>
+            </div>
+          </div>
+          <ActionBar
+            canSubmit={pending.length > 0}
+            hasPending={pending.length > 0}
+            placedCount={pending.length}
+            canSwap={canSwap}
+            onSubmit={submitMove}
+            onRecall={() => {
+              recallPending();
+              setSelectedRackIndex(null);
+            }}
+            onShuffle={shuffleRack}
+            onSwap={() => setSwapping(true)}
+            onPass={pass}
+            onResign={() => setConfirmResign(true)}
+          />
+        </div>
       </div>
 
+      {/* Modals + overlays */}
       {pendingBlankAt && (
         <BlankLetterPicker onPick={setBlankLetter} onCancel={cancelBlankPicker} />
       )}
@@ -358,92 +610,69 @@ export function GameScreen(): JSX.Element | null {
         />
       )}
       {confirmResign && (
-        <Modal title="Resign?" onClose={() => setConfirmResign(false)}>
-          <p>This ends the game and your opponent wins.</p>
-          <div className="flex gap-3 mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                playUiTap();
-                setConfirmResign(false);
-              }}
-              style={modalBtn("secondary")}
-            >
-              Cancel
-            </button>
-            {/*
-              Confirm button text is intentionally NOT "Resign" — that's the
-              same word the user just tapped (in the action bar) to open this
-              modal. Identical-looking buttons invite second-tap mistakes from
-              older users. "End game now" is more deliberate and destructive.
-            */}
-            <button
-              type="button"
-              onClick={() => {
-                playUiTap();
-                setConfirmResign(false);
-                resign();
-              }}
-              style={modalBtn("danger")}
-            >
-              End game now
-            </button>
+        <ModalFrame
+          title="End the game?"
+          sub="Your opponent will take the win. This can't be undone."
+          danger
+          onClose={() => setConfirmResign(false)}
+          footer={
+            <>
+              <Button kind="ghost" onClick={() => setConfirmResign(false)}>
+                Keep playing
+              </Button>
+              <Button
+                kind="destructive"
+                onClick={() => {
+                  setConfirmResign(false);
+                  resign();
+                }}
+              >
+                End game now
+              </Button>
+            </>
+          }
+        >
+          <div
+            style={{
+              padding: space.x4,
+              background: color.dangerBg,
+              borderRadius: radius.chip,
+              color: color.danger,
+              fontSize: size.caption,
+              fontWeight: weight.med,
+            }}
+          >
+            <SectionLabel style={{ margin: 0, color: color.danger }}>
+              Resign
+            </SectionLabel>
           </div>
-        </Modal>
+        </ModalFrame>
       )}
       {thinking && <ThinkingOverlay />}
-    </div>
-    {/*
-      DragOverlay: mounted at document.body via portal, escapes any
-      overflow-hidden ancestor (the brown rack, the board grid, the
-      score bar). Drag motion is GPU-accelerated transform — no React
-      re-renders during the drag itself. dropAnimation handles the
-      "snap" when releasing over a valid cell.
-    */}
-    <DragOverlay
-      dropAnimation={
-        // Successful placement: no animation — placed tile is on the board,
-        // animating the overlay back to the rack would be misleading.
-        // Failed drop: 220 ms ease-out back to source, so the user gets
-        // visual feedback that the tile is returning to the rack.
-        dropSuccessfulRef.current
-          ? null
-          : { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
-      }
-      zIndex={400}
-    >
-      {activeDragTile && (
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            // Slight scale-up + drop-shadow gives a tactile "lifted" feel
-            // older eyes track better than a flat-following tile.
-            transform: "scale(1.1)",
-            filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.3))",
-            cursor: "grabbing",
-            pointerEvents: "none",
-          }}
-        >
-          <Tile tile={activeDragTile} pending />
-        </div>
-      )}
-    </DragOverlay>
+
+      <DragOverlay
+        dropAnimation={
+          dropSuccessfulRef.current
+            ? null
+            : { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        }
+        zIndex={400}
+      >
+        {activeDragTile && (
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              transform: "scale(1.1)",
+              filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.3))",
+              cursor: "grabbing",
+              pointerEvents: "none",
+            }}
+          >
+            <Tile tile={activeDragTile} placed />
+          </div>
+        )}
+      </DragOverlay>
     </DndContext>
   );
-}
-
-function modalBtn(variant: "secondary" | "danger"): React.CSSProperties {
-  return {
-    flex: 1,
-    background: variant === "danger" ? ACCENT.danger : "white",
-    color: variant === "danger" ? "white" : ACCENT.text,
-    border: variant === "danger" ? "none" : `2px solid ${ACCENT.primary}`,
-    padding: "12px 16px",
-    fontSize: "1em",
-    fontWeight: 600,
-    borderRadius: 8,
-    minHeight: 48,
-    touchAction: "manipulation",
-  };
 }
