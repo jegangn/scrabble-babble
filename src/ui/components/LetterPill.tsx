@@ -25,8 +25,15 @@ export interface LetterPillProps {
  * accent colour, and gains a slightly thicker border. Older eyes see the
  * cue clearly; younger fingers feel the depressed-button affordance.
  */
-/** How long the highlight visibly persists after pointer-release. */
-const HIGHLIGHT_TAIL_MS = 220;
+/**
+ * How long the highlight visibly persists after pointer-release.
+ *
+ * Tuning history:
+ *   220 ms — too sticky, felt like the tile stayed "on" too long
+ *    50 ms — much snappier; combined with the 80 ms CSS transition it
+ *            still gives a smooth fade out, just doesn't hang.
+ */
+const HIGHLIGHT_TAIL_MS = 50;
 
 export function LetterPill({
   letter,
@@ -127,7 +134,10 @@ export function LetterPill({
             ? "0 2px 0 rgba(0,0,0,0.18)"
             : "none",
         transform: pressed ? "scale(0.94)" : "scale(1)",
-        transition: "transform 80ms ease, background 80ms ease, border-color 80ms ease, box-shadow 80ms ease",
+        // Material-standard ease-out curve (cubic-bezier 0.2/0/0/1) reads
+        // more "fluid" than plain ease — fast at the start, settles smoothly.
+        transition:
+          "transform 90ms cubic-bezier(0.2, 0, 0, 1), background 90ms cubic-bezier(0.2, 0, 0, 1), border-color 90ms cubic-bezier(0.2, 0, 0, 1), box-shadow 90ms cubic-bezier(0.2, 0, 0, 1)",
       }}
     >
       {letter}

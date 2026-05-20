@@ -8,6 +8,10 @@ import {
 } from "../../engine/games/tumbler.js";
 import { createPrng } from "../../engine/prng.js";
 import type { Letter } from "../../engine/types.js";
+import {
+  getTumblerLeaderboard,
+  type LeaderboardEntry,
+} from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
@@ -26,8 +30,10 @@ export function TumblerScreen(): JSX.Element | null {
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
 
-  // One Tumbler "session" is bound to a seed; re-mounting (Play Again) draws fresh.
-  const seed = useMemo(() => Date.now() & 0x7fffffff, []);
+  // One Tumbler "session" is bound to a seed. Stored in state (not useMemo)
+  // so the Restart button can mint a fresh seed without remounting the
+  // whole screen — that would lose the leaderboard load + flash timer.
+  const [seed, setSeed] = useState(() => Date.now() & 0x7fffffff);
   const rack = useMemo(() => drawTumblerLetters(createPrng(seed)), [seed]);
 
   const [input, setInput] = useState("");
@@ -36,11 +42,44 @@ export function TumblerScreen(): JSX.Element | null {
   const [timeLeftMs, setTimeLeftMs] = useState(TUMBLER_DURATION_MS);
   const [started, setStarted] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
 
   // Refs so the visibility handler always sees the latest values.
   const startedRef = useRef(false);
   const remainingMsRef = useRef(TUMBLER_DURATION_MS);
   const startedAtRef = useRef<number | null>(null);
+
+  // Load the leaderboard once on mount. The end-screen records new scores;
+  // when the user comes back to start another round the panel shows the
+  // latest standings (we don't bother live-reloading mid-session).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const board = await getTumblerLeaderboard();
+      if (!cancelled) setLeaderboard(board);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * Restart the session: mint a fresh seed (re-draws the rack via useMemo),
+   * reset all game state, and clear any in-flight timers. The leaderboard
+   * panel will be visible again because `started` flips back to false.
+   */
+  const restartGame = () => {
+    setSeed(Date.now() & 0x7fffffff);
+    setInput("");
+    setFoundWords([]);
+    setScore(0);
+    setTimeLeftMs(TUMBLER_DURATION_MS);
+    setStarted(false);
+    setFlash(null);
+    startedRef.current = false;
+    remainingMsRef.current = TUMBLER_DURATION_MS;
+    startedAtRef.current = null;
+  };
 
   // Drive the countdown. Effect re-runs when started flips true.
   useEffect(() => {
@@ -201,6 +240,30 @@ export function TumblerScreen(): JSX.Element | null {
         >
           {score} pts
         </div>
+        {/* Restart button — only shown after the timer has started, since
+            pre-game there's nothing to restart. Drops the current score,
+            re-draws the rack, and resets the clock. */}
+        {started && (
+          <button
+            type="button"
+            onClick={restartGame}
+            aria-label="Restart round"
+            style={{
+              background: "white",
+              color: ACCENT.text,
+              border: `2px solid ${ACCENT.primary}`,
+              borderRadius: 999,
+              padding: "6px 14px",
+              fontSize: "0.95em",
+              fontWeight: 600,
+              minHeight: 36,
+              touchAction: "manipulation",
+              cursor: "pointer",
+            }}
+          >
+            ↻ Restart
+          </button>
+        )}
       </div>
 
       {/* Rack: 7 LetterPills. Tap to append. Per the latest UX direction,
@@ -274,44 +337,118 @@ export function TumblerScreen(): JSX.Element | null {
         {flash && <FlashRow flash={flash} />}
       </div>
 
-      {/* Found words */}
-      <div
-        className="w-full max-w-md flex-1 overflow-y-auto"
-        style={{
-          background: "rgba(255,255,255,0.5)",
-          border: `1px solid ${ACCENT.primary}33`,
-          borderRadius: 10,
-          padding: 12,
-        }}
-      >
-        <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
-          Found ({foundWords.length})
+      {/*
+        Bottom panel toggles between two views:
+          - Pre-game (timer hasn't started): show the all-time leaderboard
+            so the user sees what they're aiming for before they begin.
+          - During / after game: show the live Found-words list.
+        Once the timer runs out, the screen transitions to TumblerEndScreen
+        which has both panels side-by-side.
+      */}
+      {!started ? (
+        <div
+          className="w-full max-w-md flex-1 overflow-y-auto"
+          style={{
+            background: "rgba(255,255,255,0.5)",
+            border: `1px solid ${ACCENT.primary}33`,
+            borderRadius: 10,
+            padding: 12,
+          }}
+        >
+          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
+            🏆 Top scores
+          </div>
+          {leaderboard.length === 0 ? (
+            <div style={{ opacity: 0.5 }}>
+              No scores yet. Tap a letter to start the 60-second sprint!
+            </div>
+          ) : (
+            <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {leaderboard.map((entry, i) => (
+                <li
+                  key={`${entry.name}-${entry.timestamp}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    fontSize: "0.95em",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ display: "flex", gap: 8, overflow: "hidden", minWidth: 0, flex: 1 }}>
+                    <span style={{ opacity: 0.5, minWidth: 18 }}>{i + 1}.</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {entry.name}
+                    </span>
+                  </span>
+                  <span
+                    style={{
+                      opacity: 0.55,
+                      fontSize: "0.85em",
+                      fontWeight: 500,
+                      fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {formatDate(entry.timestamp)}
+                  </span>
+                  <span style={{ fontVariantNumeric: "tabular-nums", minWidth: 32, textAlign: "right" }}>
+                    {entry.score}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
-        {foundWords.length === 0 ? (
-          <div style={{ opacity: 0.5 }}>No words yet.</div>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, columnCount: 2, columnGap: 16 }}>
-            {foundWords.map((w) => (
-              <li
-                key={w}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "2px 0",
-                  fontSize: "1em",
-                }}
-              >
-                <span>{w}</span>
-                <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>
-                  {scoreTumblerWord(w)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      ) : (
+        <div
+          className="w-full max-w-md flex-1 overflow-y-auto"
+          style={{
+            background: "rgba(255,255,255,0.5)",
+            border: `1px solid ${ACCENT.primary}33`,
+            borderRadius: 10,
+            padding: 12,
+          }}
+        >
+          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
+            Found ({foundWords.length})
+          </div>
+          {foundWords.length === 0 ? (
+            <div style={{ opacity: 0.5 }}>No words yet.</div>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, columnCount: 2, columnGap: 16 }}>
+              {foundWords.map((w) => (
+                <li
+                  key={w}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "2px 0",
+                    fontSize: "1em",
+                  }}
+                >
+                  <span>{w}</span>
+                  <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>
+                    {scoreTumblerWord(w)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/** Format an epoch timestamp as dd/MM/yyyy (local), per project defaults. */
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
 function FlashRow({ flash }: { flash: Flash }): JSX.Element {

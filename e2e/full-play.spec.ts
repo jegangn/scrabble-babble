@@ -215,7 +215,7 @@ test.describe("Spelling Bee full play-through", () => {
     // toast (not a word). Either way, the input clears and the UI is alive.
     await page.getByRole("button", { name: /^Enter$/ }).click();
     // After submit the current-word display goes back to placeholder.
-    await expect(currentWord).toContainText(/tap or type|^$/);
+    await expect(currentWord).toContainText(/Tap or Slide|^$/);
   });
 
   test("Delete button removes the last tapped letter", async ({ page }) => {

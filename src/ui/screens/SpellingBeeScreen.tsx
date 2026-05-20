@@ -289,7 +289,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
         }}
         aria-label="Current word in progress"
       >
-        {currentWord || <span style={{ opacity: 0.3 }}>tap or type</span>}
+        {currentWord || <span style={{ opacity: 0.3 }}>Tap or Slide</span>}
       </div>
 
       {/*
