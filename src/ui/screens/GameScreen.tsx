@@ -369,9 +369,14 @@ export function GameScreen(): JSX.Element | null {
           maxHeight: "100dvh",
           background: color.cream,
           overflow: "hidden",
-          // Generous padding so BackPill (top-left) + UserChip
-          // (top-right) clear the board / sidebar content below.
-          padding: `${space.x16 + 16}px ${space.x6}px ${space.x4}px`,
+          // Tight 16 px top padding so the board reaches the top of the
+          // viewport on landscape (was 80 px — left an empty band beside
+          // BackPill). BackPill (top-left) + UserChip (top-right) still
+          // sit at top: 24 with their own paper backgrounds; they float
+          // over the corners of the board/sidebar without obscuring
+          // any meaningful content. The sidebar adds its own top inset
+          // below so its first card clears UserChip.
+          padding: `${space.x4}px ${space.x6}px ${space.x4}px`,
           gap: space.x6,
         }}
       >
@@ -416,19 +421,21 @@ export function GameScreen(): JSX.Element | null {
             alignItems: "center",
             position: "relative",
             zIndex: 1,
+            // Establishes a size container so the inner board can size itself
+            // to the smaller of column width / height via `cqmin` units. Without
+            // this, max-width + max-height + aspect-ratio fight each other and
+            // the browser settles on a non-square (908×768 on Tab S8 etc.).
+            containerType: "size",
           }}
         >
           <div
             style={{
-              // height: 100% of the available column → maximised vertical
-              // use. aspect-ratio: 1 forces the width to match the
-              // rendered height. The cqi-based font scaling in BoardCell
-              // tracks the actual rendered cell size for tile + label
-              // readability at any board edge.
-              height: "100%",
-              maxHeight: "100%",
-              aspectRatio: "1",
-              maxWidth: "100%",
+              // 100cqmin = min(column inline-size, column block-size). This
+              // is the largest square that fits in the column on any device:
+              // width-constrained on small iPads, height-constrained on
+              // Tab S8 / wide displays.
+              width: "100cqmin",
+              height: "100cqmin",
               containerType: "size",
               containerName: "board",
             }}
@@ -440,7 +447,10 @@ export function GameScreen(): JSX.Element | null {
         {/* Sidebar — column on the right with scoreboard, rack, action
             stack, and contextual cards. Width chosen so the 7-tile rack
             wraps to 4 + 3 (instead of 3 + 3 + 1, which would push the
-            Resign button past the viewport bottom on iPad). */}
+            Resign button past the viewport bottom on iPad). Top inset
+            of space.x12 reserves room for the UserChip floating at
+            top: 24 / right: 24 — without it the variant tagline would
+            sit underneath the chip. */}
         <aside
           style={{
             position: "relative",
@@ -452,6 +462,7 @@ export function GameScreen(): JSX.Element | null {
             gap: space.x3,
             height: "100%",
             minHeight: 0,
+            paddingTop: space.x16,
             overflowY: "auto",
           }}
         >
