@@ -453,7 +453,12 @@ export function GameScreen(): JSX.Element | null {
             width: 360,
             display: "flex",
             flexDirection: "column",
-            gap: space.x2,
+            // Three groups distributed with space-between so any extra
+            // vertical slack splits into two smaller gaps (top↔rack,
+            // rack↔actions) instead of one big band above the rack.
+            // Adapts to viewport height — looks polished from short
+            // iPad landscapes to tall narrow viewports.
+            justifyContent: "space-between",
             height: "100%",
             minHeight: 0,
             // 72 px top inset clears the absolutely-positioned UserChip
@@ -467,6 +472,8 @@ export function GameScreen(): JSX.Element | null {
             overflowY: "hidden",
           }}
         >
+          {/* Top group — header, player cards, status strip. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
           <div
             style={{
               display: "flex",
@@ -485,7 +492,9 @@ export function GameScreen(): JSX.Element | null {
                 name={p.name}
                 score={p.score}
                 active={i === game.turn}
-                isAI={aiPlayerIndex === i}
+                {...(aiPlayerIndex === i && opponent.kind === "ai"
+                  ? { aiDifficulty: opponent.difficulty }
+                  : {})}
               />
             ))}
           </div>
@@ -613,14 +622,11 @@ export function GameScreen(): JSX.Element | null {
             }
             return null;
           })()}
-
-          {/* Flex spacer — absorbs the gap between the top stack
-              (header + player cards + status strip) and the bottom
-              stack (rack + action stack) so the Resign button always
-              hugs the bottom of the sidebar instead of leaving empty
-              cream space between Resign and the bottom-left TW corner
-              of the board. */}
-          <div style={{ flex: 1, minHeight: 0 }} aria-hidden />
+          </div>
+          {/* End top group. The Rack sits as the middle flex child;
+              the action stack below it forms the bottom group. Extra
+              vertical slack is split between top↔rack and rack↔actions
+              by justify-content: space-between on the aside. */}
 
           {/* Rack — slots into the sidebar, wraps to two rows of 4 + 3
               tiles inside a 320 px column. Brown felt + inset shadow
@@ -637,7 +643,7 @@ export function GameScreen(): JSX.Element | null {
               Recall + Shuffle + Swap + Pass fill a tidy 2-column grid;
               Resign is the destructive trailing action. Vertical layout
               keeps the board the dominant element on the screen. */}
-          <div style={{ display: "flex", flexDirection: "column", gap: space.x2, marginTop: space.x2 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
             <Button
               kind="primary"
               size="lg"

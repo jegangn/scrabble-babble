@@ -1,3 +1,4 @@
+import type { Difficulty } from "../../engine/ai/bot.js";
 import { tokens } from "../tokens.js";
 import { ScoreChip } from "./ScoreChip.js";
 
@@ -6,9 +7,20 @@ export interface PlayerCardProps {
   readonly score: number;
   /** Highlight as the current turn — thicker brown border + brown score chip. */
   readonly active?: boolean;
-  /** Show the "· Computer" suffix after the name. */
-  readonly isAI?: boolean;
+  /** If the player is the AI, the difficulty tier — shown as "· Friendly"
+   *  / "· Steady" / etc. next to the name, so the row says what the
+   *  computer's strength is at a glance. Omit for human players. */
+  readonly aiDifficulty?: Difficulty;
 }
+
+/** Human-friendly label for each AI difficulty tier. */
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  friendly: "Friendly",
+  easygoing: "Easygoing",
+  steady: "Steady",
+  sharp: "Sharp",
+  master: "Master",
+};
 
 /**
  * In-game scoreboard row. Three-column grid: avatar (circle with the
@@ -28,7 +40,7 @@ export function PlayerCard({
   name,
   score,
   active,
-  isAI,
+  aiDifficulty,
 }: PlayerCardProps): JSX.Element {
   const { color, radius, shadow, space, size, weight, font } = tokens;
   return (
@@ -94,7 +106,7 @@ export function PlayerCard({
           }}
         >
           {name}
-          {isAI && (
+          {aiDifficulty && (
             <span
               style={{
                 fontSize: size.micro + 1,
@@ -103,7 +115,7 @@ export function PlayerCard({
                 fontWeight: weight.reg,
               }}
             >
-              · Computer
+              · {DIFFICULTY_LABEL[aiDifficulty]}
             </span>
           )}
         </span>
