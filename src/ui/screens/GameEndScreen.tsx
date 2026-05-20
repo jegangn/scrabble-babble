@@ -1,5 +1,6 @@
 import { useGameStore } from "../../store/gameStore.js";
 import type { GameState, Variant } from "../../engine/types.js";
+import { playUiTap } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { ACCENT } from "../theme.js";
 
@@ -130,9 +131,10 @@ export function GameEndScreen(): JSX.Element | null {
       <div className="flex gap-3 w-full max-w-md mt-3">
         <button
           type="button"
-          onClick={() =>
-            startNewGame(settings.playerNames, settings.opponent, settings.variant)
-          }
+          onClick={() => {
+            playUiTap();
+            startNewGame(settings.playerNames, settings.opponent, settings.variant);
+          }}
           style={btnStyle("primary")}
         >
           Play again

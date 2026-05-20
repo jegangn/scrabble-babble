@@ -9,6 +9,7 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { getBotMove } from "../../ai-client/botClient.js";
+import { playUiTap } from "../../audio/sounds.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { applyPendingToBoard, pendingKeys } from "../../store/pending.js";
 import { ActionBar } from "../components/ActionBar.js";
@@ -361,7 +362,10 @@ export function GameScreen(): JSX.Element | null {
           <div className="flex gap-3 mt-4">
             <button
               type="button"
-              onClick={() => setConfirmResign(false)}
+              onClick={() => {
+                playUiTap();
+                setConfirmResign(false);
+              }}
               style={modalBtn("secondary")}
             >
               Cancel
@@ -375,6 +379,7 @@ export function GameScreen(): JSX.Element | null {
             <button
               type="button"
               onClick={() => {
+                playUiTap();
                 setConfirmResign(false);
                 resign();
               }}

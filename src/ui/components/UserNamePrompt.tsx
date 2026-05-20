@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { playUiTap } from "../../audio/sounds.js";
 import { Modal } from "./Modal.js";
 import { ACCENT } from "../theme.js";
 
@@ -47,7 +48,13 @@ export function UserNamePrompt({
   const submit = () => {
     const trimmed = name.trim();
     if (trimmed.length === 0) return; // require at least one char
+    playUiTap();
     onSubmit(trimmed);
+  };
+
+  const cancel = () => {
+    playUiTap();
+    onCancel?.();
   };
 
   return (
@@ -92,7 +99,7 @@ export function UserNamePrompt({
         {onCancel && (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={cancel}
             style={btnStyle("secondary")}
           >
             Cancel

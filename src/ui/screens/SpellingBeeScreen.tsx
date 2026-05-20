@@ -17,7 +17,7 @@ import {
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
+import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT, TILE } from "../theme.js";
@@ -537,10 +537,24 @@ export function SpellingBeeScreen(): JSX.Element | null {
 
       {/* Controls */}
       <div className="flex gap-3 w-full max-w-md">
-        <button type="button" onClick={deleteLetter} style={btnStyle("secondary")}>
+        <button
+          type="button"
+          onClick={() => {
+            playUiTap();
+            deleteLetter();
+          }}
+          style={btnStyle("secondary")}
+        >
           Delete
         </button>
-        <button type="button" onClick={shuffleOuter} style={btnStyle("secondary")}>
+        <button
+          type="button"
+          onClick={() => {
+            playUiTap();
+            shuffleOuter();
+          }}
+          style={btnStyle("secondary")}
+        >
           Shuffle
         </button>
         <button

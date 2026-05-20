@@ -1,3 +1,4 @@
+import { playUiTap } from "../../audio/sounds.js";
 import { ACCENT } from "../theme.js";
 
 export interface ActionBarProps {
@@ -69,6 +70,14 @@ function Btn({
  * 2-column grid below. Resign stays on its own row in danger style.
  */
 export function ActionBar(props: ActionBarProps): JSX.Element {
+  // Submit and Recall already trigger their own audio cues (success/error
+  // chime, recall sweep). The four secondary actions don't — they get the
+  // UI-tap tick so the user gets feedback that a press registered, but
+  // without competing with the heavier game-action sounds.
+  const withTick = (cb: () => void) => () => {
+    playUiTap();
+    cb();
+  };
   return (
     <div className="flex flex-col w-full" style={{ gap: 8 }}>
       <Btn onClick={props.onSubmit} disabled={!props.canSubmit} variant="primary" large>
@@ -76,11 +85,11 @@ export function ActionBar(props: ActionBarProps): JSX.Element {
       </Btn>
       <div className="grid grid-cols-2" style={{ gap: 8 }}>
         <Btn onClick={props.onRecall} disabled={!props.hasPending}>Recall</Btn>
-        <Btn onClick={props.onShuffle}>Shuffle</Btn>
-        <Btn onClick={props.onSwap} disabled={!props.canSwap}>Swap</Btn>
-        <Btn onClick={props.onPass}>Pass</Btn>
+        <Btn onClick={withTick(props.onShuffle)}>Shuffle</Btn>
+        <Btn onClick={withTick(props.onSwap)} disabled={!props.canSwap}>Swap</Btn>
+        <Btn onClick={withTick(props.onPass)}>Pass</Btn>
       </div>
-      <Btn onClick={props.onResign} variant="danger">Resign</Btn>
+      <Btn onClick={withTick(props.onResign)} variant="danger">Resign</Btn>
     </div>
   );
 }

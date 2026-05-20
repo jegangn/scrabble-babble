@@ -3,6 +3,7 @@ import { enumerateSevenLetterPangrams } from "../../engine/games/spelling-bee.js
 import { useGameStore } from "../../store/gameStore.js";
 import { loadInProgress, saveInProgress } from "../../storage/game-storage.js";
 import { fromJSON, toJSON } from "../../storage/serializer.js";
+import { playUiTap } from "../../audio/sounds.js";
 import { MenuItem } from "../components/MenuItem.js";
 import { MenuTile, TileWord } from "../components/MenuTile.js";
 import { UserNamePrompt } from "../components/UserNamePrompt.js";
@@ -130,7 +131,10 @@ export function HomeScreen(): JSX.Element {
       {currentUser && (
         <button
           type="button"
-          onClick={() => setNamePrompt("change")}
+          onClick={() => {
+            playUiTap();
+            setNamePrompt("change");
+          }}
           aria-label="Change user"
           style={{
             position: "absolute",

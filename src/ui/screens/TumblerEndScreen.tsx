@@ -8,6 +8,7 @@ import {
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
+import { playUiTap } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { ACCENT } from "../theme.js";
 
@@ -204,7 +205,10 @@ export function TumblerEndScreen(): JSX.Element | null {
       <div className="flex gap-3 w-full max-w-md">
         <button
           type="button"
-          onClick={() => setScreen({ kind: "tumbler" })}
+          onClick={() => {
+            playUiTap();
+            setScreen({ kind: "tumbler" });
+          }}
           style={btnStyle("primary")}
         >
           Play again

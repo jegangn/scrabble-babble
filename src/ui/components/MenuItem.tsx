@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { playUiTap } from "../../audio/sounds.js";
 
 /**
  * One menu row on the redesigned HomeScreen. Cards variant per spec:
@@ -78,7 +79,14 @@ export function MenuItem({
   return (
     <button
       type="button"
-      onClick={disabled ? undefined : onClick}
+      onClick={
+        disabled
+          ? undefined
+          : () => {
+              playUiTap();
+              onClick();
+            }
+      }
       disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => {

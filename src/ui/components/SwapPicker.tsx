@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Tile as TileT } from "../../engine/types.js";
+import { playUiTap } from "../../audio/sounds.js";
 import { ACCENT, TILE } from "../theme.js";
 import { Modal } from "./Modal.js";
 import { Tile } from "./Tile.js";
@@ -14,6 +15,7 @@ export function SwapPicker({ rack, onConfirm, onCancel }: SwapPickerProps): JSX.
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
 
   const toggle = (index: number) => {
+    playUiTap();
     const next = new Set(selected);
     if (next.has(index)) next.delete(index);
     else next.add(index);
@@ -21,11 +23,17 @@ export function SwapPicker({ rack, onConfirm, onCancel }: SwapPickerProps): JSX.
   };
 
   const confirm = () => {
+    playUiTap();
     onConfirm(rack.filter((_, i) => selected.has(i)));
   };
 
+  const cancel = () => {
+    playUiTap();
+    onCancel();
+  };
+
   return (
-    <Modal title="Select tiles to swap" onClose={onCancel}>
+    <Modal title="Select tiles to swap" onClose={cancel}>
       <div className="flex gap-2 justify-center flex-wrap">
         {rack.map((t, i) => (
           <button
@@ -51,7 +59,7 @@ export function SwapPicker({ rack, onConfirm, onCancel }: SwapPickerProps): JSX.
       <div className="flex gap-3 mt-4">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={cancel}
           className="flex-1 rounded-md font-semibold"
           style={{
             background: "white",

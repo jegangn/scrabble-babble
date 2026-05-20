@@ -3,6 +3,7 @@ import type { Difficulty } from "../../engine/ai/bot.js";
 import type { Variant } from "../../engine/types.js";
 import type { Opponent } from "../../store/gameStore.js";
 import { useGameStore } from "../../store/gameStore.js";
+import { playUiTap } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { ACCENT } from "../theme.js";
 
@@ -149,7 +150,14 @@ export function NewGameScreen(): JSX.Element {
             single canonical exit path now, consistent with every other
             screen. Start gets the full width so it's harder to miss. */}
         <div className="flex gap-3 mt-2">
-          <button type="button" onClick={onStart} style={btnStyle("primary")}>
+          <button
+            type="button"
+            onClick={() => {
+              playUiTap();
+              onStart();
+            }}
+            style={btnStyle("primary")}
+          >
             Start
           </button>
         </div>

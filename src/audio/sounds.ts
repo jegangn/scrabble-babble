@@ -103,6 +103,28 @@ export function playPlace(): void {
 }
 
 /**
+ * Soft brief "tick" for plain UI buttons (navigation, modal Cancel/
+ * Confirm, menu items, action-bar buttons that don't trigger a game
+ * outcome). Single short sine tone with a soft attack — feels like a
+ * gentle confirm without competing with the heavier place/recall thuds.
+ *
+ * Distinct from playPlace() (which is a tile thud — wood-on-wood feel)
+ * so the audio language matches the visual: UI taps get a quick high
+ * "tick", tile actions get the warm low thud.
+ */
+export function playUiTap(): void {
+  const ac = getCtx();
+  if (!ac) return;
+  tone(ac, {
+    freq: 720,
+    type: "sine",
+    attack: 0.005,
+    duration: 0.06,
+    gainPeak: 0.12,
+  });
+}
+
+/**
  * Soft reverse-thud — a brief upward sine sweep — when a tile is recalled
  * from the board back to the rack. Distinct from the place sound (which is
  * downward / heavier) so the user can tell place from recall by ear alone.

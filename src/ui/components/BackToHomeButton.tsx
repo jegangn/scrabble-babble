@@ -1,3 +1,4 @@
+import { playUiTap } from "../../audio/sounds.js";
 import { ACCENT } from "../theme.js";
 
 export interface BackToHomeButtonProps {
@@ -18,7 +19,10 @@ export function BackToHomeButton({ onClick }: BackToHomeButtonProps): JSX.Elemen
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        playUiTap();
+        onClick();
+      }}
       aria-label="Back to home"
       style={{
         position: "absolute",

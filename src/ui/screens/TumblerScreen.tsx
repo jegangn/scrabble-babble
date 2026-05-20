@@ -13,7 +13,7 @@ import {
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
+import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
@@ -258,7 +258,10 @@ export function TumblerScreen(): JSX.Element | null {
         {started && (
           <button
             type="button"
-            onClick={restartGame}
+            onClick={() => {
+              playUiTap();
+              restartGame();
+            }}
             aria-label="Restart round"
             style={{
               background: "white",
@@ -327,7 +330,10 @@ export function TumblerScreen(): JSX.Element | null {
         </div>
         <button
           type="button"
-          onClick={deleteLetter}
+          onClick={() => {
+            playUiTap();
+            deleteLetter();
+          }}
           style={btnStyle("secondary")}
           disabled={timeLeftMs <= 0 || input.length === 0}
           aria-label="Delete last letter"
