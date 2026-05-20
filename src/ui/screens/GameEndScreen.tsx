@@ -207,7 +207,6 @@ export function GameEndScreen(): JSX.Element | null {
               kind="primary"
               size="lg"
               style={{ flex: 1, minWidth: 200 }}
-              muted
               onClick={() =>
                 startNewGame(settings.playerNames, settings.opponent, settings.variant)
               }

@@ -286,7 +286,6 @@ export function TumblerEndScreen(): JSX.Element | null {
               kind="primary"
               size="lg"
               style={{ flex: 1, minWidth: 140 }}
-              muted
               onClick={() => setScreen({ kind: "tumbler" })}
             >
               Play again

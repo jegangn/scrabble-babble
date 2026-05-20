@@ -167,7 +167,7 @@ export function NewGameScreen(): JSX.Element {
           </section>
 
           <section style={{ marginTop: "auto" }}>
-            <Button kind="primary" size="lg" full onClick={onStart} disabled={!canStart} muted>
+            <Button kind="primary" size="lg" full onClick={onStart} disabled={!canStart}>
               Start game
               <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
                 <path
