@@ -1,79 +1,71 @@
 import type { CSSProperties } from "react";
 import { tokens } from "../tokens.js";
+import { Tile } from "./Tile.js";
 
 export interface BeePillProps {
   readonly letter: string;
-  /** Centre pill — brown gradient, cream letter. Outer pills are cream. */
+  /** Centre pill — brown tile, cream letter. Outer pills are cream tiles. */
   readonly center?: boolean;
   /** Highlight as touched / selected — scales down slightly with a moss outline. */
   readonly highlighted?: boolean;
-  /** Edge length in px. Defaults to 110 (the handoff spec for iPad). */
+  /** Edge length in px. Defaults to 86 (sized for the SpellingBee hex). */
   readonly size?: number;
   /**
-   * Click handler. Optional because slide-composition (Bee's primary
-   * interaction) uses pointer events on the container, not the pill.
+   * Tap handler. Fires on click (release), NOT on pointerdown, so the
+   * slide-composition's pointer-move detector on the hex container
+   * doesn't double-register the initial pill the user pressed on. The
+   * container's onClickCapture suppresses the click when a drag is
+   * detected so swipes only register each pill once.
    */
   readonly onTap?: (() => void) | undefined;
   readonly style?: CSSProperties;
 }
 
 /**
- * One Bee letter pill. Two visual variants:
+ * One Bee letter pill — rendered as a Scrabble tile (cream/brown
+ * gradient, Domine serif letter, 3D shadow) to match the rest of the
+ * app's tile vocabulary. Two variants:
  *
- *   - **center** — brown gradient with cream letter; sits in the middle
- *     of the hex. Always required in a Bee word.
- *   - **outer**  — cream gradient with ink letter; sits on the ring.
+ *   - **center** — brown tile, sits in the middle of the hex. Always
+ *     required in a Bee word.
+ *   - **outer**  — cream tile, sits on the ring.
  *
- * Highlighted state applies a 0.94× scale and a 3 px moss outline with
- * a 4 px offset — the same moss colour used for "valid word" feedback
- * everywhere else.
+ * Highlighted state applies a 0.94× scale + 3 px moss outline on the
+ * wrapper (same moss colour as "valid word" feedback elsewhere). The
+ * Tile itself is square; the hex layout positions are unaffected.
  */
 export function BeePill({
   letter,
   center,
   highlighted,
-  size = 110,
+  size = 86,
   onTap,
   style,
 }: BeePillProps): JSX.Element {
-  const { color, font, weight, motion } = tokens;
-
-  const background = center
-    ? `linear-gradient(165deg, ${color.brownMed} 0%, ${color.brown} 70%)`
-    : "linear-gradient(165deg, #F8EBD0 0%, #E2C896 100%)";
-  const fg = center ? color.cream : color.ink;
-  const boxShadow = center
-    ? "0 6px 18px -6px rgba(60,30,0,.45), 0 1px 0 rgba(255,220,180,.18) inset, 0 -2px 0 rgba(0,0,0,.18) inset"
-    : "0 4px 12px -4px rgba(60,30,0,.25), 0 1px 0 rgba(255,255,255,.55) inset";
-
+  const { color, motion } = tokens;
   return (
     <div
       role={onTap ? "button" : undefined}
       aria-label={onTap ? `Letter ${letter}` : undefined}
-      onPointerDown={onTap}
+      onClick={onTap}
       style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background,
-        color: fg,
-        display: "grid",
-        placeItems: "center",
-        fontFamily: font.serif,
-        fontWeight: weight.heavy,
-        fontSize: Math.round(size * 0.5),
-        boxShadow,
+        display: "inline-block",
         cursor: onTap ? "pointer" : "default",
         transition: `transform ${motion.fast}`,
-        userSelect: "none",
         touchAction: "manipulation",
         transform: highlighted ? "scale(0.94)" : "scale(1)",
         outline: highlighted ? `3px solid ${color.success}` : "none",
         outlineOffset: 4,
+        borderRadius: Math.max(4, Math.round(size * 0.14)),
         ...style,
       }}
     >
-      {letter}
+      <Tile
+        letter={letter}
+        variant={center ? "brown" : "cream"}
+        size={size}
+        showValue={false}
+      />
     </div>
   );
 }
