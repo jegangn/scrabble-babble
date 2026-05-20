@@ -236,88 +236,85 @@ export function GameScreen(): JSX.Element | null {
       </div>
     </div>
     <div
-      className="gs-game-body flex flex-col h-full w-full p-3"
+      className="gs-game-body flex h-full w-full p-3"
       style={{ background: ACCENT.surface, gap: 12 }}
     >
-      <ScoreBar players={game.players} turn={game.turn} bagCount={game.bag.length} />
+      {/*
+        Layout: board on the left, fills the full available height (no
+        top score-bar eating vertical space anymore). Right column holds
+        the compact ScoreBar, rack, and action stack.
+      */}
+      <div className="flex-1 min-w-0 flex items-center justify-center">
+        <div
+          style={{
+            height: "100%",
+            aspectRatio: "1",
+            maxWidth: "100%",
+            containerType: "size",
+            containerName: "board",
+          }}
+        >
+          <Board board={board} pendingKeys={keys} onCellTap={onCellTap} />
+        </div>
+      </div>
 
-      <div className="flex flex-1 gap-3 min-h-0 items-stretch">
-        <div className="flex-1 min-w-0 flex items-center justify-center">
-          {/*
-            Layout note: the wrapper needs an explicit `height: 100%` for
-            the aspect-ratio-driven square to fill the column vertically. With
-            only `max-height: 100%` (the previous implementation) the wrapper
-            collapsed to its empty content, leaving the board at ~30% of the
-            screen — a serious eyesight regression for older users.
-          */}
+      <div
+        className="flex flex-col items-stretch overflow-y-auto"
+        style={{ width: 300, flexShrink: 0, gap: 10 }}
+      >
+        {/* Compact scoreboard, replaces the old full-width top bar. */}
+        <ScoreBar players={game.players} turn={game.turn} bagCount={game.bag.length} />
+        {/* Rack wraps to 4+3 to keep the right column narrow and the board large. */}
+        <Rack
+          rack={player.rack}
+          rackOrder={rackOrder}
+          usedIndices={usedRackIndices}
+          onTileTap={onRackTap}
+          selectedIndex={selectedRackIndex}
+        />
+        {error && (
           <div
             style={{
-              height: "100%",
-              aspectRatio: "1",
-              maxWidth: "100%",
-              containerType: "size",
-              containerName: "board",
-            }}
-          >
-            <Board board={board} pendingKeys={keys} onCellTap={onCellTap} />
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col gap-3 items-stretch justify-center"
-          style={{ width: 300, flexShrink: 0 }}
-        >
-          {/* Rack wraps to 4+3 to keep the right column narrow and the board large. */}
-          <Rack
-            rack={player.rack}
-            rackOrder={rackOrder}
-            usedIndices={usedRackIndices}
-            onTileTap={onRackTap}
-            selectedIndex={selectedRackIndex}
-          />
-          {error && (
-            <div
-              style={{
-                background: "#fff0f0",
-                color: ACCENT.danger,
-                padding: "8px 12px",
-                borderRadius: 8,
-                fontSize: "0.95em",
-                fontWeight: 600,
-                textAlign: "center",
-              }}
-            >
-              {error}
-            </div>
-          )}
-          <ActionBar
-            canSubmit={pending.length > 0}
-            hasPending={pending.length > 0}
-            canSwap={canSwap}
-            onSubmit={submitMove}
-            onRecall={() => {
-              recallPending();
-              setSelectedRackIndex(null);
-            }}
-            onShuffle={shuffleRack}
-            onSwap={() => setSwapping(true)}
-            onPass={pass}
-            onResign={() => setConfirmResign(true)}
-          />
-          <button
-            type="button"
-            onClick={goHome}
-            style={{
-              background: "transparent",
-              color: ACCENT.text,
-              opacity: 0.7,
+              background: "#fff0f0",
+              color: ACCENT.danger,
               padding: "8px 12px",
+              borderRadius: 8,
               fontSize: "0.95em",
+              fontWeight: 600,
+              textAlign: "center",
             }}
           >
-            Back to home
-          </button>
-        </div>
+            {error}
+          </div>
+        )}
+        <ActionBar
+          canSubmit={pending.length > 0}
+          hasPending={pending.length > 0}
+          canSwap={canSwap}
+          onSubmit={submitMove}
+          onRecall={() => {
+            recallPending();
+            setSelectedRackIndex(null);
+          }}
+          onShuffle={shuffleRack}
+          onSwap={() => setSwapping(true)}
+          onPass={pass}
+          onResign={() => setConfirmResign(true)}
+        />
+        <button
+          type="button"
+          onClick={goHome}
+          style={{
+            background: "transparent",
+            color: ACCENT.text,
+            opacity: 0.7,
+            padding: "8px 12px",
+            fontSize: "0.95em",
+            textAlign: "center",
+          }}
+        >
+          Back to home
+        </button>
       </div>
 
       {pendingBlankAt && (
