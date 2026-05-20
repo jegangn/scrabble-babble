@@ -452,10 +452,13 @@ export function GameScreen(): JSX.Element | null {
             width: 360,
             display: "flex",
             flexDirection: "column",
-            gap: space.x1,
+            gap: space.x2,
             height: "100%",
             minHeight: 0,
-            paddingTop: space.x10,
+            // 72 px top inset clears the absolutely-positioned UserChip
+            // (top: 24, height ~40 → bottom ~64) with a small buffer so
+            // the variant + tiles-left header isn't tucked behind it.
+            paddingTop: 72,
             // Pinned — never scrolls. The contextual status strip
             // (last-move / pending / error) collapses three would-be
             // strips into one slot so this stays true even when a
@@ -609,6 +612,14 @@ export function GameScreen(): JSX.Element | null {
             }
             return null;
           })()}
+
+          {/* Flex spacer — absorbs the gap between the top stack
+              (header + player cards + status strip) and the bottom
+              stack (rack + action stack) so the Resign button always
+              hugs the bottom of the sidebar instead of leaving empty
+              cream space between Resign and the bottom-left TW corner
+              of the board. */}
+          <div style={{ flex: 1, minHeight: 0 }} aria-hidden />
 
           {/* Rack — slots into the sidebar, wraps to two rows of 4 + 3
               tiles inside a 320 px column. Brown felt + inset shadow
