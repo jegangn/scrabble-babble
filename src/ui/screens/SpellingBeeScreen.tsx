@@ -27,16 +27,20 @@ type Flash =
   | { kind: "invalid"; word: string; reason: string };
 
 const FLASH_DURATION_MS = 1200;
-// Pointy-top hex positions for 6 outer pills inside a 320×320 container with
-// 80px pill side and 92px radius from centre. Order: top, upper-right,
-// lower-right, bottom, lower-left, upper-left.
+// Pointy-top hex positions for 6 outer pills inside a 320×320 container.
+// 80 px pill side, 110 px radius from centre. Larger radius (was 92) opens
+// up the gap between diagonal neighbours — previously upper-right's left
+// edge sat at x=200 exactly where the centre pill's right edge ended, so
+// they appeared to touch. With r=110 there's a clean 15 px diagonal gap
+// and 30 px vertical gap between the centre and each outer pill.
+// Order: top, upper-right, lower-right, bottom, lower-left, upper-left.
 const HEX_POSITIONS = [
-  { top: 28, left: 120 },
-  { top: 74, left: 200 },
-  { top: 166, left: 200 },
-  { top: 212, left: 120 },
-  { top: 166, left: 40 },
-  { top: 74, left: 40 },
+  { top: 10, left: 120 },
+  { top: 65, left: 215 },
+  { top: 175, left: 215 },
+  { top: 230, left: 120 },
+  { top: 175, left: 25 },
+  { top: 65, left: 25 },
 ] as const;
 
 export function SpellingBeeScreen(): JSX.Element | null {
