@@ -18,9 +18,17 @@ import {
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
-import { BackToHomeButton } from "../components/BackToHomeButton.js";
-import { LetterPill } from "../components/LetterPill.js";
-import { ACCENT, TILE } from "../theme.js";
+import { tokens } from "../tokens.js";
+import { BackPill } from "../components/BackPill.js";
+import { BeePill } from "../components/BeePill.js";
+import { Button } from "../components/Button.js";
+import { CurrentWord } from "../components/CurrentWord.js";
+import { FoundList } from "../components/FoundList.js";
+import { SectionLabel } from "../components/SectionLabel.js";
+import { Surface } from "../components/Surface.js";
+import { Tagline } from "../components/Tagline.js";
+import { Toast } from "../components/Toast.js";
+import { UserChip } from "../components/UserChip.js";
 
 type Flash =
   | { kind: "added"; word: string; points: number }
@@ -28,26 +36,43 @@ type Flash =
   | { kind: "invalid"; word: string; reason: string };
 
 const FLASH_DURATION_MS = 1200;
-// Pointy-top hex positions for 6 outer pills inside a 320×320 container.
-// 80 px pill side, 110 px radius from centre. Larger radius (was 92) opens
-// up the gap between diagonal neighbours — previously upper-right's left
-// edge sat at x=200 exactly where the centre pill's right edge ended, so
-// they appeared to touch. With r=110 there's a clean 15 px diagonal gap
-// and 30 px vertical gap between the centre and each outer pill.
-// Order: top, upper-right, lower-right, bottom, lower-left, upper-left.
-const HEX_POSITIONS = [
-  { top: 10, left: 120 },
-  { top: 65, left: 215 },
-  { top: 175, left: 215 },
-  { top: 230, left: 120 },
-  { top: 175, left: 25 },
-  { top: 65, left: 25 },
+
+// Hex geometry — matches the handoff spec: 360×360 container, 100 px ring
+// radius, 110 px pill. Generous spacing keeps the action row below from
+// crowding the outer pills.
+const HEX_BOX = 360;
+const HEX_RADIUS = 100;
+const HEX_PILL = 110;
+const HEX_CENTRE = HEX_BOX / 2;
+
+/** Outer-position offsets — pointy-top hex, clockwise from 12 o'clock. */
+const HEX_OFFSETS = [
+  { x: 0, y: -HEX_RADIUS },
+  { x: HEX_RADIUS * 0.87, y: -HEX_RADIUS * 0.5 },
+  { x: HEX_RADIUS * 0.87, y: HEX_RADIUS * 0.5 },
+  { x: 0, y: HEX_RADIUS },
+  { x: -HEX_RADIUS * 0.87, y: HEX_RADIUS * 0.5 },
+  { x: -HEX_RADIUS * 0.87, y: -HEX_RADIUS * 0.5 },
 ] as const;
 
+/**
+ * Spelling Bee — daily 7-letter puzzle, rebuilt per the design handoff.
+ *
+ * Two-column layout:
+ *   Left  — header (tagline + h1 + date), CurrentWord, hex (1 centre +
+ *           6 outer pills with slide-trail polyline overlay), action row
+ *           (Delete / Shuffle / Submit).
+ *   Right — FoundList (sorted alphabetically) + today's leaderboard.
+ *
+ * Both tap-to-compose AND press-and-drag composition are preserved.
+ * Trail polyline draws in real-time as the finger sweeps; fades out on
+ * release. Tile reuse is allowed (Bee mechanic, unlike Tumbler).
+ */
 export function SpellingBeeScreen(): JSX.Element | null {
   const dictionary = useGameStore((s) => s.dictionary);
   const goHome = useGameStore((s) => s.goHome);
   const currentUser = useGameStore((s) => s.currentUser);
+  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
 
   const dateKey = useMemo(() => localDateKey(), []);
 
@@ -55,37 +80,27 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const [outerOrder, setOuterOrder] = useState<ReadonlyArray<Letter>>([]);
   const [currentWord, setCurrentWord] = useState("");
   const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
+  const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
+  const [flash, setFlash] = useState<Flash | null>(null);
+  const [totalWords, setTotalWords] = useState<number | null>(null);
+  const [puzzleError, setPuzzleError] = useState<string | null>(null);
 
-  // Drag-to-spell refs. We use refs (not state) so the drag is smooth — no
-  // React re-renders fire per pointer-move. The visible word is updated via
-  // setCurrentWord at the end of each step that adds a letter.
-  //
-  //   dragActiveRef:   true between pointerdown-on-pill and pointerup
-  //   dragLetterRef:   the last pill letter we appended (avoids double-add
-  //                    when finger jitters across pill boundaries)
-  //   dragStartXYRef:  pointerdown position; we only ENTER drag mode once
-  //                    the finger has moved >8 px from this point, so a
-  //                    quick tap stays a tap (handled by LetterPill onTap)
-  //   dragSawMoveRef:  flips true once the drag-threshold is crossed; we
-  //                    use it to suppress the synthetic click that would
-  //                    otherwise re-fire onTap at pointerup
+  // Drag-to-spell refs. Refs (not state) because they fire on every
+  // pointer-move and we don't want React re-renders per move.
   const dragActiveRef = useRef(false);
   const dragLetterRef = useRef<Letter | null>(null);
   const dragStartXYRef = useRef<{ x: number; y: number } | null>(null);
   const dragSawMoveRef = useRef(false);
 
-  // Slide trail: a polyline drawn between the centres of pills visited
-  // during a drag, fading slowly after release. Points are kept in state
-  // so the SVG re-renders each time a new pill is crossed; `trailFading`
-  // triggers a CSS opacity transition that gracefully clears the line
-  // after the user lifts their finger.
+  // Slide-trail state — polyline points between visited pills + fade flag.
   const hexContainerRef = useRef<HTMLDivElement | null>(null);
   const trailFadeTimerRef = useRef<number | null>(null);
-  const [trailPoints, setTrailPoints] = useState<ReadonlyArray<{ x: number; y: number }>>([]);
+  const [trailPoints, setTrailPoints] = useState<ReadonlyArray<{ x: number; y: number }>>(
+    [],
+  );
   const [trailFading, setTrailFading] = useState(false);
 
-  // Clear the fade timer on unmount so a route change mid-fade doesn't
-  // call setState on a torn-down component.
+  // Clear any in-flight fade timer on unmount.
   useEffect(() => {
     return () => {
       if (trailFadeTimerRef.current !== null) {
@@ -93,21 +108,14 @@ export function SpellingBeeScreen(): JSX.Element | null {
       }
     };
   }, []);
-  const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
-  const [flash, setFlash] = useState<Flash | null>(null);
-  const [totalWords, setTotalWords] = useState<number | null>(null);
-  const [puzzleError, setPuzzleError] = useState<string | null>(null);
 
-  // Resolve today's puzzle once on mount.
+  // Resolve today's puzzle on mount.
   useEffect(() => {
     if (!dictionary) return;
     let p: BeePuzzle;
     try {
       p = generatePuzzle(dateKey, dictionary);
     } catch (e) {
-      // Catastrophic dictionary state (corrupted gz, missing pangrams).
-      // Surface a friendly error instead of crashing the React tree with
-      // no way back to Home.
       console.error("Spelling Bee puzzle generation failed", e);
       setPuzzleError(
         e instanceof Error ? e.message : "Couldn't generate today's puzzle.",
@@ -119,11 +127,10 @@ export function SpellingBeeScreen(): JSX.Element | null {
     void (async () => {
       const saved = await getBeeProgress(dateKey);
       if (saved) setFoundWords(saved.found);
-      // Initial leaderboard load — refreshed after every found word below.
       const board = await getBeeLeaderboard(dateKey);
       setLeaderboard(board);
     })();
-    // Compute total possible words lazily after first paint (heavier walk).
+    // Lazy total-word enumeration after first paint (heavier walk).
     const handle = window.setTimeout(() => {
       try {
         const words = enumerateBeeWords(p, dictionary);
@@ -135,76 +142,75 @@ export function SpellingBeeScreen(): JSX.Element | null {
     return () => window.clearTimeout(handle);
   }, [dictionary, dateKey]);
 
-  // NOTE: persistence happens explicitly inside `submit()` on accept, NOT via
-  // a deps-based effect. An effect would echo the saved-progress hydration
-  // back to IndexedDB on every mount, which was wasteful and confusing in
-  // dev tools. Explicit-on-action is also easier to reason about.
-
-  // Auto-clear flash toast.
+  // Auto-clear the flash toast.
   useEffect(() => {
     if (!flash) return;
     const t = window.setTimeout(() => setFlash(null), FLASH_DURATION_MS);
     return () => window.clearTimeout(t);
   }, [flash]);
 
+  const { color, radius, shadow, space, font, size, weight } = tokens;
+
   if (puzzleError) {
     return (
-      <div
-        className="flex h-full w-full flex-col items-center justify-center gap-4 p-6"
-        style={{ background: ACCENT.surface }}
-      >
-        <div style={{ fontSize: "1.4em", fontWeight: 700, color: ACCENT.danger }}>
-          Couldn't load today's puzzle
-        </div>
-        <div style={{ opacity: 0.7, textAlign: "center", maxWidth: 360 }}>
-          {puzzleError}. Try refreshing the page — if it persists, the dictionary
-          file may be missing.
-        </div>
-        <button
-          type="button"
-          onClick={goHome}
+      <Surface>
+        <div
           style={{
-            background: ACCENT.primary,
-            color: "white",
-            border: "none",
-            padding: "12px 20px",
-            fontSize: "1.1em",
-            fontWeight: 600,
-            borderRadius: 10,
-            minHeight: 48,
-            touchAction: "manipulation",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: space.x4,
+            padding: space.x6,
           }}
         >
-          Back to home
-        </button>
-      </div>
+          <div style={{ fontSize: size.h4, fontWeight: weight.bold, color: color.danger }}>
+            Couldn't load today's puzzle
+          </div>
+          <div
+            style={{
+              fontSize: size.body,
+              color: color.inkSoft,
+              textAlign: "center",
+              maxWidth: 360,
+            }}
+          >
+            {puzzleError}. Try refreshing the page — if it persists, the dictionary
+            file may be missing.
+          </div>
+          <Button kind="primary" onClick={goHome}>
+            Back to home
+          </Button>
+        </div>
+      </Surface>
     );
   }
 
   if (!dictionary || !puzzle) {
     return (
-      <div className="flex h-full w-full items-center justify-center p-6">
-        <p>Preparing today's puzzle…</p>
-      </div>
+      <Surface>
+        <div style={{ flex: 1, display: "grid", placeItems: "center" }}>
+          <p>Preparing today's puzzle…</p>
+        </div>
+      </Surface>
     );
   }
 
   const score = foundWords.reduce((acc, w) => acc + scoreBeeWord(w, puzzle), 0);
 
-  const appendLetter = (letter: Letter) => {
+  const appendLetter = (letter: Letter): void => {
     if (currentWord.length >= 15) return;
     setCurrentWord(currentWord + letter);
-    // Same warm thud as the Scrabble board placement — tactile audio
-    // feedback that the tap (or drag-step) registered.
     playPlace();
   };
 
-  const deleteLetter = () => {
+  const deleteLetter = (): void => {
     if (currentWord.length === 0) return;
     setCurrentWord(currentWord.slice(0, -1));
   };
 
-  const submit = () => {
+  const submit = (): void => {
     const w = currentWord.toUpperCase();
     if (w.length === 0) return;
     setCurrentWord("");
@@ -231,9 +237,6 @@ export function SpellingBeeScreen(): JSX.Element | null {
     const next = [w, ...foundWords];
     setFoundWords(next);
     setFlash({ kind: "added", word: w, points });
-    // Persist progress + leaderboard. Recording on every word (not just at
-    // end of day) lets the leaderboard update live as the user plays — Bee
-    // is open-ended, there's no "end" to wait for.
     void (async () => {
       await setBeeProgress({ dateKey, found: next });
       if (currentUser) {
@@ -245,482 +248,487 @@ export function SpellingBeeScreen(): JSX.Element | null {
     playSuccess();
   };
 
-  const shuffleOuter = () => {
-    // Simple rotation: shift by one. Deterministic and cheap.
+  const shuffleOuter = (): void => {
     setOuterOrder((prev) => {
       if (prev.length <= 1) return prev;
       return [...prev.slice(1), prev[0]!];
     });
   };
 
-  // Allow typing on a hidden keyboard input.
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      submit();
-    } else if (e.key === "Backspace") {
-      e.preventDefault();
-      deleteLetter();
+  // Letter-tap handler — fires on simple tap (drag suppresses the click
+  // via onClickCapture below).
+  const onPillTap = (letter: Letter): void => {
+    appendLetter(letter);
+  };
+
+  // Pointer-down on the hex container — seed drag state + trail.
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
+    dragStartXYRef.current = { x: e.clientX, y: e.clientY };
+    dragSawMoveRef.current = false;
+    dragActiveRef.current = true;
+    dragLetterRef.current = null;
+    if (trailFadeTimerRef.current !== null) {
+      window.clearTimeout(trailFadeTimerRef.current);
+      trailFadeTimerRef.current = null;
+    }
+    setTrailFading(false);
+    const containerEl = hexContainerRef.current;
+    if (containerEl) {
+      const r = containerEl.getBoundingClientRect();
+      setTrailPoints([{ x: e.clientX - r.left, y: e.clientY - r.top }]);
+    } else {
+      setTrailPoints([]);
     }
   };
 
-  const onType = (raw: string) => {
-    const upper = raw.toUpperCase();
-    // Filter to allowed letters only.
-    const allowed = new Set<string>(puzzle.letters);
-    const filtered = Array.from(upper).filter((c) => allowed.has(c)).join("");
-    setCurrentWord(filtered);
+  // Pointer-move — extend the trail + maybe append a letter when a new pill
+  // is crossed. 8 px threshold to distinguish tap from drag.
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (!dragActiveRef.current) return;
+    const start = dragStartXYRef.current;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (!dragSawMoveRef.current && dx * dx + dy * dy < 64) return;
+    if (!dragSawMoveRef.current) {
+      dragSawMoveRef.current = true;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // Some browsers reject capture if the pointer isn't down — fine.
+      }
+    }
+    // Append the current finger position to the trail, throttled at 4 px.
+    const containerEl = hexContainerRef.current;
+    if (containerEl) {
+      const r = containerEl.getBoundingClientRect();
+      const fx = e.clientX - r.left;
+      const fy = e.clientY - r.top;
+      setTrailPoints((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && Math.abs(last.x - fx) < 4 && Math.abs(last.y - fy) < 4) {
+          return prev;
+        }
+        return [...prev, { x: fx, y: fy }];
+      });
+    }
+    // Identify the pill under the finger and append its letter if new.
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const pill = el?.closest("[data-bee-letter]") as HTMLElement | null;
+    const letter = pill?.dataset.beeLetter as Letter | undefined;
+    if (!letter) return;
+    if (dragLetterRef.current === letter) return; // same pill, no-op
+    dragLetterRef.current = letter;
+    let appended = false;
+    setCurrentWord((cw) => {
+      if (cw.length >= 15) return cw;
+      appended = true;
+      return cw + letter;
+    });
+    if (appended) playPlace();
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>): void => {
+    dragActiveRef.current = false;
+    dragLetterRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // Capture might never have been taken on a quick tap.
+    }
+    if (dragSawMoveRef.current) {
+      setTrailFading(true);
+      trailFadeTimerRef.current = window.setTimeout(() => {
+        setTrailPoints([]);
+        setTrailFading(false);
+        trailFadeTimerRef.current = null;
+      }, 700);
+    }
+  };
+
+  const onPointerCancel = (): void => {
+    dragActiveRef.current = false;
+    dragLetterRef.current = null;
+    if (dragSawMoveRef.current && trailPoints.length > 0) {
+      setTrailFading(true);
+      trailFadeTimerRef.current = window.setTimeout(() => {
+        setTrailPoints([]);
+        setTrailFading(false);
+        trailFadeTimerRef.current = null;
+      }, 700);
+    }
+  };
+
+  // Suppress the synthetic click that pointerup would emit if a drag happened,
+  // otherwise the last pill's onTap would double-fire.
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (dragSawMoveRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      dragSawMoveRef.current = false;
+    }
   };
 
   return (
-    <div
-      className="flex h-full w-full flex-col items-center p-4"
-      style={{ background: ACCENT.surface, gap: 14, position: "relative" }}
-    >
-      <BackToHomeButton onClick={goHome} />
-      {/* Page title centered above the date / score row. */}
-      <h1
+    <Surface padding={0}>
+      <BackPill onClick={goHome} />
+      {currentUser && (
+        <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
+      )}
+
+      <div
         style={{
-          fontSize: "1.8em",
-          fontWeight: 700,
-          color: ACCENT.primary,
-          margin: 0,
+          flex: 1,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+          gap: space.x10,
+          padding: `${space.x16 + 8}px ${space.x10}px ${space.x6}px`,
+          maxWidth: 1240,
+          margin: "0 auto",
+          width: "100%",
+          alignContent: "start",
         }}
       >
-        Spelling Bee
-      </h1>
-      <div className="flex justify-center items-center w-full max-w-2xl" style={{ gap: 32 }}>
-        <div style={{ fontSize: "0.95em", opacity: 0.7 }}>{dateKey}</div>
+        {/* Left — header + hex + actions */}
         <div
           style={{
-            fontSize: "1.4em",
-            fontWeight: 700,
-            color: ACCENT.primary,
-            fontVariantNumeric: "tabular-nums",
+            display: "flex",
+            flexDirection: "column",
+            gap: space.x4,
+            alignItems: "center",
           }}
-          aria-label="Score"
         >
-          {score} {totalWords !== null && (
-            <span style={{ fontSize: "0.6em", opacity: 0.6 }}>
-              · {foundWords.length}/{totalWords}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Current word display */}
-      <div
-        style={{
-          minHeight: 48,
-          fontSize: "1.8em",
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          color: ACCENT.text,
-        }}
-        aria-label="Current word in progress"
-      >
-        {currentWord || <span style={{ opacity: 0.3 }}>Tap or Slide</span>}
-      </div>
-
-      {/*
-        Hex grid. Two input modalities, both work:
-          - TAP a pill → existing onTap appends one letter
-          - PRESS-and-DRAG across pills → each new pill visited appends a
-            letter; finger jitter is filtered by `dragLetterRef` (which
-            holds the last appended letter so the same pill doesn't
-            re-fire while the finger hovers on it). Crossing back over
-            a previous pill DOES fire again — Bee allows letter reuse,
-            so spelling PIPE by lassoing P → I → P → E is valid.
-        We attach pointer handlers to the hex container itself so we don't
-        have to wire individual handlers on every pill, and use
-        elementFromPoint to identify which pill the finger is over.
-      */}
-      <div
-        ref={hexContainerRef}
-        style={{
-          position: "relative",
-          width: 320,
-          height: 320,
-          // flex-shrink: 0 — when the screen is short (e.g. Tab S8 800 px
-          // with the leaderboard panel), the parent flex column was
-          // squeezing this container, but the pills are absolutely
-          // positioned at fixed offsets so they kept their original
-          // positions and visibly overlapped the Shuffle/Delete/Enter
-          // row below. Pinning the box to its full 320×320 fixes that.
-          flexShrink: 0,
-          touchAction: "none",
-        }}
-        aria-label="Letter hex"
-        onPointerDown={(e) => {
-          // CRITICAL: do NOT setPointerCapture here. Capturing on the
-          // container redirects ALL subsequent events (including click) to
-          // the container, which would prevent the LetterPill's onTap from
-          // firing on a simple tap. We only capture once a real drag is
-          // detected (after the 8 px threshold in onPointerMove).
-          dragStartXYRef.current = { x: e.clientX, y: e.clientY };
-          dragSawMoveRef.current = false;
-          dragActiveRef.current = true;
-          dragLetterRef.current = null;
-          // Reset the slide-trail. Any previous fade in progress is
-          // cancelled so we don't visually mix a new trail with a fading
-          // old one. Seed the trail with the touch-down point (container-
-          // relative) so the polyline can grow from the user's finger
-          // immediately once they start moving.
-          if (trailFadeTimerRef.current !== null) {
-            window.clearTimeout(trailFadeTimerRef.current);
-            trailFadeTimerRef.current = null;
-          }
-          setTrailFading(false);
-          const containerEl = hexContainerRef.current;
-          if (containerEl) {
-            const r = containerEl.getBoundingClientRect();
-            setTrailPoints([{ x: e.clientX - r.left, y: e.clientY - r.top }]);
-          } else {
-            setTrailPoints([]);
-          }
-        }}
-        onPointerMove={(e) => {
-          if (!dragActiveRef.current) return;
-          const start = dragStartXYRef.current;
-          if (!start) return;
-          // Don't treat sub-8 px wobble as a drag — quick taps still go
-          // through the LetterPill onTap handler and append once.
-          const dx = e.clientX - start.x;
-          const dy = e.clientY - start.y;
-          if (!dragSawMoveRef.current && dx * dx + dy * dy < 64) return;
-          if (!dragSawMoveRef.current) {
-            // Threshold just crossed — NOW it's safe to capture, since the
-            // click semantics no longer matter (we're committed to a drag).
-            dragSawMoveRef.current = true;
-            try {
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-            } catch {
-              // Some browsers reject capture if the pointer isn't down — fine.
-            }
-          }
-          // Append the current finger position to the slide-trail, throttled
-          // so we don't push hundreds of near-duplicate points. ~4 px gap is
-          // dense enough for a smooth curve at any natural finger speed.
-          const containerEl = hexContainerRef.current;
-          if (containerEl) {
-            const r = containerEl.getBoundingClientRect();
-            const fx = e.clientX - r.left;
-            const fy = e.clientY - r.top;
-            setTrailPoints((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && Math.abs(last.x - fx) < 4 && Math.abs(last.y - fy) < 4) {
-                return prev;
-              }
-              return [...prev, { x: fx, y: fy }];
-            });
-          }
-          // Word-build logic: figure out which pill is under the finger and,
-          // if it's a NEW one, append its letter.
-          const el = document.elementFromPoint(e.clientX, e.clientY);
-          const pill = el?.closest("[data-bee-letter]") as HTMLElement | null;
-          const letter = pill?.dataset.beeLetter as Letter | undefined;
-          if (!letter) return;
-          if (dragLetterRef.current === letter) return; // same pill, no-op
-          dragLetterRef.current = letter;
-          let appended = false;
-          setCurrentWord((cw) => {
-            if (cw.length >= 15) return cw;
-            appended = true;
-            return cw + letter;
-          });
-          if (appended) playPlace();
-        }}
-        onPointerUp={(e) => {
-          dragActiveRef.current = false;
-          dragLetterRef.current = null;
-          try {
-            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-          } catch {
-            // Capture might never have been taken (quick tap) — fine.
-          }
-          // Kick off the trail fade-out. Any drawn points fade via a CSS
-          // opacity transition; once that completes we clear the array so
-          // a fresh drag starts from zero. If no real drag happened (just
-          // a tap), trailPoints is empty and this is effectively a no-op.
-          if (dragSawMoveRef.current) {
-            setTrailFading(true);
-            trailFadeTimerRef.current = window.setTimeout(() => {
-              setTrailPoints([]);
-              setTrailFading(false);
-              trailFadeTimerRef.current = null;
-            }, 700);
-          }
-        }}
-        onPointerCancel={() => {
-          dragActiveRef.current = false;
-          dragLetterRef.current = null;
-          // Cancel = same as up for trail purposes — fade out gracefully.
-          if (dragSawMoveRef.current && trailPoints.length > 0) {
-            setTrailFading(true);
-            trailFadeTimerRef.current = window.setTimeout(() => {
-              setTrailPoints([]);
-              setTrailFading(false);
-              trailFadeTimerRef.current = null;
-            }, 700);
-          }
-        }}
-        onClickCapture={(e) => {
-          // If a drag happened, suppress the click that pointerup would
-          // synthesize — otherwise the LetterPill onTap would fire and
-          // duplicate the last letter we already appended via drag.
-          if (dragSawMoveRef.current) {
-            e.stopPropagation();
-            e.preventDefault();
-            dragSawMoveRef.current = false;
-          }
-        }}
-      >
-        {/*
-          Slide-trail overlay — an SVG polyline that grows as the user drags
-          through pills, then fades out gracefully on release. Positioned
-          absolute over the hex with pointer-events: none so it doesn't
-          eat taps; rendered AFTER the pills in the DOM so the gold line
-          appears on top of the tiles (it's semi-transparent so the letters
-          still read clearly beneath).
-        */}
-        {trailPoints.length >= 2 && (
-          <svg
-            width={320}
-            height={320}
-            aria-hidden
+          <header
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              pointerEvents: "none",
-              zIndex: 1,
-              opacity: trailFading ? 0 : 0.7,
-              transition: trailFading ? "opacity 600ms ease-out" : "none",
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: space.x4,
             }}
           >
-            <polyline
-              points={trailPoints.map((p) => `${p.x},${p.y}`).join(" ")}
-              fill="none"
-              stroke={TILE.bgPending}
-              strokeWidth={10}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
-        {/* Centre */}
-        <div
-          data-bee-letter={puzzle.center}
-          style={{ position: "absolute", top: 120, left: 120 }}
-        >
-          <LetterPill
-            letter={puzzle.center}
-            size={80}
-            center
-            onTap={() => appendLetter(puzzle.center)}
-          />
-        </div>
-        {/* Outer 6 in current shuffle order */}
-        {outerOrder.map((letter, i) => {
-          const pos = HEX_POSITIONS[i % HEX_POSITIONS.length]!;
-          return (
-            <div
-              key={i}
-              data-bee-letter={letter}
-              style={{ position: "absolute", top: pos.top, left: pos.left }}
-            >
-              <LetterPill letter={letter} size={80} onTap={() => appendLetter(letter)} />
+            <div>
+              <Tagline>Daily puzzle</Tagline>
+              <h1
+                style={{
+                  fontFamily: font.serif,
+                  fontWeight: weight.heavy,
+                  fontSize: size.h1,
+                  margin: `${space.x2}px 0 0`,
+                  letterSpacing: "-0.02em",
+                  color: color.brown,
+                }}
+              >
+                Spelling Bee
+              </h1>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Controls */}
-      <div className="flex gap-3 w-full max-w-md">
-        <button
-          type="button"
-          onClick={() => {
-            playUiTap();
-            deleteLetter();
-          }}
-          style={btnStyle("secondary")}
-        >
-          Delete
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            playUiTap();
-            shuffleOuter();
-          }}
-          style={btnStyle("secondary")}
-        >
-          Shuffle
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          style={btnStyle("primary")}
-          disabled={currentWord.length === 0}
-        >
-          Enter
-        </button>
-      </div>
-
-      {/* Hidden input to capture hardware-keyboard typing on iPad */}
-      <input
-        type="text"
-        value={currentWord}
-        onChange={(e) => onType(e.target.value)}
-        onKeyDown={onKeyDown}
-        autoCapitalize="characters"
-        autoCorrect="off"
-        spellCheck={false}
-        style={{
-          position: "absolute",
-          left: -9999,
-          width: 1,
-          height: 1,
-          opacity: 0,
-        }}
-        aria-hidden
-      />
-
-      {/* Flash toast */}
-      <div style={{ minHeight: 32 }} aria-live="polite">
-        {flash && <FlashRow flash={flash} />}
-      </div>
-
-      {/* Two-column footer: Found words on the left, today's leaderboard
-          on the right. The leaderboard updates live as each word is
-          submitted, so the player sees their position move in real time. */}
-      <div className="flex gap-3 w-full max-w-2xl" style={{ flex: "0 0 auto" }}>
-        <div
-          className="flex-1 overflow-y-auto"
-          style={{
-            background: "rgba(255,255,255,0.5)",
-            border: `1px solid ${ACCENT.primary}33`,
-            borderRadius: 10,
-            padding: 10,
-            maxHeight: "28vh",
-            minHeight: 120,
-          }}
-        >
-          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
-            Found ({foundWords.length})
-          </div>
-          {foundWords.length === 0 ? (
-            <div style={{ opacity: 0.5 }}>No words yet.</div>
-          ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, columnCount: 2, columnGap: 16 }}>
-              {[...foundWords].sort().map((w) => (
-                <li
-                  key={w}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "2px 0",
-                    fontSize: "0.95em",
-                  }}
-                >
-                  <span>{w}</span>
-                  <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>
-                    {scoreBeeWord(w, puzzle)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div
-          className="flex-1 overflow-y-auto"
-          style={{
-            background: "rgba(255,255,255,0.5)",
-            border: `1px solid ${ACCENT.primary}33`,
-            borderRadius: 10,
-            padding: 10,
-            maxHeight: "28vh",
-            minHeight: 120,
-          }}
-        >
-          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
-            🏆 Today's leaderboard
-          </div>
-          {leaderboard.length === 0 ? (
-            <div style={{ opacity: 0.5 }}>No scores yet today.</div>
-          ) : (
-            <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {leaderboard.map((entry, i) => {
-                const isYou = currentUser !== null && entry.name === currentUser;
-                return (
-                  <li
-                    key={entry.name}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: size.caption,
+                  color: color.inkSoft,
+                  textTransform: "uppercase",
+                  letterSpacing: ".12em",
+                  fontWeight: weight.med,
+                }}
+              >
+                {formatHeaderDate(dateKey)}
+              </span>
+              <span
+                style={{
+                  fontFamily: font.serif,
+                  fontWeight: weight.bold,
+                  fontSize: size.h3,
+                  color: color.brown,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {score}
+                {totalWords !== null && (
+                  <span
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "4px 8px",
-                      borderRadius: 6,
-                      background: isYou ? `${ACCENT.primary}22` : "transparent",
-                      fontWeight: isYou ? 700 : 500,
-                      fontSize: "0.95em",
-                      gap: 8,
+                      fontSize: size.body,
+                      color: color.inkSoft,
+                      marginLeft: 8,
+                      fontWeight: weight.med,
                     }}
                   >
-                    <span style={{ display: "flex", gap: 8, overflow: "hidden", minWidth: 0, flex: 1 }}>
-                      <span style={{ opacity: 0.5, minWidth: 18 }}>{i + 1}.</span>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {entry.name}
-                      </span>
-                    </span>
-                    {/* Date set — matches the Tumbler leaderboard format.
-                        For the Bee daily board every date will be today's,
-                        but keeping the same column makes the two screens
-                        visually consistent. */}
-                    <span
+                    · {foundWords.length}/{totalWords}
+                  </span>
+                )}
+              </span>
+            </div>
+          </header>
+
+          <div style={{ width: "100%" }}>
+            <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={48} />
+          </div>
+
+          <div style={{ minHeight: 36 }} aria-live="polite">
+            {flash && <FlashToast flash={flash} />}
+          </div>
+
+          {/* Hex — pills positioned absolutely; pointer handlers on the
+              container. Dashed ring guide is purely decorative. */}
+          <div
+            ref={hexContainerRef}
+            style={{
+              position: "relative",
+              width: HEX_BOX,
+              height: HEX_BOX,
+              flexShrink: 0,
+              touchAction: "none",
+            }}
+            aria-label="Letter hex"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
+            onClickCapture={onClickCapture}
+          >
+            {/* Decorative ring guide */}
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: HEX_RADIUS * 2 + HEX_PILL,
+                height: HEX_RADIUS * 2 + HEX_PILL,
+                transform: "translate(-50%, -50%)",
+                borderRadius: "50%",
+                border: `1px dashed ${color.strokeSoft}`,
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Slide-trail polyline overlay */}
+            {trailPoints.length >= 2 && (
+              <svg
+                width={HEX_BOX}
+                height={HEX_BOX}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  pointerEvents: "none",
+                  zIndex: 1,
+                  opacity: trailFading ? 0 : 0.75,
+                  transition: trailFading ? "opacity 600ms ease-out" : "none",
+                }}
+              >
+                <polyline
+                  points={trailPoints.map((p) => `${p.x},${p.y}`).join(" ")}
+                  fill="none"
+                  stroke={color.success}
+                  strokeWidth={8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+
+            {/* Centre pill */}
+            <div
+              data-bee-letter={puzzle.center}
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <BeePill
+                letter={puzzle.center}
+                center
+                size={HEX_PILL}
+                onTap={() => onPillTap(puzzle.center)}
+              />
+            </div>
+
+            {/* Outer pills */}
+            {outerOrder.map((letter, i) => {
+              const pos = HEX_OFFSETS[i % HEX_OFFSETS.length]!;
+              return (
+                <div
+                  key={i}
+                  data-bee-letter={letter}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
+                  }}
+                >
+                  <BeePill
+                    letter={letter}
+                    size={HEX_PILL}
+                    onTap={() => onPillTap(letter)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: space.x3,
+              width: "100%",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <Button
+              kind="secondary"
+              onClick={() => {
+                playUiTap();
+                deleteLetter();
+              }}
+              disabled={currentWord.length === 0}
+              icon={<span>⌫</span>}
+              muted
+            >
+              Delete
+            </Button>
+            <Button
+              kind="secondary"
+              onClick={() => {
+                playUiTap();
+                shuffleOuter();
+              }}
+              icon={<span>⇅</span>}
+              muted
+            >
+              Shuffle
+            </Button>
+            <Button
+              kind="primary"
+              onClick={submit}
+              disabled={currentWord.length === 0}
+              muted
+            >
+              Submit
+            </Button>
+          </div>
+        </div>
+
+        {/* Right — found words + leaderboard */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: space.x4 }}>
+          <FoundList
+            title="Found"
+            count={foundWords.length}
+            columns={2}
+            words={[...foundWords].sort()}
+          />
+
+          <div
+            style={{
+              background: color.paper,
+              border: `1.5px solid ${color.stroke}`,
+              borderRadius: radius.card,
+              boxShadow: shadow.card,
+              padding: space.x4,
+              display: "flex",
+              flexDirection: "column",
+              gap: space.x3,
+            }}
+          >
+            <SectionLabel style={{ margin: 0 }}>Today's leaderboard</SectionLabel>
+            {leaderboard.length === 0 ? (
+              <span style={{ fontSize: size.caption, color: color.inkSoft }}>
+                No scores yet today.
+              </span>
+            ) : (
+              <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {leaderboard.map((entry, i) => {
+                  const isYou = currentUser !== null && entry.name === currentUser;
+                  return (
+                    <li
+                      key={entry.name}
                       style={{
-                        opacity: 0.55,
-                        fontSize: "0.85em",
-                        fontWeight: 500,
-                        fontVariantNumeric: "tabular-nums",
-                        whiteSpace: "nowrap",
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr auto",
+                        gap: space.x3,
+                        alignItems: "center",
+                        padding: "6px 4px",
+                        borderRadius: 6,
+                        borderBottom:
+                          i === leaderboard.length - 1
+                            ? "none"
+                            : `1px dashed ${color.creamDark}`,
+                        background: isYou
+                          ? `color-mix(in oklab, ${color.successBg} 60%, transparent)`
+                          : "transparent",
+                        fontSize: size.body,
                       }}
                     >
-                      {formatDate(entry.timestamp)}
-                    </span>
-                    <span style={{ fontVariantNumeric: "tabular-nums", minWidth: 32, textAlign: "right" }}>
-                      {entry.score}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </div>
+                      <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          color: color.ink,
+                          fontWeight: isYou ? weight.bold : weight.med,
+                        }}
+                      >
+                        {entry.name}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: font.serif,
+                          fontWeight: weight.bold,
+                          fontVariantNumeric: "tabular-nums",
+                          color: color.brown,
+                          minWidth: 32,
+                          textAlign: "right",
+                        }}
+                      >
+                        {entry.score}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+        </aside>
       </div>
-    </div>
+    </Surface>
   );
 }
 
-function FlashRow({ flash }: { flash: Flash }): JSX.Element {
+/** Format a YYYY-MM-DD date key as "Tue · May 20". */
+function formatHeaderDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number) as [number, number, number];
+  const dt = new Date(y, m - 1, d);
+  const weekday = dt.toLocaleString(undefined, { weekday: "short" });
+  const month = dt.toLocaleString(undefined, { month: "short" });
+  return `${weekday} · ${month} ${d}`;
+}
+
+interface FlashToastProps {
+  readonly flash: Flash;
+}
+
+function FlashToast({ flash }: FlashToastProps): JSX.Element {
   if (flash.kind === "added") {
-    return (
-      <div style={{ ...flashStyle, background: "#cdf5d8", color: "#1f5e34" }}>
-        {flash.word} · +{flash.points}
-      </div>
-    );
+    return <Toast kind="success" title={`${flash.word} · +${flash.points}`} />;
   }
   if (flash.kind === "duplicate") {
-    return (
-      <div style={{ ...flashStyle, background: "#fff1cc", color: "#7a5e0d" }}>
-        Already found
-      </div>
-    );
+    return <Toast kind="warn" title={`${flash.word} — already found`} />;
   }
-  return (
-    <div style={{ ...flashStyle, background: "#ffd8d8", color: ACCENT.danger }}>
-      {flash.reason}
-    </div>
-  );
+  return <Toast kind="error" title={flash.word} sub={flash.reason} />;
 }
 
 // Re-warm the pangram cache so HomeScreen's idle warm is sufficient even if
@@ -728,49 +736,3 @@ function FlashRow({ flash }: { flash: Flash }): JSX.Element {
 // at module top-level if `dictionary` is available globally. The HomeScreen
 // also calls it; this is a safety belt for hot-reload paths.
 void enumerateSevenLetterPangrams;
-
-const flashStyle: React.CSSProperties = {
-  padding: "6px 14px",
-  borderRadius: 8,
-  fontWeight: 600,
-  fontSize: "0.95em",
-  display: "inline-block",
-};
-
-/** Format an epoch timestamp as dd/MM/yyyy (local), per project defaults. */
-function formatDate(ts: number): string {
-  const d = new Date(ts);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getFullYear()}`;
-}
-
-function btnStyle(
-  variant: "primary" | "secondary" | "ghost",
-): React.CSSProperties {
-  if (variant === "ghost") {
-    return {
-      background: "transparent",
-      color: ACCENT.text,
-      border: "none",
-      padding: "8px 12px",
-      fontSize: "1em",
-      borderRadius: 8,
-      touchAction: "manipulation",
-      cursor: "pointer",
-    };
-  }
-  return {
-    flex: 1,
-    background: variant === "primary" ? ACCENT.primary : "white",
-    color: variant === "primary" ? "white" : ACCENT.text,
-    border: variant === "primary" ? "none" : `2px solid ${ACCENT.primary}`,
-    padding: "12px 16px",
-    fontSize: "1em",
-    fontWeight: 600,
-    borderRadius: 8,
-    minHeight: 48,
-    touchAction: "manipulation",
-    cursor: "pointer",
-  };
-}
