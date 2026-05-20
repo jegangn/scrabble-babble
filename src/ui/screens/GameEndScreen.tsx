@@ -89,7 +89,6 @@ export function GameEndScreen(): JSX.Element | null {
   const startNewGame = useGameStore((s) => s.startNewGame);
   const settings = useGameStore((s) => s.settings);
   const currentUser = useGameStore((s) => s.currentUser);
-  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const goHome = useGameStore((s) => s.goHome);
 
   const stats = useMemo(() => (game ? computeStats(game) : null), [game]);
@@ -136,9 +135,7 @@ export function GameEndScreen(): JSX.Element | null {
   return (
     <Surface padding={0}>
       <BackPill onClick={goHome} />
-      {currentUser && (
-        <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
-      )}
+      {currentUser && <UserChip name={currentUser} />}
 
       <div
         style={{

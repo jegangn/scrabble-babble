@@ -57,7 +57,6 @@ export function TumblerScreen(): JSX.Element | null {
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
   const currentUser = useGameStore((s) => s.currentUser);
-  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
 
   // Seed lives in state so Restart can mint a fresh one without losing
   // the leaderboard / personal-best loads or any in-flight timers.
@@ -241,9 +240,7 @@ export function TumblerScreen(): JSX.Element | null {
   return (
     <Surface padding={0}>
       <BackPill onClick={goHome} />
-      {currentUser && (
-        <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
-      )}
+      {currentUser && <UserChip name={currentUser} />}
 
       <div
         // Pinned to viewport — page itself doesn't scroll. Only the

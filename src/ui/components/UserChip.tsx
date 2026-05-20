@@ -1,10 +1,20 @@
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import { playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
+import { Button } from "./Button.js";
+import { ModalFrame } from "./ModalFrame.js";
 
 export interface UserChipProps {
   readonly name: string;
-  readonly onClick: () => void;
+  /**
+   * Optional click handler. When provided (HomeScreen) clicking the chip
+   * fires this — typically opens the rename flow. When omitted (every
+   * other screen) clicking opens an inline info modal that politely
+   * directs the user to the home screen to rename, so the chip never
+   * feels inert.
+   */
+  readonly onClick?: () => void;
   readonly style?: CSSProperties;
   readonly ariaLabel?: string;
 }
@@ -21,14 +31,21 @@ export interface UserChipProps {
 export function UserChip({ name, onClick, style, ariaLabel }: UserChipProps): JSX.Element {
   const { color, shadow, radius, space, size, weight, font } = tokens;
   const initial = name.charAt(0).toUpperCase();
+  // When no onClick is supplied (any non-home screen), tapping the chip
+  // opens a small info modal explaining where to rename. Keeps the
+  // affordance honest — the chip *responds* to taps, instead of
+  // silently doing nothing.
+  const [hintOpen, setHintOpen] = useState(false);
   return (
-    <button
-      type="button"
-      aria-label={ariaLabel ?? `Change user (current: ${name})`}
-      onClick={() => {
-        playUiTap();
-        onClick();
-      }}
+    <>
+      <button
+        type="button"
+        aria-label={ariaLabel ?? `Change user (current: ${name})`}
+        onClick={() => {
+          playUiTap();
+          if (onClick) onClick();
+          else setHintOpen(true);
+        }}
       style={{
         appearance: "none",
         font: "inherit",
@@ -82,5 +99,24 @@ export function UserChip({ name, onClick, style, ariaLabel }: UserChipProps): JS
         {name}
       </span>
     </button>
+    {hintOpen && (
+      <ModalFrame
+        title="Change your name"
+        onClose={() => setHintOpen(false)}
+        width={420}
+        footer={
+          <Button kind="primary" muted onClick={() => setHintOpen(false)}>
+            Got it
+          </Button>
+        }
+      >
+        <p style={{ margin: 0, fontSize: size.body, color: color.inkSoft, lineHeight: 1.55 }}>
+          To rename yourself, head back to the home screen and tap your
+          name there. Names are locked while a game or daily round is in
+          progress so leaderboards stay tied to the right player.
+        </p>
+      </ModalFrame>
+    )}
+    </>
   );
 }

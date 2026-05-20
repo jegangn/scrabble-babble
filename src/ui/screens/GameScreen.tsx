@@ -69,7 +69,6 @@ export function GameScreen(): JSX.Element | null {
   const variant = useGameStore((s) => s.settings.variant);
   const thinking = useGameStore((s) => s.thinking);
   const currentUser = useGameStore((s) => s.currentUser);
-  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const placeFromRack = useGameStore((s) => s.placeFromRack);
   const movePending = useGameStore((s) => s.movePending);
   const recallOne = useGameStore((s) => s.recallOne);
@@ -397,14 +396,9 @@ export function GameScreen(): JSX.Element | null {
 
         <BackPill onClick={goHome} />
         {currentUser && (
-          <UserChip
-            name={currentUser}
-            onClick={() => {
-              // No-op on the in-game screen — changing names mid-game
-              // would be confusing. The chip is visual identity only.
-              setCurrentUser(currentUser);
-            }}
-          />
+          /* No onClick — UserChip opens its built-in "change your name
+             from home" info modal so the chip never feels inert. */
+          <UserChip name={currentUser} />
         )}
 
         {/* Board — fills the available vertical space. The board's outer

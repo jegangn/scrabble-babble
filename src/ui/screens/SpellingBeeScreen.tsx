@@ -73,7 +73,6 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const dictionary = useGameStore((s) => s.dictionary);
   const goHome = useGameStore((s) => s.goHome);
   const currentUser = useGameStore((s) => s.currentUser);
-  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
 
   const dateKey = useMemo(() => localDateKey(), []);
 
@@ -373,9 +372,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
   return (
     <Surface padding={0}>
       <BackPill onClick={goHome} />
-      {currentUser && (
-        <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
-      )}
+      {currentUser && <UserChip name={currentUser} />}
 
       {/* Portrait-phone reflow: scale the hex container down so the 360 px
           spec still fits inside a 480 px viewport (after 32 px of side padding,

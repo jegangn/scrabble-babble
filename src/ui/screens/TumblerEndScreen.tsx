@@ -37,7 +37,6 @@ export function TumblerEndScreen(): JSX.Element | null {
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
   const currentUser = useGameStore((s) => s.currentUser);
-  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
 
   const [previousBest, setPreviousBest] = useState<number | null>(null);
   const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
@@ -89,9 +88,7 @@ export function TumblerEndScreen(): JSX.Element | null {
   return (
     <Surface padding={0}>
       <BackPill onClick={goHome} />
-      {currentUser && (
-        <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
-      )}
+      {currentUser && <UserChip name={currentUser} />}
 
       <div
         style={{
