@@ -21,7 +21,9 @@ export interface CurrentWordProps {
   readonly availableWidth?: number;
   /**
    * Smallest the tile is allowed to shrink to when fitting many letters.
-   * Defaults to 24 — letter still ~14 px (0.55 × 24), readable on iPad.
+   * Defaults to 18 — letter still ~10 px (0.55 × 18). Bee's 420 px strip
+   * needs ≤ 20 px tiles for a 15-letter word; Tumbler's 480 px strip
+   * lands at 24 px naturally so this floor doesn't change its rendering.
    */
   readonly minTileSize?: number;
 }
@@ -47,7 +49,7 @@ export function CurrentWord({
   tileSize = 56,
   stripHeight = 64,
   availableWidth = 480,
-  minTileSize = 24,
+  minTileSize = 18,
 }: CurrentWordProps): JSX.Element {
   const { color, radius, space, size, shadow } = tokens;
   const letters = word.split("");
