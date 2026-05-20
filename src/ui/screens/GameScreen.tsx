@@ -196,10 +196,25 @@ export function GameScreen(): JSX.Element | null {
     const move = pendingToMove(pending);
     const validation = validatePlaceMove(game, move, dictionary);
     if (!validation.ok) {
-      // Best-effort: show the letters the user has placed, in placement
-      // order, so they at least see "what they're building" even if it's
-      // not yet a legal move.
-      const partial = pending
+      // Best-effort: show the letters the user has placed, sorted by
+      // board POSITION (not insertion order) so the preview reads as
+      // the word the user actually sees forming on the board. E.g.
+      // dropping A→R→I→S vertically should show "ARIS", not the order
+      // in which the tiles were dragged ("ISA" etc).
+      const allSameRow = pending.every(
+        (p) => p.position.row === pending[0]!.position.row,
+      );
+      const allSameCol = pending.every(
+        (p) => p.position.col === pending[0]!.position.col,
+      );
+      const sorted = [...pending].sort((a, b) => {
+        if (allSameRow) return a.position.col - b.position.col;
+        if (allSameCol) return a.position.row - b.position.row;
+        return (
+          a.position.row - b.position.row || a.position.col - b.position.col
+        );
+      });
+      const partial = sorted
         .map((p) =>
           p.tile.kind === "letter"
             ? p.tile.letter

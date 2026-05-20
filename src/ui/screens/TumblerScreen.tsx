@@ -34,7 +34,9 @@ type Flash =
   | { kind: "invalid"; word: string; reason: string };
 
 const FLASH_DURATION_MS = 1200;
-const RACK_TILE_SIZE = 84; // handoff: rack-first screen, larger tile
+// Compact rack tile — smaller than the 84 px handoff spec so the page
+// fits on iPad without scrolling. Still ≥ 64 px tap-min for older users.
+const RACK_TILE_SIZE = 68;
 
 /**
  * Tumbler — 60-second word-finding sprint, rebuilt per the design handoff.
@@ -243,34 +245,33 @@ export function TumblerScreen(): JSX.Element | null {
       )}
 
       <div
-        // Single centered column — keeps the rack + action row in the
-        // middle of the screen where the hands naturally rest on an
-        // iPad. The viewport-height pin + overflow-y on the body lets
-        // the leaderboard / found list grow without pushing controls
-        // off the bottom.
+        // Pinned to viewport — page itself doesn't scroll. Only the
+        // bottom "Top scores / Found this round" card has overflow-y
+        // so a long leaderboard doesn't push the rack + action row
+        // off the screen.
         style={{
           height: "100dvh",
           maxHeight: "100dvh",
-          overflowY: "auto",
-          overflowX: "hidden",
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: space.x4,
-          padding: `${space.x16 + 16}px ${space.x6}px ${space.x6}px`,
+          gap: space.x3,
+          padding: `${space.x16}px ${space.x6}px ${space.x4}px`,
           maxWidth: 720,
           margin: "0 auto",
           width: "100%",
         }}
       >
-        {/* Header — centred tagline + h1 above the timer/score row. */}
-        <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space.x2 }}>
-          <Tagline>Solo mode · 60-second sprint</Tagline>
+        {/* Header — tight: tagline + h1 inline on small screens, stacked
+            on larger ones. Reduced gap so the page fits. */}
+        <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <Tagline>Solo · 60-second sprint</Tagline>
           <h1
             style={{
               fontFamily: font.serif,
               fontWeight: weight.heavy,
-              fontSize: size.h1,
+              fontSize: size.h2,
               margin: 0,
               letterSpacing: "-0.02em",
               color: color.brown,
@@ -280,8 +281,7 @@ export function TumblerScreen(): JSX.Element | null {
           </h1>
         </header>
 
-        {/* Timer + score, side-by-side. Restart only appears mid-round
-            so the pre-game state stays uncluttered. */}
+        {/* Timer + score, side-by-side. Restart only appears mid-round. */}
         <div style={{ display: "flex", gap: space.x3, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
           <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} />
           <BigNumber value={score} label="Score" tone="brown" />
@@ -301,73 +301,82 @@ export function TumblerScreen(): JSX.Element | null {
           )}
         </div>
 
-        {/* Current word — full width of the centred column. */}
         <div style={{ width: "100%", maxWidth: 480 }}>
           <CurrentWord
             word={input}
             hint={started ? "Tap a letter to extend the word" : "Tap a letter to start"}
+            tileSize={44}
           />
         </div>
 
-        {/* Flash toast — reserves vertical space so the layout doesn't
-            jump when a success / error pill appears + disappears. */}
         <div
-          style={{ minHeight: 36, display: "flex", justifyContent: "center" }}
+          style={{ minHeight: 32, display: "flex", justifyContent: "center" }}
           aria-live="polite"
         >
           {flash && <FlashToast flash={flash} />}
         </div>
 
-        {/* Rack — centred brown felt strip. Tap-only (no drag); engine
-            Rack isn't used because it expects engine Tile objects, but
-            the same visual idiom is preserved. */}
+        {/* Rack — explicitly two rows: top has the first 3 tiles, bottom
+            has the remaining 4 tiles (per user feedback). Splitting on
+            rackOrder so shuffle still works correctly. */}
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: space.x3,
+            flexDirection: "column",
+            gap: space.x2,
             padding: `${space.x3}px ${space.x4}px`,
             background: color.brown,
             borderRadius: tokens.radius.card,
             boxShadow: `inset 0 2px 6px rgba(0,0,0,.25), ${tokens.shadow.card}`,
           }}
         >
-          {rackOrder.map((rackIndex) => {
-            const letter = rack[rackIndex]!;
-            return (
-              <button
-                key={rackIndex}
-                type="button"
-                onClick={() => appendLetter(letter)}
-                disabled={timeLeftMs <= 0}
-                aria-label={`Letter ${letter}`}
-                style={{
-                  appearance: "none",
-                  font: "inherit",
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  cursor: timeLeftMs <= 0 ? "not-allowed" : "pointer",
-                  touchAction: "manipulation",
-                }}
-              >
-                <Tile letter={letter} size={RACK_TILE_SIZE} variant="cream" />
-              </button>
-            );
-          })}
+          {[rackOrder.slice(0, 3), rackOrder.slice(3, 7)].map((row, rowIdx) => (
+            <div
+              key={rowIdx}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: space.x2,
+              }}
+            >
+              {row.map((rackIndex) => {
+                const letter = rack[rackIndex]!;
+                return (
+                  <button
+                    key={rackIndex}
+                    type="button"
+                    onClick={() => appendLetter(letter)}
+                    disabled={timeLeftMs <= 0}
+                    aria-label={`Letter ${letter}`}
+                    style={{
+                      appearance: "none",
+                      font: "inherit",
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      cursor: timeLeftMs <= 0 ? "not-allowed" : "pointer",
+                      touchAction: "manipulation",
+                    }}
+                  >
+                    <Tile letter={letter} size={RACK_TILE_SIZE} variant="cream" />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
 
         {/* Action row — Shuffle / Clear / Submit, centred. */}
         <div style={{ display: "flex", gap: space.x3, justifyContent: "center", flexWrap: "wrap" }}>
-          <Button kind="secondary" onClick={shuffleRack} icon={<span>⇅</span>} muted>
+          <Button kind="secondary" size="sm" onClick={shuffleRack} icon={<span>⇅</span>} muted>
             Shuffle
           </Button>
-          <Button kind="ghost" onClick={clearWord} disabled={input.length === 0} muted>
+          <Button kind="ghost" size="sm" onClick={clearWord} disabled={input.length === 0} muted>
             ↺ Clear
           </Button>
           <Button
             kind="primary"
+            size="sm"
             onClick={handleSubmit}
             disabled={timeLeftMs <= 0 || input.length === 0}
             muted
@@ -376,29 +385,34 @@ export function TumblerScreen(): JSX.Element | null {
           </Button>
         </div>
 
-        {/* Bottom — found words (during play) OR leaderboard (pre-game),
-            plus the persistent personal-best card. Width-constrained
-            so the cards don't span the full 720 px column. */}
+        {/* Bottom — found words (during play) OR top-scores leaderboard
+            (pre-game) PLUS the personal-best card. flex: 1 + min-height: 0
+            on the wrapper + overflow-y: auto on the FoundList /
+            LeaderboardPanel itself = page doesn't scroll, only the inner
+            list does. */}
         <div
           style={{
             width: "100%",
+            flex: 1,
+            minHeight: 0,
             display: "flex",
             flexDirection: "column",
-            gap: space.x3,
-            marginTop: space.x2,
+            gap: space.x2,
+            marginTop: space.x1,
           }}
         >
-          {started ? (
-            <FoundList
-              title="Found this round"
-              words={foundWords}
-              count={foundWords.length}
-              columns={3}
-            />
-          ) : (
-            <LeaderboardPanel entries={leaderboard} />
-          )}
-
+          <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            {started ? (
+              <FoundList
+                title="Found this round"
+                words={foundWords}
+                count={foundWords.length}
+                columns={3}
+              />
+            ) : (
+              <LeaderboardPanel entries={leaderboard} />
+            )}
+          </div>
           <PersonalBestCard best={personalBest} current={score} started={started} />
         </div>
       </div>
@@ -489,6 +503,11 @@ function LeaderboardPanel({ entries }: LeaderboardPanelProps): JSX.Element {
         display: "flex",
         flexDirection: "column",
         gap: space.x3,
+        // flex: 1 + min-height: 0 lets the card fill the available
+        // space; the ol inside scrolls if there are more entries
+        // than fit.
+        flex: 1,
+        minHeight: 0,
       }}
     >
       <SectionLabel style={{ marginBottom: 0 }}>Top scores</SectionLabel>
@@ -497,7 +516,7 @@ function LeaderboardPanel({ entries }: LeaderboardPanelProps): JSX.Element {
           No scores yet — tap a letter to start the 60-second sprint.
         </span>
       ) : (
-        <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ol style={{ listStyle: "none", padding: 0, margin: 0, overflowY: "auto", minHeight: 0, paddingRight: 4 }}>
           {entries.map((entry, i) => (
             <li
               key={`${entry.name}-${entry.timestamp}`}

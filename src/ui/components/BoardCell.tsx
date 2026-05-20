@@ -1,9 +1,8 @@
 import { memo } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import type { BoardCell as BoardCellT, Position } from "../../engine/types.js";
+import type { BoardCell as BoardCellT, PlacedTile, Position } from "../../engine/types.js";
 import { tokens } from "../tokens.js";
 import { PREMIUM_COLORS } from "../theme.js";
-import { Tile } from "./Tile.js";
 
 export interface BoardCellProps {
   readonly cell: BoardCellT;
@@ -11,6 +10,87 @@ export interface BoardCellProps {
   readonly isCenter: boolean;
   readonly isPending: boolean;
   readonly onTap?: ((position: Position) => void) | undefined;
+}
+
+/**
+ * In-cell tile — renders the placed tile inside its board cell. Uses
+ * container-query (`cqi`) units for the letter + point-value sizes so
+ * the type scales with the *actual rendered* cell on iPad, iPad Mini,
+ * Tab S8, and phone-portrait views without a per-viewport JS measure.
+ *
+ * Mirrors the handoff Tile spec: 165° cream gradient, three-layered
+ * bevel shadow (inset top highlight + inset bottom bevel + warm drop),
+ * letter at ~58 % of cell height nudged up 3 % so the bottom-right
+ * value digit sits below the letter's baseline.
+ *
+ * `placed` adds a 2 px moss inset ring — the "uncommitted" treatment.
+ */
+function CellTile({ tile, placed }: { readonly tile: PlacedTile; readonly placed: boolean }): JSX.Element {
+  const { color, font, shadow, tileGradient, weight } = tokens;
+  // Resolve letter + value. Blank tiles render the chosen letter (set
+  // when the user picks one) but always show value 0 (suppressed).
+  const isLetter = tile.kind === "letter";
+  const letter = isLetter
+    ? tile.letter
+    : "letter" in tile && typeof tile.letter === "string"
+      ? tile.letter
+      : "";
+  const value = isLetter ? tile.value : null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        // inset:6% gives a small breathing margin inside the cell so the
+        // tile reads as "sitting on" the cell rather than filling it edge
+        // to edge. The board's 3px gap + this margin = visible separation.
+        inset: "6%",
+        borderRadius: "14%",
+        background: tileGradient.cream,
+        color: color.ink,
+        boxShadow: placed
+          ? `0 0 0 2px ${color.success} inset, ${shadow.tile}`
+          : shadow.tile,
+        fontFamily: font.serif,
+        fontWeight: weight.bold,
+        display: "grid",
+        placeItems: "center",
+        userSelect: "none",
+        pointerEvents: "none",
+      }}
+    >
+      {/* Letter — sized at ~5.4cqi (≈ 58 % of a 9.3cqi cell on a 15×15
+          board). The min(... rem) clamp keeps the type readable at very
+          small viewports without going huge on very wide boards. */}
+      <span
+        style={{
+          fontSize: "min(5.4cqi, 2.6rem)",
+          lineHeight: 1,
+          transform: "translateY(-4%)",
+        }}
+      >
+        {letter}
+      </span>
+      {value !== null && (
+        <span
+          style={{
+            position: "absolute",
+            right: "12%",
+            bottom: "8%",
+            fontFamily: font.sans,
+            fontWeight: weight.med,
+            // Point-value subscript at ~2.2cqi, min 9px so it never
+            // disappears on tiny cells.
+            fontSize: "max(9px, 2.2cqi)",
+            lineHeight: 1,
+            opacity: 0.82,
+          }}
+        >
+          {value}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function BoardCellInner({
@@ -27,10 +107,6 @@ function BoardCellInner({
     data: { kind: "cell", position },
     disabled: !empty,
   });
-  // Pending tiles (placed-but-not-submitted) are draggable: the user can
-  // move a misplaced tile to a different cell instead of having to recall
-  // it to the rack first. Non-pending committed tiles are NOT draggable —
-  // they're locked into the board.
   const {
     setNodeRef: setDragRef,
     attributes: dragAttributes,
@@ -48,19 +124,12 @@ function BoardCellInner({
       onClick={onTap ? () => onTap(position) : undefined}
       className="relative flex items-center justify-center"
       style={{
-        // Centre cell on an empty board is the brown star square; otherwise
-        // the premium colour (or cream-step for plain cells). A drop-target
-        // highlight tints the moss/success backdrop while the user is
-        // dragging a tile over.
         background: isOver && empty
           ? tokens.color.successBg
           : isCenter && empty
             ? tokens.color.brown
             : premium.bg,
         color: isCenter && empty ? tokens.color.cream : premium.fg,
-        // Border removed — Board uses a 3 px gap on a brown background to
-        // separate cells, per the handoff. A border on top of the gap
-        // would double up and look chunky.
         border: "none",
         borderRadius: 3,
         minWidth: 0,
@@ -68,10 +137,9 @@ function BoardCellInner({
         aspectRatio: "1",
         padding: 0,
         touchAction: "manipulation",
-        // Base font scales with the board container so tile letters + values
-        // (rendered by <Tile> in em units) inherit a size proportional to
-        // the cell. Older-user eyesight friendly.
-        fontSize: "min(3.2cqi, 1.6rem)",
+        // Cell label base font (used by the premium-square text below).
+        // Tile letters use their own cqi formula in <CellTile>.
+        fontSize: "min(2.6cqi, 1.3rem)",
         fontFamily: tokens.font.sans,
         fontWeight: tokens.weight.bold,
         letterSpacing: ".02em",
@@ -79,53 +147,39 @@ function BoardCellInner({
     >
       {empty ? (
         isCenter ? (
-          // Cream ★ on the brown centre square — matches the brand tile-hero
-          // language: cream-on-brown is the inverted treatment.
           <span style={{ color: tokens.color.cream, fontSize: "min(6cqi, 3rem)" }}>★</span>
         ) : (
-          // Premium label uses em (≈ 0.7× cell font) — readable at any size.
-          <span style={{ fontSize: "0.7em", fontWeight: 700 }}>
+          <span style={{ fontSize: "0.85em", fontWeight: 700 }}>
             {premium.label}
           </span>
         )
       ) : isPending ? (
-        // Pending tile: wrap in the draggable handle. Ghost to 40 % opacity
-        // while dragging — the moving tile is rendered by GameScreen's
-        // <DragOverlay>, mirroring the rack-tile drag pattern.
         <div
           ref={setDragRef}
           {...dragAttributes}
           {...dragListeners}
-          className="absolute inset-[2px]"
           style={{
+            position: "absolute",
+            inset: 0,
             cursor: isDragging ? "grabbing" : "grab",
             opacity: isDragging ? 0.4 : 1,
             touchAction: "none",
             transition: "opacity 120ms ease",
           }}
         >
-          <Tile tile={cell.tile!} pending />
+          <CellTile tile={cell.tile!} placed />
         </div>
       ) : (
-        <div className="absolute inset-[2px]">
-          <Tile tile={cell.tile!} pending={false} />
-        </div>
+        <CellTile tile={cell.tile!} placed={false} />
       )}
     </button>
   );
 }
 
 /**
- * Memoized so placing one tile doesn't re-render all 225 board cells. The
- * comparator compares `cell` by REFERENCE — applyPendingToBoard preserves
- * cell-object identity for unchanged cells, so only the cell whose tile
- * changed gets a fresh reference. `position` is recreated each render in
- * Board.tsx (a fresh literal), so compare row+col by value. The rest are
- * booleans / stable function references.
- *
- * Drag-over highlight (`isOver`) is internal to useDroppable's hook state,
- * not a prop, so React.memo doesn't suppress those updates — that's the
- * desired behaviour (only the hovered cell re-renders during drag).
+ * Memoized so placing one tile doesn't re-render all 225 board cells.
+ * Comparator compares `cell` by reference — applyPendingToBoard
+ * preserves cell-object identity for unchanged cells.
  */
 export const BoardCell = memo(BoardCellInner, (a, b) =>
   a.cell === b.cell &&

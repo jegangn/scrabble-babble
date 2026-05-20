@@ -37,12 +37,13 @@ type Flash =
 
 const FLASH_DURATION_MS = 1200;
 
-// Hex geometry — matches the handoff spec: 360×360 container, 100 px ring
-// radius, 110 px pill. Generous spacing keeps the action row below from
-// crowding the outer pills.
-const HEX_BOX = 360;
-const HEX_RADIUS = 100;
-const HEX_PILL = 110;
+// Hex geometry — tightened from the handoff's 360 px so the page fits
+// on iPad without scrolling. 280 px container + 78 px radius + 86 px
+// pill keeps the touch target comfortable (well above the 44 px tap min)
+// while leaving room for the score header + found-list below.
+const HEX_BOX = 280;
+const HEX_RADIUS = 78;
+const HEX_PILL = 86;
 const HEX_CENTRE = HEX_BOX / 2;
 
 /** Outer-position offsets — pointy-top hex, clockwise from 12 o'clock. */
@@ -398,34 +399,31 @@ export function SpellingBeeScreen(): JSX.Element | null {
       `}</style>
 
       <div
-        // Single centered column — keeps the hex in the visual middle
-        // of the iPad where the dominant hand naturally rests. Tight
-        // vertical rhythm so the action row stays in the viewport on
-        // 820 px iPads; leaderboard / found-list scroll into view.
+        // Pinned to viewport — page itself doesn't scroll. Only the
+        // bottom found-words + leaderboard area scrolls internally.
         style={{
           height: "100dvh",
           maxHeight: "100dvh",
-          overflowY: "auto",
-          overflowX: "hidden",
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: space.x3,
-          padding: `${space.x16}px ${space.x6}px ${space.x4}px`,
+          padding: `${space.x12}px ${space.x6}px ${space.x4}px`,
           maxWidth: 720,
           margin: "0 auto",
           width: "100%",
         }}
       >
-        {/* Header — centred tagline + h1; date + score in a separate
-            line below so they're not crowded by the title. */}
-        <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space.x2 }}>
+        {/* Header — tight single line: tagline + h2 (smaller than h1 to
+            save vertical space) + inline score badge. */}
+        <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
           <Tagline>Daily puzzle · {formatHeaderDate(dateKey)}</Tagline>
           <h1
             style={{
               fontFamily: font.serif,
               fontWeight: weight.heavy,
-              fontSize: size.h1,
+              fontSize: size.h2,
               margin: 0,
               letterSpacing: "-0.02em",
               color: color.brown,
@@ -437,19 +435,18 @@ export function SpellingBeeScreen(): JSX.Element | null {
             style={{
               fontFamily: font.serif,
               fontWeight: weight.bold,
-              fontSize: size.h3,
+              fontSize: size.bodyLg,
               color: color.brown,
               fontVariantNumeric: "tabular-nums",
-              marginTop: space.x1,
             }}
           >
             {score}
             {totalWords !== null && (
               <span
                 style={{
-                  fontSize: size.body,
+                  fontSize: size.caption,
                   color: color.inkSoft,
-                  marginLeft: 8,
+                  marginLeft: 6,
                   fontWeight: weight.med,
                 }}
               >
@@ -459,11 +456,11 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </span>
         </header>
 
-        <div style={{ width: "100%", maxWidth: 480 }}>
-          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={48} />
+        <div style={{ width: "100%", maxWidth: 420 }}>
+          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={40} />
         </div>
 
-        <div style={{ minHeight: 36 }} aria-live="polite">
+        <div style={{ minHeight: 28 }} aria-live="polite">
           {flash && <FlashToast flash={flash} />}
         </div>
 
@@ -577,7 +574,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </div>
         </div>
 
-        {/* Action row — centred Delete / Shuffle / Submit. */}
+        {/* Action row — centred Delete / Shuffle / Submit, small. */}
         <div
           style={{
             display: "flex",
@@ -588,6 +585,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
         >
           <Button
             kind="secondary"
+            size="sm"
             onClick={() => {
               playUiTap();
               deleteLetter();
@@ -600,6 +598,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </Button>
           <Button
             kind="secondary"
+            size="sm"
             onClick={() => {
               playUiTap();
               shuffleOuter();
@@ -611,6 +610,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </Button>
           <Button
             kind="primary"
+            size="sm"
             onClick={submit}
             disabled={currentWord.length === 0}
             muted
@@ -619,14 +619,19 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </Button>
         </div>
 
-        {/* Bottom — found words + today's leaderboard, full column width. */}
+        {/* Bottom — found words + today's leaderboard. flex: 1 +
+            min-height: 0 lets these cards fill the remaining vertical
+            space and scroll internally without pushing the hex up. */}
         <div
           style={{
             width: "100%",
+            flex: 1,
+            minHeight: 0,
             display: "flex",
             flexDirection: "column",
-            gap: space.x3,
-            marginTop: space.x2,
+            gap: space.x2,
+            marginTop: space.x1,
+            overflow: "hidden",
           }}
         >
           <FoundList
@@ -642,10 +647,13 @@ export function SpellingBeeScreen(): JSX.Element | null {
               border: `1.5px solid ${color.stroke}`,
               borderRadius: radius.card,
               boxShadow: shadow.card,
-              padding: space.x4,
+              padding: space.x3,
               display: "flex",
               flexDirection: "column",
-              gap: space.x3,
+              gap: space.x2,
+              flexShrink: 0,
+              maxHeight: 140,
+              overflow: "hidden",
             }}
           >
             <SectionLabel style={{ margin: 0 }}>Today's leaderboard</SectionLabel>
@@ -654,7 +662,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
                 No scores yet today.
               </span>
             ) : (
-              <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              <ol style={{ listStyle: "none", padding: 0, margin: 0, overflowY: "auto", minHeight: 0, paddingRight: 4 }}>
                 {leaderboard.map((entry, i) => {
                   const isYou = currentUser !== null && entry.name === currentUser;
                   return (

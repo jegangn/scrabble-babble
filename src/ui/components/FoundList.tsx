@@ -38,6 +38,11 @@ export function FoundList({
         display: "flex",
         flexDirection: "column",
         gap: space.x3,
+        // flex: 1 + min-height: 0 lets the card fill the available
+        // space in a flex column and the inner grid scroll when the
+        // word list overflows — Tumbler / Bee both need this so the
+        // page itself doesn't scroll.
+        flex: 1,
         minHeight: 0,
       }}
     >
@@ -58,6 +63,11 @@ export function FoundList({
           display: "grid",
           gridTemplateColumns: `repeat(${columns}, 1fr)`,
           gap: 6,
+          // Scroll inside the card if the grid overflows. The card
+          // itself doesn't grow.
+          overflowY: "auto",
+          minHeight: 0,
+          paddingRight: 4,
         }}
       >
         {words.map((w, i) => (
