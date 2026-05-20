@@ -214,9 +214,9 @@ export function SpellingBeeScreen(): JSX.Element | null {
     playPlace();
   };
 
-  const deleteLetter = (): void => {
+  const clearWord = (): void => {
     if (currentWord.length === 0) return;
-    setCurrentWord(currentWord.slice(0, -1));
+    setCurrentWord("");
   };
 
   const submit = (): void => {
@@ -635,12 +635,12 @@ export function SpellingBeeScreen(): JSX.Element | null {
             size="sm"
             onClick={() => {
               playUiTap();
-              deleteLetter();
+              clearWord();
             }}
             disabled={currentWord.length === 0}
             muted
           >
-            ⌫ Delete
+            ↺ Clear
           </Button>
           <Button
             kind="primary"

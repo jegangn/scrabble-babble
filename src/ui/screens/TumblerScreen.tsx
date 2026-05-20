@@ -77,6 +77,7 @@ export function TumblerScreen(): JSX.Element | null {
   const [flash, setFlash] = useState<Flash | null>(null);
   const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
   const [personalBest, setPersonalBest] = useState<number>(0);
+  const [topScoresExpanded, setTopScoresExpanded] = useState(false);
 
   // Refs so the visibility handler always sees the latest values.
   const startedRef = useRef(false);
@@ -287,20 +288,37 @@ export function TumblerScreen(): JSX.Element | null {
           <BigNumber value={score} label="Score" tone="brown" compact width={112} />
         </div>
 
-        {/* Restart — always visible, beneath Time/Score. Resets the
-            seed, rack, score, and timer; safe to tap mid-round. */}
-        <Button
-          kind="ghost"
-          size="sm"
+        {/* Restart — always visible, beneath Time/Score. Compact inline
+            button (not the shared Button — which has a 44 px tap-min that
+            stacks too much vertical space between Score and the rack)
+            with generous horizontal padding to keep the hit area
+            comfortable. Negative vertical margins claw back the parent's
+            x2 (8 px) flex-gap on each side. */}
+        <button
+          type="button"
           onClick={() => {
             playUiTap();
             restartGame();
           }}
-          muted
-          ariaLabel="Restart round"
+          aria-label="Restart round"
+          style={{
+            appearance: "none",
+            font: "inherit",
+            background: "transparent",
+            color: color.brown,
+            border: "none",
+            padding: "4px 18px",
+            marginTop: -space.x2 + 2,
+            marginBottom: -space.x2 + 2,
+            fontSize: size.caption,
+            fontWeight: weight.med,
+            cursor: "pointer",
+            touchAction: "manipulation",
+            opacity: 0.85,
+          }}
         >
           ↻ Restart
-        </Button>
+        </button>
 
         {/* CurrentWord + Flash overlay — the flash toast renders
             absolutely on top of the strip so its appearance/disappearance
@@ -402,11 +420,11 @@ export function TumblerScreen(): JSX.Element | null {
           </Button>
         </div>
 
-        {/* Bottom — found words (during play) OR top-scores leaderboard
-            (pre-game) PLUS the personal-best card. flex: 1 + min-height: 0
-            on the wrapper + overflow-y: auto on the FoundList /
-            LeaderboardPanel itself = page doesn't scroll, only the inner
-            list does. */}
+        {/* Bottom — FoundList (always present, fills space), then the
+            compact PersonalBest strip, then the collapsible TopScores
+            card. Mirrors the Spelling Bee layout so both solo screens
+            read the same. Page itself stays pinned; only the FoundList
+            grid and the expanded TopScores list scroll internally. */}
         <div
           style={{
             width: "100%",
@@ -416,21 +434,25 @@ export function TumblerScreen(): JSX.Element | null {
             flexDirection: "column",
             gap: space.x2,
             marginTop: space.x1,
+            overflow: "hidden",
           }}
         >
-          <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            {started ? (
-              <FoundList
-                title="Found this round"
-                words={foundWords}
-                count={foundWords.length}
-                columns={3}
-              />
-            ) : (
-              <LeaderboardPanel entries={leaderboard} />
-            )}
-          </div>
+          <FoundList
+            title={started ? "Found this round" : "Found"}
+            words={foundWords}
+            count={foundWords.length}
+            columns={3}
+          />
           <PersonalBestCard best={personalBest} current={score} started={started} />
+          <TumblerTopScoresCard
+            entries={leaderboard}
+            expanded={topScoresExpanded}
+            currentUser={currentUser}
+            onToggle={() => {
+              playUiTap();
+              setTopScoresExpanded((v) => !v);
+            }}
+          />
         </div>
       </div>
     </Surface>
@@ -503,11 +525,23 @@ function PersonalBestCard({ best, current, started }: PersonalBestCardProps): JS
   );
 }
 
-interface LeaderboardPanelProps {
+interface TumblerTopScoresCardProps {
   readonly entries: ReadonlyArray<LeaderboardEntry>;
+  readonly expanded: boolean;
+  readonly currentUser: string | null;
+  readonly onToggle: () => void;
 }
 
-function LeaderboardPanel({ entries }: LeaderboardPanelProps): JSX.Element {
+/** Collapsible Top-Scores card — same shape as the Spelling Bee version.
+ *  Collapsed shows just the header + entry count; tapping expands an
+ *  inline scroll region capped at 220 px so the page itself stays
+ *  single-screen. */
+function TumblerTopScoresCard({
+  entries,
+  expanded,
+  currentUser,
+  onToggle,
+}: TumblerTopScoresCardProps): JSX.Element {
   const { color, radius, shadow, space, font, size, weight } = tokens;
   return (
     <div
@@ -516,73 +550,122 @@ function LeaderboardPanel({ entries }: LeaderboardPanelProps): JSX.Element {
         border: `1.5px solid ${color.stroke}`,
         borderRadius: radius.card,
         boxShadow: shadow.card,
-        padding: space.x4,
+        flexShrink: 0,
         display: "flex",
         flexDirection: "column",
-        gap: space.x3,
-        // flex: 1 + min-height: 0 lets the card fill the available
-        // space; the ol inside scrolls if there are more entries
-        // than fit.
-        flex: 1,
-        minHeight: 0,
+        overflow: "hidden",
       }}
     >
-      <SectionLabel style={{ marginBottom: 0 }}>Top scores</SectionLabel>
-      {entries.length === 0 ? (
-        <span style={{ fontSize: size.caption, color: color.inkSoft }}>
-          No scores yet — tap a letter to start the 60-second sprint.
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        style={{
+          appearance: "none",
+          font: "inherit",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: `${space.x3}px ${space.x4}px`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: space.x3,
+          touchAction: "manipulation",
+          width: "100%",
+        }}
+      >
+        <SectionLabel style={{ margin: 0 }}>Top scores</SectionLabel>
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: space.x2,
+            fontSize: size.caption,
+            color: color.inkSoft,
+            fontWeight: weight.med,
+          }}
+        >
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{entries.length}</span>
+          <span aria-hidden style={{ fontSize: size.body, color: color.brown }}>
+            {expanded ? "▾" : "▸"}
+          </span>
         </span>
-      ) : (
-        <ol style={{ listStyle: "none", padding: 0, margin: 0, overflowY: "auto", minHeight: 0, paddingRight: 4 }}>
-          {entries.map((entry, i) => (
-            <li
-              key={`${entry.name}-${entry.timestamp}`}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "auto 1fr auto auto",
-                gap: space.x3,
-                alignItems: "center",
-                padding: "6px 0",
-                borderBottom:
-                  i === entries.length - 1 ? "none" : `1px dashed ${color.creamDark}`,
-                fontSize: size.body,
-              }}
-            >
-              <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
-              <span
-                style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  color: color.ink,
-                  fontWeight: weight.med,
-                }}
-              >
-                {entry.name}
-              </span>
-              <span
-                style={{
-                  fontSize: size.micro + 1,
-                  color: color.inkSoft,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {formatDate(entry.timestamp)}
-              </span>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontWeight: weight.bold,
-                  fontVariantNumeric: "tabular-nums",
-                  color: color.brown,
-                  minWidth: 32,
-                  textAlign: "right",
-                }}
-              >
-                {entry.score}
-              </span>
+      </button>
+      {expanded && (
+        <ol
+          style={{
+            listStyle: "none",
+            padding: `0 ${space.x4}px ${space.x3}px`,
+            margin: 0,
+            overflowY: "auto",
+            maxHeight: 220,
+          }}
+        >
+          {entries.length === 0 ? (
+            <li style={{ fontSize: size.caption, color: color.inkSoft, padding: "6px 0" }}>
+              No scores yet — tap a letter to start the 60-second sprint.
             </li>
-          ))}
+          ) : (
+            entries.map((entry, i) => {
+              const isYou = currentUser !== null && entry.name === currentUser;
+              return (
+                <li
+                  key={`${entry.name}-${entry.timestamp}`}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr auto auto",
+                    gap: space.x3,
+                    alignItems: "center",
+                    padding: "6px 4px",
+                    borderRadius: 6,
+                    borderBottom:
+                      i === entries.length - 1
+                        ? "none"
+                        : `1px dashed ${color.creamDark}`,
+                    background: isYou
+                      ? `color-mix(in oklab, ${color.successBg} 60%, transparent)`
+                      : "transparent",
+                    fontSize: size.body,
+                  }}
+                >
+                  <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: color.ink,
+                      fontWeight: isYou ? weight.bold : weight.med,
+                    }}
+                  >
+                    {entry.name}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: size.micro + 1,
+                      color: color.inkSoft,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatDate(entry.timestamp)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: font.serif,
+                      fontWeight: weight.bold,
+                      fontVariantNumeric: "tabular-nums",
+                      color: color.brown,
+                      minWidth: 32,
+                      textAlign: "right",
+                    }}
+                  >
+                    {entry.score}
+                  </span>
+                </li>
+              );
+            })
+          )}
         </ol>
       )}
     </div>
