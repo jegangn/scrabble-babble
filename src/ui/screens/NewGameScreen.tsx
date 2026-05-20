@@ -24,7 +24,7 @@ export function NewGameScreen(): JSX.Element {
     settings.opponent.kind,
   );
   const [difficulty, setDifficulty] = useState<Difficulty>(
-    settings.opponent.kind === "ai" ? settings.opponent.difficulty : "medium",
+    settings.opponent.kind === "ai" ? settings.opponent.difficulty : "easygoing",
   );
   const [variant, setVariant] = useState<Variant>(settings.variant);
 
@@ -123,24 +123,38 @@ export function NewGameScreen(): JSX.Element {
             <div className="flex flex-col gap-2 mt-1">
               <RadioRow
                 name="difficulty"
-                value="easy"
-                checked={difficulty === "easy"}
-                onChange={() => setDifficulty("easy")}
-                label="Easy — random legal moves"
+                value="friendly"
+                checked={difficulty === "friendly"}
+                onChange={() => setDifficulty("friendly")}
+                label="Friendly — short words, very forgiving"
               />
               <RadioRow
                 name="difficulty"
-                value="medium"
-                checked={difficulty === "medium"}
-                onChange={() => setDifficulty("medium")}
-                label="Medium — best score each turn"
+                value="easygoing"
+                checked={difficulty === "easygoing"}
+                onChange={() => setDifficulty("easygoing")}
+                label="Easygoing — mid-length words, no bingos"
               />
               <RadioRow
                 name="difficulty"
-                value="hard"
-                checked={difficulty === "hard"}
-                onChange={() => setDifficulty("hard")}
-                label="Hard — looks one move ahead"
+                value="steady"
+                checked={difficulty === "steady"}
+                onChange={() => setDifficulty("steady")}
+                label="Steady — full play, varies its picks"
+              />
+              <RadioRow
+                name="difficulty"
+                value="sharp"
+                checked={difficulty === "sharp"}
+                onChange={() => setDifficulty("sharp")}
+                label="Sharp — defends, manages rack"
+              />
+              <RadioRow
+                name="difficulty"
+                value="master"
+                checked={difficulty === "master"}
+                onChange={() => setDifficulty("master")}
+                label="Master — relentlessly optimal"
               />
             </div>
           </fieldset>

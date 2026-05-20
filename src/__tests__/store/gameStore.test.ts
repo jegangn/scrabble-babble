@@ -112,11 +112,11 @@ describe("gameStore", () => {
 
   it("startNewGame with AI opponent records aiPlayerIndex=1 and names player 2 'Computer'", () => {
     useGameStore.getState().setDictionary(DICT);
-    useGameStore.getState().startNewGame(["A", "B"], { kind: "ai", difficulty: "medium" });
+    useGameStore.getState().startNewGame(["A", "B"], { kind: "ai", difficulty: "steady" });
     const s = useGameStore.getState();
     expect(s.aiPlayerIndex).toBe(1);
     expect(s.game?.players[1]?.name).toBe("Computer");
-    expect(s.settings.opponent).toEqual({ kind: "ai", difficulty: "medium" });
+    expect(s.settings.opponent).toEqual({ kind: "ai", difficulty: "steady" });
   });
 
   it("startNewGame with hot-seat opponent clears aiPlayerIndex", () => {
@@ -127,7 +127,7 @@ describe("gameStore", () => {
 
   it("applyAiMove with a pass advances the game and clears thinking", () => {
     useGameStore.getState().setDictionary(DICT);
-    useGameStore.getState().startNewGame(["You", "Computer"], { kind: "ai", difficulty: "easy" });
+    useGameStore.getState().startNewGame(["You", "Computer"], { kind: "ai", difficulty: "easygoing" });
     // Pretend the human just played; now it's the AI's turn.
     useGameStore.getState().pass();
     // After pass, it's AI's turn 1. Drive the AI by applying a pass move.
@@ -140,7 +140,7 @@ describe("gameStore", () => {
 
   it("post-move transition skips handoff when the next player is the AI", () => {
     useGameStore.getState().setDictionary(DICT);
-    useGameStore.getState().startNewGame(["You", "Computer"], { kind: "ai", difficulty: "easy" });
+    useGameStore.getState().startNewGame(["You", "Computer"], { kind: "ai", difficulty: "easygoing" });
     useGameStore.getState().pass();
     // Next turn is AI — screen should be `game`, not `handoff`.
     expect(useGameStore.getState().screen.kind).toBe("game");

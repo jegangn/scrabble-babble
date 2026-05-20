@@ -1,4 +1,5 @@
 import { useGameStore } from "../../store/gameStore.js";
+import type { Difficulty } from "../../engine/ai/bot.js";
 import type { GameState, Variant } from "../../engine/types.js";
 import { playUiTap } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
@@ -12,6 +13,22 @@ function variantLabel(variant: Variant): string {
       return "Random — 15×15";
     case "mini":
       return "Mini — 11×11";
+  }
+}
+
+/** Human-readable label for a difficulty tier (title-cased). */
+function difficultyLabel(d: Difficulty): string {
+  switch (d) {
+    case "friendly":
+      return "Friendly";
+    case "easygoing":
+      return "Easygoing";
+    case "steady":
+      return "Steady";
+    case "sharp":
+      return "Sharp";
+    case "master":
+      return "Master";
   }
 }
 
@@ -69,9 +86,9 @@ export function GameEndScreen(): JSX.Element | null {
       break;
   }
 
-  const difficultyLabel =
+  const modeLabel =
     settings.opponent.kind === "ai"
-      ? `vs Computer (${settings.opponent.difficulty})`
+      ? `vs Computer (${difficultyLabel(settings.opponent.difficulty)})`
       : "Hot-seat";
 
   return (
@@ -124,7 +141,7 @@ export function GameEndScreen(): JSX.Element | null {
           }
         />
         <StatRow label="Board" value={variantLabel(game.variant)} />
-        <StatRow label="Mode" value={difficultyLabel} />
+        <StatRow label="Mode" value={modeLabel} />
       </div>
 
       {/* Home button removed — the top-left pill handles it. */}

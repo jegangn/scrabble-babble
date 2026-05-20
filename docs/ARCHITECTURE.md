@@ -77,6 +77,22 @@ Message protocol (`src/workers/bot-protocol.ts`):
 
 The client lazy-spawns one worker, bounds each call to 4 800 ms, and lets the bot's own deadline expire 200 ms sooner so a best-found move comes back before the client times out.
 
+### Difficulty tiers (5-tier system)
+
+Phase 2 shipped with `easy` / `medium` / `hard`. Post-launch we expanded to five tiers so the progression feels natural and the middle isn't already optimal play:
+
+| Tier | Max rack tiles placed | Candidate pool | Pick style | Leave-eval | 1-ply lookahead |
+|---|---|---|---|---|---|
+| `friendly`  | 4 | top 15 | uniform random  | ✗ | ✗ |
+| `easygoing` | 5 | top 10 | uniform random  | ✗ | ✗ |
+| `steady`    | 7 (no cap) | top 6  | score-weighted | ✓ | ✗ |
+| `sharp`     | 7 | top 3  | score-weighted | ✓ | ✓ |
+| `master`    | 7 | top 1  | strict-best     | ✓ | ✓ |
+
+The tile-placement cap is the natural-feel lever: Friendly literally cannot play a 5+ tile move (and therefore cannot bingo), so it picks shorter words without any probabilistic gating. Variance comes from the pool size + pick style, not from a per-move dice roll.
+
+Legacy 3-tier saves (`easy` / `medium` / `hard`) are migrated at the storage boundary via `migrateLegacyDifficulty()` in `engine/ai/bot.ts`: `easy → easygoing`, `medium → steady`, `hard → sharp`. Master is *new* terrain above the old Hard.
+
 ## Why this layering
 
 If the engine is pure, every variant (Classic, Random, Mini, Tumbler, Spelling Bee, AI difficulty) reuses it with injected config. The AI Web Worker imports only `src/engine/` plus the small `data/` and `storage/serializer` helpers, so the worker chunk stays under ~20 KB gzip.

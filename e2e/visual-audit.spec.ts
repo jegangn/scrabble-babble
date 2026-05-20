@@ -75,7 +75,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await shot(page, "02-new-game-default", vpName);
     });
 
-    test("NewGame — Mini + AI Medium", async ({ page }) => {
+    test("NewGame — Mini + AI Easygoing", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
       await page.getByLabel(/^computer$/i).check();

@@ -51,3 +51,10 @@
 - **Tumbler timer starts on first keystroke**: gives him time to read the rack. If he never types, the timer never starts. (No grace timeout — he can pause as long as he likes.)
 - **Tumbler scoring formula**: `(Σ letter values) × word length` is mathematically equivalent to `Σ (value × length)`. Both spellings appear in the spec; we implement the former because it matches the per-tile mental model.
 - **Hex layout**: 6 outer letter pills positioned at pointy-top angles (90° / 150° / 210° / 270° / 330° / 30°) in a 320×320 absolute-positioned container. Pill size 80 px. Shuffle button rotates the outer order by one — deterministic, cheap, visually pleasing.
+
+## Post-launch (5-tier AI difficulty)
+
+- **Legacy difficulty migration**: pre-5-tier saves stored `easy`/`medium`/`hard` in the settings store. `getOpponent()` in `settings-storage.ts` runs the value through `migrateLegacyDifficulty()` on the way out, so the rest of the codebase only ever sees the new 5-tier IDs (`friendly`/`easygoing`/`steady`/`sharp`/`master`). If you add a new tier, also extend the type guards in `settings-storage.ts` AND `migrateLegacyDifficulty()` — both list every tier explicitly.
+- **`maxTilesPlaced` is the headline natural-feel lever**: Friendly/Easygoing's cap on rack-tiles-placed-per-move physically prevents bingos and long-word power plays. Don't try to "improve" Friendly by removing the cap — the cap *is* the feature. If even the top candidate scores below `FALLBACK_SCORE_FLOOR` (5), the bot swaps low-leave tiles instead.
+- **Pick-style uses base scores for weighting, not utility**: leave-eval and lookahead can drive utility negative; using utility as weights breaks the positive-weight assumption of `weightedPick()`. We weight by `Math.max(1, c.total)` instead, which keeps the score-bias intact.
+- **Sharp/Master deadline guard**: if the worker's deadline has already elapsed when `decide()` runs (stale queued message), the lookahead loop would otherwise produce an empty `scored` array and crash on `pool[0]`. Falls back to base-score ordering in that case so the bot always returns *something*.

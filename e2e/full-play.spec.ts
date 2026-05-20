@@ -265,7 +265,7 @@ test.describe("Classic vs Computer", () => {
   test("pass move triggers the AI to take its turn (turn alternates)", async ({ page }) => {
     await page.getByRole("button", { name: /New game/ }).click();
     await page.getByLabel(/^Computer$/).check();
-    // Difficulty defaults to Medium; leave alone.
+    // Difficulty defaults to Easygoing; leave alone.
     await page.getByRole("button", { name: /Start/ }).click();
 
     // Read the Player 1 score (should be 0). Player 1 now defaults to the

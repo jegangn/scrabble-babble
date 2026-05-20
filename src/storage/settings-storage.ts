@@ -1,4 +1,5 @@
 import type { Difficulty } from "../engine/ai/bot.js";
+import { migrateLegacyDifficulty } from "../engine/ai/bot.js";
 import type { Variant } from "../engine/types.js";
 import { open } from "./db.js";
 
@@ -15,6 +16,23 @@ export type PersistedOpponent =
 const DEFAULT_OPPONENT: PersistedOpponent = { kind: "human" };
 
 function isDifficulty(x: unknown): x is Difficulty {
+  return (
+    x === "friendly" ||
+    x === "easygoing" ||
+    x === "steady" ||
+    x === "sharp" ||
+    x === "master"
+  );
+}
+
+/**
+ * Loose check that returns true for either the new 5-tier IDs or the legacy
+ * 3-tier IDs (easy/medium/hard). Used at the storage boundary so we accept
+ * old saves and migrate them on the way in.
+ */
+function isDifficultyOrLegacy(x: unknown): x is string {
+  if (typeof x !== "string") return false;
+  if (isDifficulty(x)) return true;
   return x === "easy" || x === "medium" || x === "hard";
 }
 
@@ -22,7 +40,7 @@ function isOpponent(x: unknown): x is PersistedOpponent {
   if (typeof x !== "object" || x === null) return false;
   const k = (x as { kind?: unknown }).kind;
   if (k === "human") return true;
-  if (k === "ai") return isDifficulty((x as { difficulty?: unknown }).difficulty);
+  if (k === "ai") return isDifficultyOrLegacy((x as { difficulty?: unknown }).difficulty);
   return false;
 }
 
@@ -48,7 +66,15 @@ export async function getOpponent(): Promise<PersistedOpponent> {
   const entry = await db.get("settings", OPPONENT_KEY);
   db.close();
   const value = entry?.value;
-  return isOpponent(value) ? value : DEFAULT_OPPONENT;
+  if (!isOpponent(value)) return DEFAULT_OPPONENT;
+  if (value.kind === "human") return value;
+  // AI: migrate legacy 3-tier IDs (easy/medium/hard) to the 5-tier system.
+  // A pre-Phase-5 save with `"medium"` comes back as `"steady"` so the rest
+  // of the codebase only ever sees the new type.
+  return {
+    kind: "ai",
+    difficulty: migrateLegacyDifficulty(value.difficulty as string),
+  };
 }
 
 /** Persist the opponent so it auto-selects on next new-game. */
