@@ -17,7 +17,7 @@ import {
   type BeeTopEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
+import { playError, playPlace, playRecall, playSuccess, playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { BackPill } from "../components/BackPill.js";
 import { BeePill } from "../components/BeePill.js";
@@ -207,6 +207,15 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const clearWord = (): void => {
     if (currentWord.length === 0) return;
     setCurrentWord("");
+  };
+
+  /** Remove the letter at a specific index in the current word. Wired
+   *  from CurrentWord's tile-tap so the user can pull a single letter
+   *  out of the middle, not just truncate the end. */
+  const removeAt = (i: number): void => {
+    if (i < 0 || i >= currentWord.length) return;
+    setCurrentWord(currentWord.slice(0, i) + currentWord.slice(i + 1));
+    playRecall();
   };
 
   const submit = (): void => {
@@ -443,7 +452,14 @@ export function SpellingBeeScreen(): JSX.Element | null {
             flash fires (submit), so the strip beneath shows its hint and
             the overlay covers plain text only. */}
         <div style={{ position: "relative", width: "100%", maxWidth: 420 }}>
-          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={32} stripHeight={52} availableWidth={420} />
+          <CurrentWord
+            word={currentWord}
+            hint="Tap or slide to spell"
+            tileSize={32}
+            stripHeight={52}
+            availableWidth={420}
+            onTileTap={removeAt}
+          />
           {flash && (
             <div
               style={{

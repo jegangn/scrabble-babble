@@ -14,7 +14,7 @@ import {
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
+import { playError, playPlace, playRecall, playSuccess, playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { BackPill } from "../components/BackPill.js";
 import { BigNumber } from "../components/BigNumber.js";
@@ -232,6 +232,15 @@ export function TumblerScreen(): JSX.Element | null {
     setInput("");
   };
 
+  /** Remove the letter at a specific index in the current input.
+   *  Wired from CurrentWord's tile-tap so the user can pull a letter
+   *  out of the middle of the word, not just truncate the end. */
+  const removeAt = (i: number): void => {
+    if (i < 0 || i >= input.length) return;
+    setInput(input.slice(0, i) + input.slice(i + 1));
+    playRecall();
+  };
+
   const secondsLeft = (timeLeftMs / 1000).toFixed(1);
   const timerTone = timeLeftMs <= 10_000 && started ? "warn" : "ink";
 
@@ -332,6 +341,7 @@ export function TumblerScreen(): JSX.Element | null {
             tileSize={36}
             stripHeight={56}
             availableWidth={480}
+            onTileTap={removeAt}
           />
           {flash && (
             <div

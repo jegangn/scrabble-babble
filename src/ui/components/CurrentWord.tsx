@@ -26,6 +26,13 @@ export interface CurrentWordProps {
    * lands at 24 px naturally so this floor doesn't change its rendering.
    */
   readonly minTileSize?: number;
+  /**
+   * Optional callback fired when the user taps an individual tile in
+   * the strip. When provided, each tile becomes a clickable button so
+   * the user can remove a specific letter from the middle of the word
+   * (not just the last one). Omit for a read-only display.
+   */
+  readonly onTileTap?: (index: number) => void;
 }
 
 const GAP = 6;
@@ -50,6 +57,7 @@ export function CurrentWord({
   stripHeight = 64,
   availableWidth = 480,
   minTileSize = 18,
+  onTileTap,
 }: CurrentWordProps): JSX.Element {
   const { color, radius, space, size, shadow } = tokens;
   const letters = word.split("");
@@ -100,9 +108,30 @@ export function CurrentWord({
         overflow: "hidden",
       }}
     >
-      {letters.map((ch, i) => (
-        <Tile key={i} letter={ch} size={effectiveSize} variant="cream" />
-      ))}
+      {letters.map((ch, i) =>
+        onTileTap ? (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onTileTap(i)}
+            aria-label={`Remove letter ${ch} at position ${i + 1}`}
+            style={{
+              appearance: "none",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              touchAction: "manipulation",
+              flexShrink: 0,
+              borderRadius: Math.max(4, Math.round(effectiveSize * 0.14)),
+            }}
+          >
+            <Tile letter={ch} size={effectiveSize} variant="cream" />
+          </button>
+        ) : (
+          <Tile key={i} letter={ch} size={effectiveSize} variant="cream" />
+        ),
+      )}
     </div>
   );
 }
