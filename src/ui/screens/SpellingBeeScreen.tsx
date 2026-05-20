@@ -258,7 +258,17 @@ export function SpellingBeeScreen(): JSX.Element | null {
       style={{ background: ACCENT.surface, gap: 14, position: "relative" }}
     >
       <BackToHomeButton onClick={goHome} />
-      {/* Header — back-button moved to the shared top-left pill. */}
+      {/* Page title centered above the date / score row. */}
+      <h1
+        style={{
+          fontSize: "1.8em",
+          fontWeight: 700,
+          color: ACCENT.primary,
+          margin: 0,
+        }}
+      >
+        Spelling Bee
+      </h1>
       <div className="flex justify-center items-center w-full max-w-2xl" style={{ gap: 32 }}>
         <div style={{ fontSize: "0.95em", opacity: 0.7 }}>{dateKey}</div>
         <div

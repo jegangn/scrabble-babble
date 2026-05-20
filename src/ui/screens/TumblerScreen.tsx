@@ -203,8 +203,20 @@ export function TumblerScreen(): JSX.Element | null {
       style={{ background: ACCENT.surface, gap: 14, position: "relative" }}
     >
       <BackToHomeButton onClick={goHome} />
-      {/* Header: timer + score. Back-button moved to the top-left
-          floating pill (shared component) for consistency across screens. */}
+      {/* Page title. The back-home pill sits floating at top-left; this
+          title stays in the document flow so it can be centered above the
+          timer / score / restart row below. */}
+      <h1
+        style={{
+          fontSize: "1.8em",
+          fontWeight: 700,
+          color: ACCENT.primary,
+          margin: 0,
+        }}
+      >
+        Tumbler
+      </h1>
+      {/* Header: timer + score + (mid-game) restart. */}
       <div
         className="flex justify-center items-center w-full max-w-2xl"
         style={{ minHeight: 56, gap: 32 }}
