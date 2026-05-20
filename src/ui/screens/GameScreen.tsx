@@ -86,6 +86,7 @@ export function GameScreen(): JSX.Element | null {
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
+  const [confirmPass, setConfirmPass] = useState(false);
   // Tracks the in-flight drag (if any) so <DragOverlay> can render a
   // moving tile that follows the cursor. See the original implementation
   // notes for why both sources matter.
@@ -684,7 +685,7 @@ export function GameScreen(): JSX.Element | null {
               >
                 Swap
               </Button>
-              <Button kind="secondary" size="sm" onClick={pass}>
+              <Button kind="secondary" size="sm" onClick={() => setConfirmPass(true)}>
                 Pass
               </Button>
             </div>
@@ -708,6 +709,45 @@ export function GameScreen(): JSX.Element | null {
           }}
           onCancel={() => setSwapping(false)}
         />
+      )}
+      {confirmPass && (
+        <ModalFrame
+          title="Pass your turn?"
+          sub="You'll skip this turn without placing any tiles."
+          onClose={() => setConfirmPass(false)}
+          footer={
+            <>
+              <Button kind="ghost" onClick={() => setConfirmPass(false)}>
+                Keep playing
+              </Button>
+              <Button
+                kind="primary"
+                onClick={() => {
+                  setConfirmPass(false);
+                  pass();
+                }}
+              >
+                Pass turn
+              </Button>
+            </>
+          }
+        >
+          {/* Body — surface the only mild but real consequence: if both
+              players pass twice in a row, the game ends. */}
+          <div
+            style={{
+              padding: space.x4,
+              background: color.warnBg,
+              borderRadius: radius.chip,
+              color: color.brownDark,
+              fontSize: size.caption,
+              fontWeight: weight.med,
+              lineHeight: 1.5,
+            }}
+          >
+            Four passes in a row (two by each player) end the game.
+          </div>
+        </ModalFrame>
       )}
       {confirmResign && (
         <ModalFrame
