@@ -182,20 +182,29 @@ function BoardCellInner({
     >
       {empty ? (
         isCenter ? (
-          <span
+          // SVG five-point star. The Unicode ★ glyph's visual ink sits
+          // asymmetrically inside its em-box (font-dependent) and would
+          // not land dead-centre inside the cell. Drawing the star as
+          // SVG lets us place its bounding box exactly at the cell's
+          // geometric centre. The rotation centre is at (50, 54.3) of
+          // the viewBox so the bbox [y=9.3 .. y=90.7] is centred on 50
+          // — i.e. the apex sits the same distance from the top edge
+          // that the two base V's sit from the bottom edge.
+          <svg
+            aria-hidden
+            viewBox="0 0 100 100"
             style={{
+              width: "min(6cqi, 3rem)",
+              height: "min(6cqi, 3rem)",
               color: tokens.color.cream,
-              fontSize: "min(6cqi, 3rem)",
-              // Pin line-height to 1 so the glyph's box matches its visual
-              // bounds, and neutralise the parent button's .02em letter-
-              // spacing so a single glyph doesn't get pushed visually left.
-              display: "inline-block",
-              lineHeight: 1,
-              letterSpacing: 0,
+              display: "block",
             }}
           >
-            ★
-          </span>
+            <path
+              fill="currentColor"
+              d="M50 9.3 L60.58 39.74 L92.80 40.39 L67.12 59.86 L76.45 90.70 L50 72.30 L23.55 90.70 L32.88 59.86 L7.20 40.39 L39.42 39.74 Z"
+            />
+          </svg>
         ) : (
           <span style={{ fontSize: "0.85em", fontWeight: 700 }}>
             {premium.label}

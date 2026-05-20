@@ -7,7 +7,6 @@ import { BackPill } from "../components/BackPill.js";
 import { BoardOption } from "../components/BoardOption.js";
 import { Button } from "../components/Button.js";
 import { DifficultyCards } from "../components/DifficultyCards.js";
-import { FooterMark } from "../components/FooterMark.js";
 import { NameInput } from "../components/NameInput.js";
 import { SectionLabel } from "../components/SectionLabel.js";
 import { Segmented } from "../components/Segmented.js";
@@ -62,11 +61,18 @@ export function NewGameScreen(): JSX.Element {
 
       <div
         style={{
-          flex: 1,
+          // Pinned to the viewport — page itself doesn't scroll. The
+          // inner sections were tightened so the entire form (header,
+          // Players, Opponent, Difficulty, Board, Start) fits inside one
+          // iPad-landscape screen. Tag stack: 100dvh + overflow: hidden
+          // on the outer + tighter gap/padding inside.
+          height: "100dvh",
+          maxHeight: "100dvh",
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          gap: tokens.space.x6,
-          padding: `${tokens.space.x16 + 16}px ${tokens.space.x6}px ${tokens.space.x8}px`,
+          gap: tokens.space.x4,
+          padding: `${tokens.space.x12}px ${tokens.space.x6}px ${tokens.space.x4}px`,
           maxWidth: 720,
           margin: "0 auto",
           width: "100%",
@@ -168,14 +174,6 @@ export function NewGameScreen(): JSX.Element {
           </Button>
         </section>
       </div>
-
-      <footer
-        style={{
-          padding: `${tokens.space.x4}px ${tokens.space.x8}px ${tokens.space.x6}px`,
-        }}
-      >
-        <FooterMark />
-      </footer>
     </Surface>
   );
 }
