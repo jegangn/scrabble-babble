@@ -300,7 +300,19 @@ export function SpellingBeeScreen(): JSX.Element | null {
         elementFromPoint to identify which pill the finger is over.
       */}
       <div
-        style={{ position: "relative", width: 320, height: 320, touchAction: "none" }}
+        style={{
+          position: "relative",
+          width: 320,
+          height: 320,
+          // flex-shrink: 0 — when the screen is short (e.g. Tab S8 800 px
+          // with the leaderboard panel), the parent flex column was
+          // squeezing this container, but the pills are absolutely
+          // positioned at fixed offsets so they kept their original
+          // positions and visibly overlapped the Shuffle/Delete/Enter
+          // row below. Pinning the box to its full 320×320 fixes that.
+          flexShrink: 0,
+          touchAction: "none",
+        }}
         aria-label="Letter hex"
         onPointerDown={(e) => {
           // CRITICAL: do NOT setPointerCapture here. Capturing on the

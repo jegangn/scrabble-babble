@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ACCENT, TILE } from "../theme.js";
 import type { Letter } from "../../engine/types.js";
 
@@ -25,6 +25,9 @@ export interface LetterPillProps {
  * accent colour, and gains a slightly thicker border. Older eyes see the
  * cue clearly; younger fingers feel the depressed-button affordance.
  */
+/** How long the highlight visibly persists after pointer-release. */
+const HIGHLIGHT_TAIL_MS = 220;
+
 export function LetterPill({
   letter,
   size = 64,
@@ -34,11 +37,44 @@ export function LetterPill({
   ariaLabel,
 }: LetterPillProps): JSX.Element {
   const [pressed, setPressed] = useState(false);
+  // We keep the press visual ON for HIGHLIGHT_TAIL_MS after the user lifts
+  // their finger so the "I just tapped this" cue is unmissable even for
+  // a quick tap. Without this tail, a 50 ms touch is gone before older
+  // eyes register the change.
+  const releaseTimerRef = useRef<number | null>(null);
+
+  // Cancel any in-flight release timer when the component unmounts —
+  // otherwise the setTimeout could try to set state on an unmounted
+  // component during route changes.
+  useEffect(() => {
+    return () => {
+      if (releaseTimerRef.current !== null) {
+        window.clearTimeout(releaseTimerRef.current);
+      }
+    };
+  }, []);
+
+  const press = () => {
+    if (releaseTimerRef.current !== null) {
+      window.clearTimeout(releaseTimerRef.current);
+      releaseTimerRef.current = null;
+    }
+    setPressed(true);
+  };
+
+  const release = () => {
+    if (releaseTimerRef.current !== null) {
+      window.clearTimeout(releaseTimerRef.current);
+    }
+    releaseTimerRef.current = window.setTimeout(() => {
+      setPressed(false);
+      releaseTimerRef.current = null;
+    }, HIGHLIGHT_TAIL_MS);
+  };
 
   // Active visual state combines the "explicit selection" prop with the
   // momentary "currently pressed" gesture state. Both flow into the same
-  // accent treatment so the user can't tell them apart visually — which is
-  // intentional, they're the same idea (this pill is the user's focus).
+  // accent treatment so the user can't tell them apart visually.
   const isHighlighted = pressed || selected;
 
   // Centre pill (Bee centre) keeps its accent fill at rest; on press it
@@ -51,18 +87,18 @@ export function LetterPill({
       ? ACCENT.primary
       : TILE.bg;
   const fg = center || isHighlighted ? "#ffffff" : TILE.letter;
-  const borderColor = isHighlighted ? ACCENT.primaryHover : TILE.border;
-  const borderWidth = isHighlighted ? 4 : 2;
-
-  // Reset pressed-state in EVERY release path so the highlight never gets
-  // stuck (pointer leaves the pill mid-press, browser cancels, etc.).
-  const release = () => setPressed(false);
+  // Thick contrast outline when highlighted — uses the pending-tile gold so
+  // it stands out against both the white and the accent-brown backgrounds.
+  // 5 px (was 4) makes the "I picked this one" cue unmistakable for older
+  // users with eyesight problems.
+  const borderColor = isHighlighted ? TILE.bgPending : TILE.border;
+  const borderWidth = isHighlighted ? 5 : 2;
 
   return (
     <button
       type="button"
       onClick={onTap}
-      onPointerDown={onTap ? () => setPressed(true) : undefined}
+      onPointerDown={onTap ? press : undefined}
       onPointerUp={onTap ? release : undefined}
       onPointerLeave={onTap ? release : undefined}
       onPointerCancel={onTap ? release : undefined}
@@ -86,12 +122,12 @@ export function LetterPill({
         alignItems: "center",
         justifyContent: "center",
         boxShadow: pressed
-          ? "0 1px 0 rgba(0,0,0,0.12)"
+          ? "0 0 0 2px rgba(255,225,138,0.5)"
           : center
             ? "0 2px 0 rgba(0,0,0,0.18)"
             : "none",
         transform: pressed ? "scale(0.94)" : "scale(1)",
-        transition: "transform 80ms ease, background 80ms ease, border-color 80ms ease",
+        transition: "transform 80ms ease, background 80ms ease, border-color 80ms ease, box-shadow 80ms ease",
       }}
     >
       {letter}
