@@ -30,6 +30,28 @@ async function shot(page: Page, name: string, viewport: keyof typeof VIEWPORTS) 
 
 async function gotoHome(page: Page) {
   await page.goto("/");
+  // Pre-seed current_user so the welcome name-prompt doesn't block screen
+  // captures. Create ALL stores at v1 (see smoke.spec for rationale).
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open("scrabble-babble", 1);
+      open.onupgradeneeded = () => {
+        const db = open.result;
+        if (!db.objectStoreNames.contains("in_progress")) db.createObjectStore("in_progress");
+        if (!db.objectStoreNames.contains("history")) db.createObjectStore("history", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("settings")) db.createObjectStore("settings", { keyPath: "key" });
+      };
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction("settings", "readwrite");
+        tx.objectStore("settings").put({ key: "current_user", value: "Tester" });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      open.onerror = () => reject(open.error);
+    });
+  });
+  await page.reload();
   await expect(page.getByRole("button", { name: /^new game$/i })).toBeVisible({
     timeout: 20_000,
   });

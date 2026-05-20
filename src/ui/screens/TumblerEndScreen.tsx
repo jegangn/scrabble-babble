@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { scoreTumblerWord } from "../../engine/games/tumbler.js";
-import { getTumblerBest, setTumblerBest } from "../../storage/solo-storage.js";
+import {
+  getTumblerBest,
+  getTumblerLeaderboard,
+  recordTumblerScore,
+  setTumblerBest,
+  type LeaderboardEntry,
+} from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { ACCENT } from "../theme.js";
 
@@ -8,9 +14,11 @@ export function TumblerEndScreen(): JSX.Element | null {
   const screen = useGameStore((s) => s.screen);
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
+  const currentUser = useGameStore((s) => s.currentUser);
 
   // Loaded once on mount; we compare against this snapshot for the "new best" badge.
   const [previousBest, setPreviousBest] = useState<number | null>(null);
+  const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
 
   // Capture-and-write on mount so the score doesn't get re-persisted on re-renders.
   useEffect(() => {
@@ -23,6 +31,15 @@ export function TumblerEndScreen(): JSX.Element | null {
       if (screen.score > prev) {
         await setTumblerBest(screen.score);
       }
+      // Record on the leaderboard (only if user has a name AND scored ≥1).
+      // currentUser should always exist by the time the user reaches a
+      // game mode (first-launch prompt enforces it), but guard defensively.
+      if (currentUser && screen.score > 0) {
+        await recordTumblerScore(currentUser, screen.score);
+      }
+      const board = await getTumblerLeaderboard();
+      if (cancelled) return;
+      setLeaderboard(board);
     })();
     return () => {
       cancelled = true;
@@ -38,8 +55,8 @@ export function TumblerEndScreen(): JSX.Element | null {
   const sortedWords = [...screen.foundWords].sort((a, b) => scoreTumblerWord(b) - scoreTumblerWord(a));
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 p-6">
-      <h2 style={{ fontSize: "2.4em", fontWeight: 700, color: ACCENT.primary }}>
+    <div className="flex h-full w-full flex-col items-center justify-start gap-4 p-4 overflow-y-auto">
+      <h2 style={{ fontSize: "2em", fontWeight: 700, color: ACCENT.primary, margin: 0 }}>
         Time's up!
       </h2>
 
@@ -49,57 +66,115 @@ export function TumblerEndScreen(): JSX.Element | null {
           background: "white",
           border: `3px solid ${isNewBest ? "#1f5e34" : ACCENT.primary}`,
           borderRadius: 14,
-          padding: "18px 28px",
+          padding: "14px 28px",
           minWidth: 260,
         }}
       >
         <div style={{ fontSize: "0.9em", opacity: 0.7 }}>Final score</div>
-        <div style={{ fontSize: "3em", fontWeight: 800, color: ACCENT.primary, fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ fontSize: "2.6em", fontWeight: 800, color: ACCENT.primary, fontVariantNumeric: "tabular-nums" }}>
           {screen.score}
         </div>
         {previousBest !== null && (
-          <div style={{ fontSize: "0.95em", color: isNewBest ? "#1f5e34" : ACCENT.text, opacity: isNewBest ? 1 : 0.7 }}>
+          <div style={{ fontSize: "0.9em", color: isNewBest ? "#1f5e34" : ACCENT.text, opacity: isNewBest ? 1 : 0.7 }}>
             {isNewBest ? `🏆 New best! (was ${previousBest})` : `Personal best: ${Math.max(previousBest, screen.score)}`}
           </div>
         )}
       </div>
 
-      <div
-        className="w-full max-w-md flex-1"
-        style={{
-          background: "rgba(255,255,255,0.5)",
-          border: `1px solid ${ACCENT.primary}33`,
-          borderRadius: 10,
-          padding: 12,
-          maxHeight: "40vh",
-          overflowY: "auto",
-        }}
-      >
-        <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
-          Words found ({screen.foundWords.length})
+      {/* Two side-by-side panels on landscape: words found + leaderboard. */}
+      <div className="flex gap-3 w-full" style={{ maxWidth: 720, flex: "1 0 auto" }}>
+        <div
+          className="flex-1"
+          style={{
+            background: "rgba(255,255,255,0.5)",
+            border: `1px solid ${ACCENT.primary}33`,
+            borderRadius: 10,
+            padding: 10,
+            maxHeight: "44vh",
+            overflowY: "auto",
+            minHeight: 160,
+          }}
+        >
+          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
+            Words found ({screen.foundWords.length})
+          </div>
+          {screen.foundWords.length === 0 ? (
+            <div style={{ opacity: 0.5 }}>No words this round.</div>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {sortedWords.map((w) => (
+                <li
+                  key={w}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "2px 0",
+                    fontSize: "0.95em",
+                  }}
+                >
+                  <span>{w}</span>
+                  <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>
+                    {scoreTumblerWord(w)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        {screen.foundWords.length === 0 ? (
-          <div style={{ opacity: 0.5 }}>No words this round.</div>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, columnCount: 2, columnGap: 16 }}>
-            {sortedWords.map((w) => (
-              <li
-                key={w}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "2px 0",
-                  fontSize: "1em",
-                }}
-              >
-                <span>{w}</span>
-                <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>
-                  {scoreTumblerWord(w)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        {/* Tumbler all-time leaderboard. Highlights the just-recorded entry
+            (current user, matching score, recent timestamp). */}
+        <div
+          className="flex-1"
+          style={{
+            background: "rgba(255,255,255,0.5)",
+            border: `1px solid ${ACCENT.primary}33`,
+            borderRadius: 10,
+            padding: 10,
+            maxHeight: "44vh",
+            overflowY: "auto",
+            minHeight: 160,
+          }}
+        >
+          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
+            🏆 Top scores
+          </div>
+          {leaderboard.length === 0 ? (
+            <div style={{ opacity: 0.5 }}>No scores yet.</div>
+          ) : (
+            <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {leaderboard.map((entry, i) => {
+                const isYou =
+                  currentUser !== null &&
+                  entry.name === currentUser &&
+                  entry.score === screen.score &&
+                  Math.abs(entry.timestamp - Date.now()) < 60_000;
+                return (
+                  <li
+                    key={`${entry.name}-${entry.timestamp}`}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      background: isYou ? `${ACCENT.primary}22` : "transparent",
+                      fontWeight: isYou ? 700 : 500,
+                      fontSize: "0.95em",
+                    }}
+                  >
+                    <span style={{ display: "flex", gap: 8, overflow: "hidden" }}>
+                      <span style={{ opacity: 0.5, minWidth: 18 }}>{i + 1}.</span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {entry.name}
+                      </span>
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{entry.score}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-3 w-full max-w-md">

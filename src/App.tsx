@@ -2,7 +2,12 @@ import { useEffect } from "react";
 import { useGameStore } from "./store/gameStore.js";
 import { loadDictionary } from "./data/load-dictionary.js";
 import { loadInProgress } from "./storage/game-storage.js";
-import { getOpponent, getPlayerNames, getVariant } from "./storage/settings-storage.js";
+import {
+  getCurrentUser,
+  getOpponent,
+  getPlayerNames,
+  getVariant,
+} from "./storage/settings-storage.js";
 import { LoadingScreen } from "./ui/screens/LoadingScreen.js";
 import { HomeScreen } from "./ui/screens/HomeScreen.js";
 import { NewGameScreen } from "./ui/screens/NewGameScreen.js";
@@ -20,13 +25,14 @@ export function App(): JSX.Element {
   const setSettings = useGameStore((s) => s.setSettings);
   const setOpponent = useGameStore((s) => s.setOpponent);
   const setVariant = useGameStore((s) => s.setVariant);
+  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const game = useGameStore((s) => s.game);
 
   useEffect(() => {
     void (async () => {
       // Every load is wrapped so a corrupt IndexedDB or a missing wordlist
       // doesn't strand the user on the loading screen. Defaults are sane.
-      const [trie, inProgress, names, opponent, variant] = await Promise.all([
+      const [trie, inProgress, names, opponent, variant, user] = await Promise.all([
         loadDictionary().catch((e: unknown) => {
           console.error("Dictionary load failed", e);
           return null;
@@ -47,16 +53,21 @@ export function App(): JSX.Element {
           console.error("Load variant failed", e);
           return "classic" as const;
         }),
+        getCurrentUser().catch((e: unknown) => {
+          console.error("Load current user failed", e);
+          return null;
+        }),
       ]);
       if (trie) setDictionary(trie);
       setSettings(names);
       setOpponent(opponent);
       setVariant(variant);
+      if (user) setCurrentUser(user);
       // Always land on Home — Resume button availability is computed there.
       void inProgress;
       setScreen({ kind: "home" });
     })();
-  }, [setDictionary, setScreen, setSettings, setOpponent, setVariant]);
+  }, [setDictionary, setScreen, setSettings, setOpponent, setVariant, setCurrentUser]);
 
   switch (screen.kind) {
     case "loading":

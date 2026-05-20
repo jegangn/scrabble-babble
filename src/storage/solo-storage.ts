@@ -12,6 +12,31 @@ import { open } from "./db.js";
 
 const TUMBLER_BEST_KEY = "tumbler_best";
 const BEE_PROGRESS_PREFIX = "bee_progress_";
+const TUMBLER_LEADERBOARD_KEY = "leaderboard_tumbler";
+const BEE_LEADERBOARD_PREFIX = "leaderboard_bee_";
+const MAX_LEADERBOARD_ENTRIES = 10;
+
+/** One entry on a leaderboard. */
+export interface LeaderboardEntry {
+  readonly name: string;
+  readonly score: number;
+  readonly timestamp: number;
+}
+
+function isLeaderboardEntry(x: unknown): x is LeaderboardEntry {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as { name?: unknown; score?: unknown; timestamp?: unknown };
+  return (
+    typeof o.name === "string" &&
+    typeof o.score === "number" &&
+    typeof o.timestamp === "number"
+  );
+}
+
+function sanitizeBoard(raw: unknown): LeaderboardEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isLeaderboardEntry);
+}
 
 /**
  * Local-time date key in `YYYY-MM-DD` format. The Bee uses this as both
@@ -76,5 +101,83 @@ export async function setBeeProgress(progress: BeeProgress): Promise<void> {
     key: BEE_PROGRESS_PREFIX + progress.dateKey,
     value: progress,
   });
+  db.close();
+}
+
+/**
+ * Tumbler leaderboard (all-time, all-users on this device). Top 10 scores
+ * kept; older / lower entries are evicted on insert.
+ */
+export async function getTumblerLeaderboard(): Promise<ReadonlyArray<LeaderboardEntry>> {
+  const db = await open();
+  const entry = await db.get("settings", TUMBLER_LEADERBOARD_KEY);
+  db.close();
+  return sanitizeBoard(entry?.value);
+}
+
+export async function recordTumblerScore(name: string, score: number): Promise<void> {
+  const board = sanitizeBoard((await (async () => {
+    const db = await open();
+    const entry = await db.get("settings", TUMBLER_LEADERBOARD_KEY);
+    db.close();
+    return entry?.value;
+  })()));
+  // Insert + sort + cap. We allow multiple entries per player so the user
+  // can see their improvement over time, but cap the whole board at 10.
+  const next: LeaderboardEntry[] = [
+    ...board,
+    { name: name.trim().slice(0, 24) || "Player", score, timestamp: Date.now() },
+  ]
+    .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
+    .slice(0, MAX_LEADERBOARD_ENTRIES);
+  const db = await open();
+  await db.put("settings", { key: TUMBLER_LEADERBOARD_KEY, value: next });
+  db.close();
+}
+
+/**
+ * Spelling Bee leaderboard for a single day. Each user gets ONE slot per
+ * day (subsequent recordings for the same name update the entry if the
+ * new score is higher). Top 10 shown.
+ */
+export async function getBeeLeaderboard(
+  dateKey: string,
+): Promise<ReadonlyArray<LeaderboardEntry>> {
+  const db = await open();
+  const entry = await db.get("settings", BEE_LEADERBOARD_PREFIX + dateKey);
+  db.close();
+  return sanitizeBoard(entry?.value);
+}
+
+export async function recordBeeScore(
+  dateKey: string,
+  name: string,
+  score: number,
+): Promise<void> {
+  const board = sanitizeBoard(await (async () => {
+    const db = await open();
+    const entry = await db.get("settings", BEE_LEADERBOARD_PREFIX + dateKey);
+    db.close();
+    return entry?.value;
+  })());
+  const cleanName = name.trim().slice(0, 24) || "Player";
+  // One entry per player per day. If they already have an entry, keep the
+  // HIGHER of the two scores (latest finds always add, never subtract).
+  const existing = board.findIndex((e) => e.name === cleanName);
+  const next: LeaderboardEntry[] = [...board];
+  if (existing >= 0) {
+    const prev = next[existing]!;
+    next[existing] = {
+      name: cleanName,
+      score: Math.max(prev.score, score),
+      timestamp: Date.now(),
+    };
+  } else {
+    next.push({ name: cleanName, score, timestamp: Date.now() });
+  }
+  next.sort((a, b) => b.score - a.score || a.timestamp - b.timestamp);
+  const capped = next.slice(0, MAX_LEADERBOARD_ENTRIES);
+  const db = await open();
+  await db.put("settings", { key: BEE_LEADERBOARD_PREFIX + dateKey, value: capped });
   db.close();
 }

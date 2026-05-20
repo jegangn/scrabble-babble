@@ -5,12 +5,18 @@ import { useGameStore } from "../../store/gameStore.js";
 import { loadInProgress, saveInProgress } from "../../storage/game-storage.js";
 import { fromJSON, toJSON } from "../../storage/serializer.js";
 import { ACCENT } from "../theme.js";
+import { UserNamePrompt } from "../components/UserNamePrompt.js";
 
 export function HomeScreen(): JSX.Element {
   const hydrate = useGameStore((s) => s.hydrate);
   const setScreen = useGameStore((s) => s.setScreen);
   const dictionary = useGameStore((s) => s.dictionary);
+  const currentUser = useGameStore((s) => s.currentUser);
+  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
   const [hasInProgress, setHasInProgress] = useState(false);
+  // null === no prompt; "first" === mandatory first-launch greeting;
+  // "change" === user clicked "Change user", may cancel out.
+  const [namePrompt, setNamePrompt] = useState<"first" | "change" | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -19,6 +25,15 @@ export function HomeScreen(): JSX.Element {
       setHasInProgress(!!game && game.status.kind !== "ended");
     })();
   }, []);
+
+  // First-launch: if no name has been saved yet, show the mandatory
+  // welcome prompt. App.tsx has already finished initial hydration by
+  // the time HomeScreen renders, so `currentUser` reflects what's in IDB.
+  useEffect(() => {
+    if (currentUser === null && namePrompt === null) {
+      setNamePrompt("first");
+    }
+  }, [currentUser, namePrompt]);
 
   // Warm the Spelling Bee pangram cache in the background once the dictionary
   // is loaded. The first call walks the trie (~50-200 ms); doing it here means
@@ -71,7 +86,42 @@ export function HomeScreen(): JSX.Element {
   const dictMissing = dictionary === null;
 
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 p-6">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-6 p-6" style={{ position: "relative" }}>
+      {/* Top-right user chip — shows current name, tap to change. */}
+      {currentUser && (
+        <button
+          type="button"
+          onClick={() => setNamePrompt("change")}
+          aria-label="Change user"
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            background: "white",
+            color: ACCENT.text,
+            border: `2px solid ${ACCENT.primary}`,
+            borderRadius: 999,
+            padding: "8px 14px",
+            fontSize: "0.95em",
+            fontWeight: 600,
+            minHeight: 40,
+            touchAction: "manipulation",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            maxWidth: 220,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          <span aria-hidden>👤</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+            {currentUser}
+          </span>
+          <span aria-hidden style={{ opacity: 0.5, fontSize: "0.85em" }}>›</span>
+        </button>
+      )}
       <h1 style={{ fontSize: "3em", fontWeight: 700, color: ACCENT.primary }}>{APP_NAME}</h1>
       {dictMissing && (
         <div
@@ -143,6 +193,24 @@ export function HomeScreen(): JSX.Element {
           }}
         />
       </div>
+
+      {namePrompt && (
+        <UserNamePrompt
+          initialName={namePrompt === "change" ? (currentUser ?? "") : ""}
+          title={
+            namePrompt === "change"
+              ? "Change user"
+              : "Welcome — what's your name?"
+          }
+          onSubmit={(name) => {
+            setCurrentUser(name);
+            setNamePrompt(null);
+          }}
+          // First-launch prompt is mandatory (no onCancel). Change-user is
+          // dismissible.
+          {...(namePrompt === "change" ? { onCancel: () => setNamePrompt(null) } : {})}
+        />
+      )}
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
   saveInProgress,
 } from "../storage/game-storage.js";
 import {
+  setCurrentUser as persistCurrentUser,
   setOpponent,
   setPlayerNames,
   setVariant as persistVariant,
@@ -97,6 +98,12 @@ export interface StoreState {
   error: string | null;
   /** A blank tile dropped on the board that needs a chosen letter. */
   pendingBlankAt: Position | null;
+  /**
+   * The name shown on solo-mode leaderboards. null on first launch — the UI
+   * prompts the user to enter a name on Home before any solo mode is played.
+   * Persists across sessions via the settings store.
+   */
+  currentUser: string | null;
 
   // Init
   setDictionary: (trie: TrieNode) => void;
@@ -105,6 +112,7 @@ export interface StoreState {
   setOpponent: (opponent: Opponent) => void;
   setVariant: (variant: Variant) => void;
   setThinking: (thinking: boolean) => void;
+  setCurrentUser: (name: string) => void;
   hydrate: (game: GameState) => void;
 
   // Game flow
@@ -229,6 +237,7 @@ export const useGameStore = create<StoreState>((set, get) => ({
   thinking: false,
   error: null,
   pendingBlankAt: null,
+  currentUser: null,
 
   setDictionary: (dictionary) => set({ dictionary }),
   setScreen: (screen) => set({ screen, error: null }),
@@ -239,6 +248,12 @@ export const useGameStore = create<StoreState>((set, get) => ({
   setVariant: (variant) =>
     set((state) => ({ settings: { ...state.settings, variant } })),
   setThinking: (thinking) => set({ thinking }),
+  setCurrentUser: (name) => {
+    const trimmed = name.trim().slice(0, 24);
+    if (trimmed.length === 0) return;
+    set({ currentUser: trimmed });
+    void persistCurrentUser(trimmed);
+  },
 
   hydrate: (game) => {
     const rackSize = game.players[game.turn]?.rack.length ?? 7;

@@ -5,6 +5,7 @@ import { open } from "./db.js";
 const PLAYER_NAMES_KEY = "player_names";
 const OPPONENT_KEY = "opponent";
 const VARIANT_KEY = "variant";
+const CURRENT_USER_KEY = "current_user";
 
 /** Persisted opponent shape. Mirrors `Opponent` in gameStore. */
 export type PersistedOpponent =
@@ -76,5 +77,26 @@ export async function getVariant(): Promise<Variant> {
 export async function setVariant(variant: Variant): Promise<void> {
   const db = await open();
   await db.put("settings", { key: VARIANT_KEY, value: variant });
+  db.close();
+}
+
+/**
+ * The "current user" is the name shown on solo-mode leaderboards and pre-
+ * filled into new-game forms. null on first launch — the UI prompts for a
+ * name before any solo mode is played. Persisted across sessions.
+ */
+export async function getCurrentUser(): Promise<string | null> {
+  const db = await open();
+  const entry = await db.get("settings", CURRENT_USER_KEY);
+  db.close();
+  const value = entry?.value;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export async function setCurrentUser(name: string): Promise<void> {
+  const trimmed = name.trim().slice(0, 24);
+  if (trimmed.length === 0) return;
+  const db = await open();
+  await db.put("settings", { key: CURRENT_USER_KEY, value: trimmed });
   db.close();
 }

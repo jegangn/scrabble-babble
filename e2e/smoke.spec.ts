@@ -24,9 +24,30 @@ test.beforeEach(async ({ page, context }) => {
       req.onerror = () => resolve();
       req.onblocked = () => resolve();
     });
+    // Pre-seed a current_user so the welcome name-prompt doesn't block
+    // tests. CRITICAL: we must create ALL three object stores at v1, not
+    // just "settings". The app's own open() at v1 won't fire the upgrade
+    // hook if our seed already created the DB at the same version, and
+    // any later db.put("in_progress", ...) would fail.
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open("scrabble-babble", 1);
+      open.onupgradeneeded = () => {
+        const db = open.result;
+        if (!db.objectStoreNames.contains("in_progress")) db.createObjectStore("in_progress");
+        if (!db.objectStoreNames.contains("history")) db.createObjectStore("history", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("settings")) db.createObjectStore("settings", { keyPath: "key" });
+      };
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction("settings", "readwrite");
+        tx.objectStore("settings").put({ key: "current_user", value: "Tester" });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      open.onerror = () => reject(open.error);
+    });
   });
   await page.reload();
-  // Wait for the dictionary to load and Home to render.
   await expect(page.getByRole("heading", { name: /Scrabble Babble/ })).toBeVisible({
     timeout: 10_000,
   });

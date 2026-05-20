@@ -194,10 +194,19 @@ export function TumblerScreen(): JSX.Element | null {
         </div>
       </div>
 
-      {/* Rack: 7 LetterPills */}
+      {/* Rack: 7 LetterPills. Tap-to-append: each pill onTap fires
+          handleInputChange with the current input + the letter. This also
+          starts the timer (handleInputChange checks `started`). The
+          validator still enforces multiset legality on submit, so over-tapping
+          a letter doesn't break the game — just yields "Not in rack". */}
       <div className="flex gap-2 flex-wrap justify-center" aria-label="Your letters">
         {rack.map((letter, i) => (
-          <LetterPill key={i} letter={letter} size={64} />
+          <LetterPill
+            key={i}
+            letter={letter}
+            size={64}
+            onTap={() => handleInputChange(input + letter)}
+          />
         ))}
       </div>
 
