@@ -65,6 +65,11 @@ export function App(): JSX.Element {
       if (user) setCurrentUser(user);
       // Always land on Home — Resume button availability is computed there.
       void inProgress;
+      // Give LoadingScreen 200 ms to fade out before we swap screens, so
+      // the transition reads as a fade rather than a cut. The splash's
+      // own opacity transition is driven by `dictionary !== null`, which
+      // flipped on the setDictionary(trie) call above.
+      await new Promise((resolve) => setTimeout(resolve, 200));
       setScreen({ kind: "home" });
     })();
   }, [setDictionary, setScreen, setSettings, setOpponent, setVariant, setCurrentUser]);
