@@ -49,6 +49,7 @@ export function Board({ board, pendingKeys, onCellTap }: BoardProps): JSX.Elemen
             position={{ row: r, col: c }}
             isCenter={r === center && c === center}
             isPending={pendingKeys.has(cellKey({ row: r, col: c }))}
+            boardSize={size}
             onTap={onCellTap}
           />
         )),

@@ -15,8 +15,19 @@ export interface BoardCellProps {
   readonly position: Position;
   readonly isCenter: boolean;
   readonly isPending: boolean;
+  /** Board side length (15 for Classic / Random, 11 for Mini). Used to
+   *  detect the four corner cells so they can round their outer corner
+   *  to match the board container's border-radius. */
+  readonly boardSize: number;
   readonly onTap?: ((position: Position) => void) | undefined;
 }
+
+/** Standard inner-cell radius. Matches the design handoff. */
+const CELL_RADIUS = 3;
+/** Outer-corner radius for the four corner cells — board container is
+ *  `tokens.radius.card` (14 px) with a 3 px inner gap, so 12 px gives
+ *  the corner cell an arc that visually kisses the container's curve. */
+const OUTER_CORNER_RADIUS = 12;
 
 /**
  * In-cell tile — renders the placed tile inside its board cell. Uses
@@ -110,10 +121,19 @@ function BoardCellInner({
   position,
   isCenter,
   isPending,
+  boardSize,
   onTap,
 }: BoardCellProps): JSX.Element {
   const premium = PREMIUM_COLORS[cell.premium];
   const empty = cell.tile === null;
+  // Per-corner radii: only the OUTER corner of each of the four corner
+  // cells gets the larger radius; the other three corners stay at the
+  // standard cell radius so neighbouring cells stay flush.
+  const lastIndex = boardSize - 1;
+  const isTopLeft = position.row === 0 && position.col === 0;
+  const isTopRight = position.row === 0 && position.col === lastIndex;
+  const isBottomLeft = position.row === lastIndex && position.col === 0;
+  const isBottomRight = position.row === lastIndex && position.col === lastIndex;
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `cell-${position.row}-${position.col}`,
     data: { kind: "cell", position },
@@ -143,7 +163,10 @@ function BoardCellInner({
             : premium.bg,
         color: isCenter && empty ? tokens.color.cream : premium.fg,
         border: "none",
-        borderRadius: 3,
+        borderTopLeftRadius: isTopLeft ? OUTER_CORNER_RADIUS : CELL_RADIUS,
+        borderTopRightRadius: isTopRight ? OUTER_CORNER_RADIUS : CELL_RADIUS,
+        borderBottomLeftRadius: isBottomLeft ? OUTER_CORNER_RADIUS : CELL_RADIUS,
+        borderBottomRightRadius: isBottomRight ? OUTER_CORNER_RADIUS : CELL_RADIUS,
         minWidth: 0,
         minHeight: 0,
         aspectRatio: "1",
@@ -159,7 +182,20 @@ function BoardCellInner({
     >
       {empty ? (
         isCenter ? (
-          <span style={{ color: tokens.color.cream, fontSize: "min(6cqi, 3rem)" }}>★</span>
+          <span
+            style={{
+              color: tokens.color.cream,
+              fontSize: "min(6cqi, 3rem)",
+              // Pin line-height to 1 so the glyph's box matches its visual
+              // bounds, and neutralise the parent button's .02em letter-
+              // spacing so a single glyph doesn't get pushed visually left.
+              display: "inline-block",
+              lineHeight: 1,
+              letterSpacing: 0,
+            }}
+          >
+            ★
+          </span>
         ) : (
           <span style={{ fontSize: "0.85em", fontWeight: 700 }}>
             {premium.label}

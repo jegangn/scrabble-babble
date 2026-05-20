@@ -106,16 +106,31 @@ function MiniBoardThumb({ variant }: { variant: Variant }): JSX.Element {
         aspectRatio: "1 / 1",
       }}
     >
-      {cells.map((bg, i) => (
-        <div
-          key={i}
-          style={{
-            background: bg,
-            borderRadius: 4,
-            aspectRatio: "1 / 1",
-          }}
-        />
-      ))}
+      {cells.map((bg, i) => {
+        // 3×3 grid: indices 0, 2, 6, 8 are the four corner cells. Round
+        // only their OUTER corner so each thumbnail's corner cells visually
+        // kiss the container's chip radius, mirroring the real-board
+        // corner treatment in BoardCell.
+        const isTopLeft = i === 0;
+        const isTopRight = i === 2;
+        const isBottomLeft = i === 6;
+        const isBottomRight = i === 8;
+        const OUTER = 5;
+        const INNER = 4;
+        return (
+          <div
+            key={i}
+            style={{
+              background: bg,
+              borderTopLeftRadius: isTopLeft ? OUTER : INNER,
+              borderTopRightRadius: isTopRight ? OUTER : INNER,
+              borderBottomLeftRadius: isBottomLeft ? OUTER : INNER,
+              borderBottomRightRadius: isBottomRight ? OUTER : INNER,
+              aspectRatio: "1 / 1",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
