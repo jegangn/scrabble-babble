@@ -180,15 +180,18 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
     {
       id: "sweep",
       label: "Sweep",
-      description: "Upward sweep — the original",
+      description: "Upward sweep — the original (subtle lift)",
       impl: (ac, m) => {
-        tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.22 * m });
+        // Per-tone defaults nudged up from 0.22/0.20 to 0.26/0.23 so recall
+        // sits at roughly −11.7 / −12.8 dB instead of −13.2 / −14.0 dB —
+        // still the quieter of the place/recall pair but closer in weight.
+        tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.26 * m });
         tone(ac, {
           freq: 360,
           type: "sine",
           startOffset: 0.04,
           duration: 0.08,
-          gainPeak: 0.2 * m,
+          gainPeak: 0.23 * m,
         });
       },
     },
