@@ -271,8 +271,38 @@ export function GameScreen(): JSX.Element | null {
     </div>
     <div
       className="gs-game-body flex h-full w-full p-3"
-      style={{ background: ACCENT.surface, gap: 12 }}
+      style={{ background: ACCENT.surface, gap: 12, position: "relative" }}
     >
+      {/*
+        Top-left "← Home" pill. Consistent placement with Tumbler / Bee
+        which have ← Home in the same corner. Floating (position: absolute)
+        so the board can still claim the full vertical extent under it.
+        z-index 50 sits above the board's TW red corner but below modals.
+      */}
+      <button
+        type="button"
+        onClick={goHome}
+        aria-label="Back to home"
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          zIndex: 50,
+          background: "white",
+          color: ACCENT.text,
+          border: `2px solid ${ACCENT.primary}`,
+          borderRadius: 999,
+          padding: "6px 14px",
+          fontSize: "0.95em",
+          fontWeight: 600,
+          minHeight: 36,
+          touchAction: "manipulation",
+          cursor: "pointer",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.12)",
+        }}
+      >
+        ← Home
+      </button>
       {/*
         Layout: board on the left, fills the full available height (no
         top score-bar eating vertical space anymore). Right column holds
@@ -335,20 +365,9 @@ export function GameScreen(): JSX.Element | null {
           onPass={pass}
           onResign={() => setConfirmResign(true)}
         />
-        <button
-          type="button"
-          onClick={goHome}
-          style={{
-            background: "transparent",
-            color: ACCENT.text,
-            opacity: 0.7,
-            padding: "8px 12px",
-            fontSize: "0.95em",
-            textAlign: "center",
-          }}
-        >
-          Back to home
-        </button>
+        {/* Back-to-home moved to the top-left of the screen (see the
+            floating pill in the parent flex container) so it lives where
+            users expect it across all screens. */}
       </div>
 
       {pendingBlankAt && (
