@@ -8,6 +8,9 @@ export interface CurrentWordProps {
   readonly hint?: string;
   /** Tile size in px. Defaults to 56 — fits 6-7 tiles comfortably on iPad. */
   readonly tileSize?: number;
+  /** Outer strip height in px. Defaults to 64. Both empty + populated
+      states use this so the layout doesn't jump on first keystroke. */
+  readonly stripHeight?: number;
 }
 
 /**
@@ -15,13 +18,14 @@ export interface CurrentWordProps {
  * Empty state is a dashed rounded panel with a hint; populated state
  * lays out cream tiles in a row with a 6 px gap.
  *
- * The 80 px min-height keeps both states the same size so the layout
- * doesn't jump when the user types the first letter.
+ * Both states share the same `stripHeight` so the column doesn't jump
+ * when the user types the first letter.
  */
 export function CurrentWord({
   word,
   hint = "Tap rack tiles to build a word",
   tileSize = 56,
+  stripHeight = 64,
 }: CurrentWordProps): JSX.Element {
   const { color, radius, space, size, shadow } = tokens;
   const letters = word.split("");
@@ -30,14 +34,14 @@ export function CurrentWord({
     return (
       <div
         style={{
-          height: 80,
+          height: stripHeight,
           display: "grid",
           placeItems: "center",
           color: color.inkSoft,
           fontSize: size.body,
           border: `2px dashed ${color.stroke}`,
           borderRadius: radius.card,
-          padding: space.x4,
+          padding: `0 ${space.x4}px`,
         }}
       >
         {hint}
@@ -51,12 +55,12 @@ export function CurrentWord({
         display: "flex",
         gap: 6,
         justifyContent: "center",
-        padding: space.x3,
+        padding: `0 ${space.x3}px`,
         background: color.paper,
         border: `1.5px solid ${color.stroke}`,
         borderRadius: radius.card,
         boxShadow: shadow.card,
-        minHeight: 80,
+        height: stripHeight,
         alignItems: "center",
         flexWrap: "wrap",
       }}

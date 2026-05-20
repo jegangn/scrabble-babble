@@ -408,22 +408,21 @@ export function SpellingBeeScreen(): JSX.Element | null {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: space.x3,
-          padding: `${space.x12}px ${space.x6}px ${space.x4}px`,
+          gap: space.x2,
+          padding: `${space.x10}px ${space.x6}px ${space.x4}px`,
           maxWidth: 720,
           margin: "0 auto",
           width: "100%",
         }}
       >
-        {/* Header — tight single line: tagline + h2 (smaller than h1 to
-            save vertical space) + inline score badge. */}
+        {/* Header — tight: tagline · h3 · inline score · progress. */}
         <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
           <Tagline>Daily puzzle · {formatHeaderDate(dateKey)}</Tagline>
           <h1
             style={{
               fontFamily: font.serif,
               fontWeight: weight.heavy,
-              fontSize: size.h2,
+              fontSize: size.h3,
               margin: 0,
               letterSpacing: "-0.02em",
               color: color.brown,
@@ -435,7 +434,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
             style={{
               fontFamily: font.serif,
               fontWeight: weight.bold,
-              fontSize: size.bodyLg,
+              fontSize: size.body,
               color: color.brown,
               fontVariantNumeric: "tabular-nums",
             }}
@@ -456,12 +455,29 @@ export function SpellingBeeScreen(): JSX.Element | null {
           </span>
         </header>
 
-        <div style={{ width: "100%", maxWidth: 420 }}>
-          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={40} />
-        </div>
-
-        <div style={{ minHeight: 28 }} aria-live="polite">
-          {flash && <FlashToast flash={flash} />}
+        {/* CurrentWord + Flash overlay — the flash toast renders
+            absolutely on top of the strip so its appearance/disappearance
+            doesn't push the hex up or down. Input is cleared before a
+            flash fires (submit), so the strip beneath shows its hint and
+            the overlay covers plain text only. */}
+        <div style={{ position: "relative", width: "100%", maxWidth: 420 }}>
+          <CurrentWord word={currentWord} hint="Tap or slide to spell" tileSize={32} stripHeight={52} />
+          {flash && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                zIndex: 5,
+              }}
+              aria-live="polite"
+            >
+              <FlashToast flash={flash} />
+            </div>
+          )}
         </div>
 
         {/* Hex — centred. The .bee-hex-scale-wrap responds to a CSS

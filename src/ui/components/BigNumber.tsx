@@ -9,6 +9,9 @@ export interface BigNumberProps {
   readonly label: string;
   /** Colour tone — see {@link BigNumberTone}. */
   readonly tone?: BigNumberTone;
+  /** Compact variant — smaller padding + h3 number. Used when screen
+      real estate is tight (Tumbler header). */
+  readonly compact?: boolean;
 }
 
 /**
@@ -18,7 +21,7 @@ export interface BigNumberProps {
  * many seconds are left. `tabular-nums` keeps the digit columns aligned
  * as the timer ticks down.
  */
-export function BigNumber({ value, label, tone = "ink" }: BigNumberProps): JSX.Element {
+export function BigNumber({ value, label, tone = "ink", compact = false }: BigNumberProps): JSX.Element {
   const { color, radius, space, font, size, weight, shadow } = tokens;
   const palette =
     tone === "brown"
@@ -36,17 +39,17 @@ export function BigNumber({ value, label, tone = "ink" }: BigNumberProps): JSX.E
         color: palette.fg,
         border: `1.5px solid ${palette.border}`,
         borderRadius: radius.panel,
-        padding: `${space.x4}px ${space.x6}px`,
+        padding: compact ? `${space.x2}px ${space.x4}px` : `${space.x4}px ${space.x6}px`,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        minWidth: 140,
+        minWidth: compact ? 96 : 140,
         boxShadow: tone === "ink" ? shadow.card : "none",
       }}
     >
       <span
         style={{
-          fontSize: size.micro + 1,
+          fontSize: size.micro,
           letterSpacing: ".12em",
           textTransform: "uppercase",
           fontWeight: weight.med,
@@ -59,10 +62,10 @@ export function BigNumber({ value, label, tone = "ink" }: BigNumberProps): JSX.E
         style={{
           fontFamily: font.serif,
           fontWeight: weight.heavy,
-          fontSize: size.h1,
+          fontSize: compact ? size.h3 : size.h1,
           lineHeight: 1,
           fontVariantNumeric: "tabular-nums",
-          marginTop: 4,
+          marginTop: 2,
         }}
       >
         {value}

@@ -35,8 +35,9 @@ type Flash =
 
 const FLASH_DURATION_MS = 1200;
 // Compact rack tile — smaller than the 84 px handoff spec so the page
-// fits on iPad without scrolling. Still ≥ 64 px tap-min for older users.
-const RACK_TILE_SIZE = 68;
+// fits on iPad without scrolling. 60 px is still well above the 44 px
+// tap-min and reads comfortably for the older user.
+const RACK_TILE_SIZE = 60;
 
 /**
  * Tumbler — 60-second word-finding sprint, rebuilt per the design handoff.
@@ -244,6 +245,26 @@ export function TumblerScreen(): JSX.Element | null {
         <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
       )}
 
+      {/* Restart — absolute top-right (mirrors BackPill at top-left) so
+          its appearance/disappearance doesn't shift the centre column.
+          Hidden pre-game; only visible once the timer has started. */}
+      {started && (
+        <div style={{ position: "absolute", top: space.x4, right: space.x4, zIndex: 20 }}>
+          <Button
+            kind="ghost"
+            size="sm"
+            onClick={() => {
+              playUiTap();
+              restartGame();
+            }}
+            muted
+            ariaLabel="Restart round"
+          >
+            ↻ Restart
+          </Button>
+        </div>
+      )}
+
       <div
         // Pinned to viewport — page itself doesn't scroll. Only the
         // bottom "Top scores / Found this round" card has overflow-y
@@ -256,22 +277,21 @@ export function TumblerScreen(): JSX.Element | null {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: space.x3,
-          padding: `${space.x16}px ${space.x6}px ${space.x4}px`,
+          gap: space.x2,
+          padding: `${space.x12}px ${space.x6}px ${space.x4}px`,
           maxWidth: 720,
           margin: "0 auto",
           width: "100%",
         }}
       >
-        {/* Header — tight: tagline + h1 inline on small screens, stacked
-            on larger ones. Reduced gap so the page fits. */}
+        {/* Header — tight: tagline + h3 title. */}
         <header style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
           <Tagline>Solo · 60-second sprint</Tagline>
           <h1
             style={{
               fontFamily: font.serif,
               fontWeight: weight.heavy,
-              fontSize: size.h2,
+              fontSize: size.h3,
               margin: 0,
               letterSpacing: "-0.02em",
               color: color.brown,
@@ -281,39 +301,41 @@ export function TumblerScreen(): JSX.Element | null {
           </h1>
         </header>
 
-        {/* Timer + score, side-by-side. Restart only appears mid-round. */}
-        <div style={{ display: "flex", gap: space.x3, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-          <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} />
-          <BigNumber value={score} label="Score" tone="brown" />
-          {started && (
-            <Button
-              kind="ghost"
-              size="sm"
-              onClick={() => {
-                playUiTap();
-                restartGame();
-              }}
-              muted
-              ariaLabel="Restart round"
-            >
-              ↻ Restart
-            </Button>
-          )}
+        {/* Timer + score, side-by-side. Restart lives top-right (above)
+            so this row never reflows once the round starts. */}
+        <div style={{ display: "flex", gap: space.x3, alignItems: "center", justifyContent: "center" }}>
+          <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} compact />
+          <BigNumber value={score} label="Score" tone="brown" compact />
         </div>
 
-        <div style={{ width: "100%", maxWidth: 480 }}>
+        {/* CurrentWord + Flash overlay — the flash toast renders
+            absolutely on top of the strip so its appearance/disappearance
+            doesn't push the rack up or down. Input is always cleared
+            before a flash fires (handleSubmit), so the strip beneath is
+            showing its hint and the overlay covers plain text only. */}
+        <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
           <CurrentWord
             word={input}
             hint={started ? "Tap a letter to extend the word" : "Tap a letter to start"}
-            tileSize={44}
+            tileSize={36}
+            stripHeight={56}
           />
-        </div>
-
-        <div
-          style={{ minHeight: 32, display: "flex", justifyContent: "center" }}
-          aria-live="polite"
-        >
-          {flash && <FlashToast flash={flash} />}
+          {flash && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                zIndex: 5,
+              }}
+              aria-live="polite"
+            >
+              <FlashToast flash={flash} />
+            </div>
+          )}
         </div>
 
         {/* Rack — explicitly two rows: top has the first 3 tiles, bottom
@@ -324,7 +346,7 @@ export function TumblerScreen(): JSX.Element | null {
             display: "flex",
             flexDirection: "column",
             gap: space.x2,
-            padding: `${space.x3}px ${space.x4}px`,
+            padding: `${space.x2}px ${space.x3}px`,
             background: color.brown,
             borderRadius: tokens.radius.card,
             boxShadow: `inset 0 2px 6px rgba(0,0,0,.25), ${tokens.shadow.card}`,
