@@ -18,9 +18,10 @@ export interface SwapPickerProps {
  * Confirm sends the selected tiles to the swap action; the engine
  * draws fresh tiles + advances the turn.
  *
- * Visual treatment per the handoff: rack on a brown felt strip; selected
- * tiles flip to "ghost" outline + show a moss check-circle in the
- * top-right; deselected tiles render as normal cream Scrabble tiles.
+ * Visual treatment: rack on a brown felt strip. Selected tiles stay
+ * fully rendered (so the letter + score remain readable on the dark
+ * felt) and get a moss outline ring + check-circle badge as the
+ * "picked for swap" cue. Deselected tiles render as plain cream tiles.
  */
 export function SwapPicker({
   rack,
@@ -93,16 +94,28 @@ export function SwapPicker({
                 cursor: "pointer",
                 touchAction: "manipulation",
                 position: "relative",
+                // Moss ring on the wrapper — sits outside the tile so
+                // the tile face itself stays fully rendered (letter +
+                // score readable on the dark felt). 3 px ring, 3 px
+                // gap, plus a soft moss glow underneath for emphasis.
+                borderRadius: Math.round(64 * 0.14) + 3,
+                outline: isSelected ? `3px solid ${color.success}` : "none",
+                outlineOffset: isSelected ? 3 : 0,
+                boxShadow: isSelected
+                  ? `0 0 0 6px color-mix(in oklab, ${color.success} 25%, transparent)`
+                  : "none",
+                transform: isSelected ? "scale(0.96)" : "scale(1)",
+                transition: "transform 120ms ease",
               }}
             >
-              <Tile tile={tile} size={64} variant={isSelected ? "ghost" : "cream"} />
+              <Tile tile={tile} size={64} variant="cream" />
               {isSelected && (
                 <span
                   aria-hidden
                   style={{
                     position: "absolute",
-                    top: -6,
-                    right: -6,
+                    top: -8,
+                    right: -8,
                     width: 22,
                     height: 22,
                     borderRadius: "50%",
