@@ -56,9 +56,16 @@ export function SettingsModal({
   return (
     <ModalFrame
       title="Settings"
-      sub="Tweak sounds, export your progress, or import a backup."
       width={760}
       onClose={onClose}
+      // Pin the panel to the viewport so the Done footer never slips off
+      // the bottom on iPad-height screens. Modal uses display:flex column
+      // so header + body + footer stack and the body can scroll inside.
+      style={{
+        maxHeight: "calc(100dvh - 24px)",
+        display: "flex",
+        flexDirection: "column",
+      }}
       footer={
         <Button kind="primary" onClick={onClose}>
           Done
@@ -69,7 +76,11 @@ export function SettingsModal({
         style={{
           display: "flex",
           gap: space.x6,
-          minHeight: 380,
+          // Stretch to fill nearly the full viewport height. Modal chrome
+          // (header + footer + body padding + backdrop padding) eats ~200 px,
+          // so the inner area gets the rest. Falls back gracefully on short
+          // viewports because `calc` clamps via min.
+          minHeight: "min(580px, calc(100dvh - 240px))",
         }}
       >
         {/* Left rail — menu */}
@@ -189,8 +200,12 @@ function SoundsPanel(): JSX.Element {
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: space.x4,
-        maxHeight: 420,
+        gap: space.x2,
+        // Match the modal's inner min-height — keeps the sounds list as
+        // tall as the modal grows, so a 820 px viewport gives ~580 px of
+        // scroll space. Tightened row gap (x2 not x4) so the five sound
+        // rows fit without much scroll on iPad-height screens.
+        maxHeight: "min(580px, calc(100dvh - 240px))",
         overflowY: "auto",
         paddingRight: space.x2,
       }}
@@ -206,11 +221,11 @@ function SoundsPanel(): JSX.Element {
               background: color.paper,
               border: `1.5px solid ${color.stroke}`,
               borderRadius: radius.card,
-              padding: `${space.x3}px ${space.x4}px`,
+              padding: `${space.x2}px ${space.x4}px`,
               boxShadow: shadow.card,
               display: "flex",
               flexDirection: "column",
-              gap: space.x3,
+              gap: space.x2,
             }}
           >
             <div
