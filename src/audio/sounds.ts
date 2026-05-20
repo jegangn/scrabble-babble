@@ -118,7 +118,9 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Tick",
       description: "Quick high sine — the original",
       impl: (ac, m) =>
-        tone(ac, { freq: 720, type: "sine", duration: 0.06, gainPeak: 0.12 * m }),
+        // 0.18 → -14.89 dB. +3.5 dB uniform bump from 0.12 so the default
+        // tier sits closer to typical iOS notification loudness.
+        tone(ac, { freq: 720, type: "sine", duration: 0.06, gainPeak: 0.18 * m }),
     },
     {
       id: "pop",
@@ -149,10 +151,9 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Thud",
       description: "Two-layer warm bass — the default",
       impl: (ac, m) => {
-        // 0.54 / 0.47 (-5.4 / -6.6 dB) — +3 dB from the prior 0.38/0.33
-        // so the place cue lands with real weight on iPad speakers.
-        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.54 * m });
-        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.47 * m });
+        // 0.81 / 0.70 (-1.8 / -3.1 dB) — +3.5 dB uniform bump from 0.54/0.47.
+        tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.81 * m });
+        tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.70 * m });
       },
     },
     {
@@ -184,16 +185,14 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Sweep",
       description: "Upward sweep — the original (subtle lift)",
       impl: (ac, m) => {
-        // Per-tone defaults nudged up from 0.22/0.20 to 0.26/0.23 so recall
-        // sits at roughly −11.7 / −12.8 dB instead of −13.2 / −14.0 dB —
-        // still the quieter of the place/recall pair but closer in weight.
-        tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.26 * m });
+        // 0.39 / 0.34 (-8.2 / -9.4 dB) — +3.5 dB uniform bump from 0.26/0.23.
+        tone(ac, { freq: 220, type: "sine", duration: 0.06, gainPeak: 0.39 * m });
         tone(ac, {
           freq: 360,
           type: "sine",
           startOffset: 0.04,
           duration: 0.08,
-          gainPeak: 0.23 * m,
+          gainPeak: 0.34 * m,
         });
       },
     },
@@ -242,7 +241,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Arpeggio",
       description: "C5 → E5 → G5 — the default",
       impl: (ac, m) => {
-        // 0.19 per note → -14.42 dB. Dropped a further 1.5 dB from 0.23.
+        // 0.28 per note → -11.06 dB. +3.5 dB uniform bump from 0.19.
         const notes = [523.25, 659.25, 783.99];
         notes.forEach((freq, i) =>
           tone(ac, {
@@ -250,7 +249,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
             type: "triangle",
             startOffset: i * 0.08,
             duration: 0.22,
-            gainPeak: 0.19 * m,
+            gainPeak: 0.28 * m,
           }),
         );
       },
@@ -298,14 +297,13 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
       label: "Minor third",
       description: "G4 → E♭4 — the default",
       impl: (ac, m) => {
-        // 0.17 / 0.19 → -15.39 / -14.42 dB. Dropped a further 1.5 dB from
-        // 0.20/0.23 so the warning sits politely under gameplay cues.
+        // 0.25 / 0.28 → -12.04 / -11.06 dB. +3.5 dB uniform bump from 0.17/0.19.
         tone(ac, {
           freq: 392,
           type: "triangle",
           attack: 0.015,
           duration: 0.16,
-          gainPeak: 0.17 * m,
+          gainPeak: 0.25 * m,
         });
         tone(ac, {
           freq: 311,
@@ -313,7 +311,7 @@ export const PRESETS: Record<SoundKey, ReadonlyArray<PresetMeta>> = {
           startOffset: 0.11,
           attack: 0.015,
           duration: 0.26,
-          gainPeak: 0.19 * m,
+          gainPeak: 0.28 * m,
         });
       },
     },
