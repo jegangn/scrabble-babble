@@ -20,7 +20,7 @@ import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
 import { BackToHomeButton } from "../components/BackToHomeButton.js";
 import { LetterPill } from "../components/LetterPill.js";
-import { ACCENT } from "../theme.js";
+import { ACCENT, TILE } from "../theme.js";
 
 type Flash =
   | { kind: "added"; word: string; points: number }
@@ -73,6 +73,26 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const dragLetterRef = useRef<Letter | null>(null);
   const dragStartXYRef = useRef<{ x: number; y: number } | null>(null);
   const dragSawMoveRef = useRef(false);
+
+  // Slide trail: a polyline drawn between the centres of pills visited
+  // during a drag, fading slowly after release. Points are kept in state
+  // so the SVG re-renders each time a new pill is crossed; `trailFading`
+  // triggers a CSS opacity transition that gracefully clears the line
+  // after the user lifts their finger.
+  const hexContainerRef = useRef<HTMLDivElement | null>(null);
+  const trailFadeTimerRef = useRef<number | null>(null);
+  const [trailPoints, setTrailPoints] = useState<ReadonlyArray<{ x: number; y: number }>>([]);
+  const [trailFading, setTrailFading] = useState(false);
+
+  // Clear the fade timer on unmount so a route change mid-fade doesn't
+  // call setState on a torn-down component.
+  useEffect(() => {
+    return () => {
+      if (trailFadeTimerRef.current !== null) {
+        window.clearTimeout(trailFadeTimerRef.current);
+      }
+    };
+  }, []);
   const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [totalWords, setTotalWords] = useState<number | null>(null);
@@ -316,6 +336,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
         elementFromPoint to identify which pill the finger is over.
       */}
       <div
+        ref={hexContainerRef}
         style={{
           position: "relative",
           width: 320,
@@ -340,6 +361,15 @@ export function SpellingBeeScreen(): JSX.Element | null {
           dragSawMoveRef.current = false;
           dragActiveRef.current = true;
           dragLetterRef.current = null;
+          // Reset the slide-trail. Any previous fade in progress is
+          // cancelled so we don't visually mix a new trail with a fading
+          // old one.
+          if (trailFadeTimerRef.current !== null) {
+            window.clearTimeout(trailFadeTimerRef.current);
+            trailFadeTimerRef.current = null;
+          }
+          setTrailFading(false);
+          setTrailPoints([]);
         }}
         onPointerMove={(e) => {
           if (!dragActiveRef.current) return;
@@ -369,16 +399,27 @@ export function SpellingBeeScreen(): JSX.Element | null {
           // Append to whatever's in the input. Replacement-on-drag would
           // be a different UX choice; appending keeps tap+drag composable
           // (tap A, then drag B-C-D, gives "ABCD").
-          // Use the functional setter to read fresh state; check length
-          // before deciding whether to play the sound (no thud if we
-          // were already at the 15-char cap, since nothing changed).
           let appended = false;
           setCurrentWord((cw) => {
             if (cw.length >= 15) return cw;
             appended = true;
             return cw + letter;
           });
-          if (appended) playPlace();
+          if (!appended) return;
+          playPlace();
+          // Record the pill's centre as a new trail point. Container-
+          // relative coordinates so the SVG (also positioned inside the
+          // container) renders the line in the right place.
+          const containerEl = hexContainerRef.current;
+          // pill non-null is implied by `letter` having been read from it,
+          // but TS doesn't track that — narrow explicitly.
+          if (containerEl && pill) {
+            const pillRect = pill.getBoundingClientRect();
+            const containerRect = containerEl.getBoundingClientRect();
+            const px = pillRect.left + pillRect.width / 2 - containerRect.left;
+            const py = pillRect.top + pillRect.height / 2 - containerRect.top;
+            setTrailPoints((prev) => [...prev, { x: px, y: py }]);
+          }
         }}
         onPointerUp={(e) => {
           dragActiveRef.current = false;
@@ -388,10 +429,31 @@ export function SpellingBeeScreen(): JSX.Element | null {
           } catch {
             // Capture might never have been taken (quick tap) — fine.
           }
+          // Kick off the trail fade-out. Any drawn points fade via a CSS
+          // opacity transition; once that completes we clear the array so
+          // a fresh drag starts from zero. If no real drag happened (just
+          // a tap), trailPoints is empty and this is effectively a no-op.
+          if (dragSawMoveRef.current) {
+            setTrailFading(true);
+            trailFadeTimerRef.current = window.setTimeout(() => {
+              setTrailPoints([]);
+              setTrailFading(false);
+              trailFadeTimerRef.current = null;
+            }, 700);
+          }
         }}
         onPointerCancel={() => {
           dragActiveRef.current = false;
           dragLetterRef.current = null;
+          // Cancel = same as up for trail purposes — fade out gracefully.
+          if (dragSawMoveRef.current && trailPoints.length > 0) {
+            setTrailFading(true);
+            trailFadeTimerRef.current = window.setTimeout(() => {
+              setTrailPoints([]);
+              setTrailFading(false);
+              trailFadeTimerRef.current = null;
+            }, 700);
+          }
         }}
         onClickCapture={(e) => {
           // If a drag happened, suppress the click that pointerup would
@@ -404,6 +466,39 @@ export function SpellingBeeScreen(): JSX.Element | null {
           }
         }}
       >
+        {/*
+          Slide-trail overlay — an SVG polyline that grows as the user drags
+          through pills, then fades out gracefully on release. Positioned
+          absolute over the hex with pointer-events: none so it doesn't
+          eat taps; rendered AFTER the pills in the DOM so the gold line
+          appears on top of the tiles (it's semi-transparent so the letters
+          still read clearly beneath).
+        */}
+        {trailPoints.length >= 2 && (
+          <svg
+            width={320}
+            height={320}
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              pointerEvents: "none",
+              zIndex: 1,
+              opacity: trailFading ? 0 : 0.7,
+              transition: trailFading ? "opacity 600ms ease-out" : "none",
+            }}
+          >
+            <polyline
+              points={trailPoints.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke={TILE.bgPending}
+              strokeWidth={10}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
         {/* Centre */}
         <div
           data-bee-letter={puzzle.center}
