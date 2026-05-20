@@ -4,6 +4,7 @@ import { useGameStore } from "../../store/gameStore.js";
 import { loadInProgress, saveInProgress } from "../../storage/game-storage.js";
 import { fromJSON, toJSON } from "../../storage/serializer.js";
 import { playUiTap } from "../../audio/sounds.js";
+import { tokens } from "../tokens.js";
 import { MenuItem } from "../components/MenuItem.js";
 import { MenuTile, TileWord } from "../components/MenuTile.js";
 import { UserNamePrompt } from "../components/UserNamePrompt.js";
@@ -99,7 +100,7 @@ export function HomeScreen(): JSX.Element {
       style={{
         position: "relative",
         minHeight: "100%",
-        background: "#F1E5CF",
+        background: tokens.color.cream,
         overflowX: "hidden",
         overflowY: "auto",
       }}
@@ -116,11 +117,10 @@ export function HomeScreen(): JSX.Element {
           position: "fixed",
           inset: 0,
           pointerEvents: "none",
-          opacity: 0.35,
-          backgroundImage:
-            "radial-gradient(rgba(110,70,30,.05) 1px, transparent 1px), radial-gradient(rgba(110,70,30,.04) 1px, transparent 1px)",
-          backgroundSize: "7px 7px, 11px 11px",
-          backgroundPosition: "0 0, 3px 5px",
+          opacity: tokens.grain.opacity,
+          backgroundImage: tokens.grain.image,
+          backgroundSize: tokens.grain.size,
+          backgroundPosition: tokens.grain.position,
         }}
       />
 
@@ -141,10 +141,10 @@ export function HomeScreen(): JSX.Element {
             top: 12,
             right: 12,
             zIndex: 10,
-            background: "#FFFFFF",
-            color: "#2A1A0C",
-            border: "1.5px solid #C9B48E",
-            borderRadius: 999,
+            background: tokens.color.paper,
+            color: tokens.color.ink,
+            border: `1.5px solid ${tokens.color.stroke}`,
+            borderRadius: tokens.radius.pill,
             padding: "8px 14px",
             fontSize: "0.95em",
             fontWeight: 600,
@@ -158,8 +158,7 @@ export function HomeScreen(): JSX.Element {
             overflow: "hidden",
             textOverflow: "ellipsis",
             cursor: "pointer",
-            boxShadow:
-              "0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(60,30,0,.06), 0 8px 22px -12px rgba(60,30,0,.18)",
+            boxShadow: tokens.shadow.card,
           }}
         >
           <span aria-hidden>👤</span>
@@ -216,12 +215,12 @@ export function HomeScreen(): JSX.Element {
           <p
             style={{
               margin: 0,
-              fontSize: 14,
+              fontSize: tokens.size.caption,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: "#6B5641",
-              fontWeight: 500,
-              fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif",
+              color: tokens.color.inkSoft,
+              fontWeight: tokens.weight.reg,
+              fontFamily: tokens.font.sans,
             }}
           >
             Words, on your terms.
@@ -237,13 +236,13 @@ export function HomeScreen(): JSX.Element {
           <div
             role="alert"
             style={{
-              background: "#FFF1E6",
-              border: "1.5px solid #B03030",
-              borderRadius: 14,
+              background: tokens.color.warnBg,
+              border: `1.5px solid ${tokens.color.warn}`,
+              borderRadius: tokens.radius.card,
               padding: "12px 16px",
-              color: "#7A1F1F",
+              color: tokens.color.brownDark,
               textAlign: "center",
-              fontWeight: 600,
+              fontWeight: tokens.weight.med,
             }}
           >
             The word list didn't load — go online and refresh the page to download
@@ -297,8 +296,8 @@ export function HomeScreen(): JSX.Element {
             alignItems: "center",
             justifyContent: "center",
             gap: 10,
-            color: "#6B5641",
-            fontSize: 12,
+            color: tokens.color.inkSoft,
+            fontSize: tokens.size.micro,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             marginTop: 8,

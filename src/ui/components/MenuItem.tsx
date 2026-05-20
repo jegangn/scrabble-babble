@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { playUiTap } from "../../audio/sounds.js";
+import { tokens } from "../tokens.js";
 
 /**
  * One menu row on the redesigned HomeScreen. Cards variant per spec:
@@ -40,28 +41,25 @@ export function MenuItem({
   // Secondary "card" style + primary "filled brown" style. Hover toggles
   // a deeper shadow and (for cards) a darker border. Press collapses the
   // -1px translate back to 0 so the button feels physically pushed.
+  const { color, shadow } = tokens;
   const base: React.CSSProperties = primary
     ? {
-        background:
-          hover
-            ? "linear-gradient(180deg, color-mix(in oklab, #6F4423 86%, white 14%) 0%, color-mix(in oklab, #6F4423 96%, black 4%) 100%)"
-            : "linear-gradient(180deg, color-mix(in oklab, #6F4423 92%, white 8%) 0%, #6F4423 100%)",
-        color: "#F1E5CF",
-        border: "1.5px solid #56341A",
+        background: hover
+          ? `linear-gradient(180deg, color-mix(in oklab, ${color.brown} 86%, white 14%) 0%, color-mix(in oklab, ${color.brown} 96%, black 4%) 100%)`
+          : `linear-gradient(180deg, color-mix(in oklab, ${color.brown} 92%, white 8%) 0%, ${color.brown} 100%)`,
+        color: color.cream,
+        border: `1.5px solid ${color.brownDark}`,
         padding: "20px 18px",
-        fontSize: 19,
-        boxShadow:
-          "0 1px 0 rgba(255,220,180,.18) inset, 0 -2px 0 rgba(0,0,0,.18) inset, 0 12px 26px -14px rgba(60,30,0,.55)",
+        fontSize: tokens.size.bodyLg,
+        boxShadow: shadow.primary,
       }
     : {
-        background: "#FFFFFF",
-        color: "#2A1A0C",
-        border: `1.5px solid ${hover ? "#8E5E37" : "#C9B48E"}`,
+        background: color.paper,
+        color: color.ink,
+        border: `1.5px solid ${hover ? color.brownMed : color.stroke}`,
         padding: "16px 18px",
-        fontSize: 17,
-        boxShadow: hover
-          ? "0 1px 0 rgba(255,255,255,.7) inset, 0 4px 10px rgba(60,30,0,.10), 0 18px 36px -16px rgba(60,30,0,.28)"
-          : "0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(60,30,0,.06), 0 8px 22px -12px rgba(60,30,0,.18)",
+        fontSize: tokens.size.body,
+        boxShadow: hover ? shadow.cardHover : shadow.card,
       };
 
   // Icon-chip colours invert on the primary row (translucent white on
@@ -69,11 +67,11 @@ export function MenuItem({
   const iconStyle: React.CSSProperties = primary
     ? {
         background: "rgba(255,255,255,.16)",
-        color: "#F1E5CF",
+        color: color.cream,
       }
     : {
-        background: "color-mix(in oklab, #6F4423 10%, transparent)",
-        color: "#6F4423",
+        background: `color-mix(in oklab, ${color.brown} 10%, transparent)`,
+        color: color.brown,
       };
 
   return (
@@ -99,7 +97,7 @@ export function MenuItem({
       style={{
         appearance: "none",
         ...base,
-        borderRadius: 14,
+        borderRadius: tokens.radius.card,
         display: "grid",
         gridTemplateColumns: "auto 1fr auto",
         alignItems: "center",
@@ -128,7 +126,7 @@ export function MenuItem({
           height: 36,
           display: "grid",
           placeItems: "center",
-          borderRadius: 10,
+          borderRadius: tokens.radius.chip,
           fontSize: 16,
           flexShrink: 0,
           ...iconStyle,
@@ -140,16 +138,16 @@ export function MenuItem({
       {/* Body — label + optional sublabel stacked. min-width: 0 lets the
           label ellipsize cleanly inside the grid track. */}
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-        <span style={{ fontWeight: 600, letterSpacing: "-0.005em" }}>{label}</span>
+        <span style={{ fontWeight: tokens.weight.med, letterSpacing: "-0.005em" }}>{label}</span>
         {sublabel && (
           <span
             style={{
               fontSize: 12.5,
-              fontWeight: 500,
+              fontWeight: tokens.weight.reg,
               letterSpacing: "0.02em",
               color: primary
-                ? "color-mix(in oklab, #F1E5CF 78%, transparent)"
-                : "#6B5641",
+                ? `color-mix(in oklab, ${color.cream} 78%, transparent)`
+                : color.inkSoft,
             }}
           >
             {sublabel}
@@ -165,11 +163,11 @@ export function MenuItem({
           placeItems: "center",
           color: primary
             ? hover
-              ? "#F1E5CF"
-              : "color-mix(in oklab, #F1E5CF 75%, transparent)"
+              ? color.cream
+              : `color-mix(in oklab, ${color.cream} 75%, transparent)`
             : hover
-              ? "#6F4423"
-              : "color-mix(in oklab, #6F4423 55%, transparent)",
+              ? color.brown
+              : `color-mix(in oklab, ${color.brown} 55%, transparent)`,
           transform: hover ? "translateX(2px)" : "translateX(0)",
           transition: "transform .15s ease, color .2s ease",
         }}
