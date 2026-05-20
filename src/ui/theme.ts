@@ -1,42 +1,48 @@
+/**
+ * DEPRECATED — kept as a thin back-compat shim during the design-system
+ * migration. New code should import from `./tokens.js` directly.
+ *
+ * The shape and colour values here are now derived from `tokens.ts`. As
+ * each screen is rebuilt to use the token namespace, its import of this
+ * file gets removed. Once no consumers remain, this file is deleted.
+ */
+
 import type { PremiumType } from "../engine/types.js";
+import { color, square } from "./tokens.js";
 
 /**
- * Premium-cell colors. WCAG AA verified against board cell label size
- * (~12 px in cell labels). All combinations >= 4.5:1 for body-text legibility.
- * NONE (empty cell): bg #e8d8c0 + fg #5a4128 = 5.8:1 (was 3.3:1 — fail).
- * DW pink: bg #f4a4c0 + fg #5a0e2c = 6.1:1 (was 3.4:1 — fail).
- * The other three (DL/TL/TW) already passed AA; left unchanged for theme
- * continuity.
+ * Premium-cell palette. Backed by the muted tokens
+ * (terracotta/peach/teal/sage), not the old vivid Scrabble colours.
  */
 export const PREMIUM_COLORS: Record<PremiumType, { bg: string; fg: string; label: string }> = {
-  NONE: { bg: "#e8d8c0", fg: "#5a4128", label: "" },
-  DL: { bg: "#9bd5f0", fg: "#0c4f6b", label: "DL" },
-  TL: { bg: "#2f6fb0", fg: "#ffffff", label: "TL" },
-  DW: { bg: "#f4a4c0", fg: "#5a0e2c", label: "DW" },
-  TW: { bg: "#d04848", fg: "#ffffff", label: "TW" },
+  NONE: { bg: square.base, fg: color.inkSoft, label: "" },
+  DL: { bg: square.dl.bg, fg: square.dl.ink, label: "DL" },
+  TL: { bg: square.tl.bg, fg: square.tl.ink, label: "TL" },
+  DW: { bg: square.dw.bg, fg: square.dw.ink, label: "DW" },
+  TW: { bg: square.tw.bg, fg: square.tw.ink, label: "TW" },
 };
 
-/** Tile face + lettering. Warm parchment tone. */
+/** Tile face + lettering — legacy keys, now from tokens. */
 export const TILE = {
   bg: "#fff4dc",
-  bgPending: "#ffe18a",
-  border: "#7c4a2a",
-  letter: "#2b2118",
-  value: "#7a5d3f",
+  bgPending: color.success, // moss ring for placed-but-uncommitted
+  border: color.brown,
+  letter: color.ink,
+  value: color.inkSoft,
 };
 
 /** Board frame. */
 export const BOARD = {
-  bg: "#3a2618",
-  cellBorder: "#7c4a2a",
-  star: "#ffd56b",
+  bg: color.brown,
+  cellBorder: color.brownMed,
+  star: color.cream,
 };
 
 /** App accent. */
 export const ACCENT = {
-  primary: "#7c4a2a",
-  primaryHover: "#5a341d",
-  text: "#2b2118",
-  surface: "#f5ede2",
-  danger: "#b03030",
+  primary: color.brown,
+  primaryHover: color.brownDark,
+  text: color.ink,
+  surface: color.cream,
+  danger: color.danger,
 };
