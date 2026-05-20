@@ -40,7 +40,6 @@ export function TumblerScreen(): JSX.Element | null {
   const startedRef = useRef(false);
   const remainingMsRef = useRef(TUMBLER_DURATION_MS);
   const startedAtRef = useRef<number | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Drive the countdown. Effect re-runs when started flips true.
   useEffect(() => {
@@ -131,13 +130,25 @@ export function TumblerScreen(): JSX.Element | null {
     playSuccess();
   };
 
-  // Start the timer on first keystroke. Once running, startedRef mirrors `started`.
-  const handleInputChange = (value: string) => {
-    setInput(value);
-    if (!started && value.length > 0) {
+  // Start the timer on the first letter added. Tile taps drive this now
+  // (hardware-keyboard entry was removed in favour of tap-only input).
+  const startTimerIfNeeded = () => {
+    if (!started) {
       setStarted(true);
       startedRef.current = true;
     }
+  };
+
+  const appendLetter = (letter: Letter) => {
+    if (timeLeftMs <= 0) return;
+    if (input.length >= 15) return;
+    startTimerIfNeeded();
+    setInput(input + letter);
+  };
+
+  const deleteLetter = () => {
+    if (input.length === 0) return;
+    setInput(input.slice(0, -1));
   };
 
   const secondsLeft = (timeLeftMs / 1000).toFixed(1);
@@ -194,52 +205,71 @@ export function TumblerScreen(): JSX.Element | null {
         </div>
       </div>
 
-      {/* Rack: 7 LetterPills. Tap-to-append: each pill onTap fires
-          handleInputChange with the current input + the letter. This also
-          starts the timer (handleInputChange checks `started`). The
-          validator still enforces multiset legality on submit, so over-tapping
-          a letter doesn't break the game — just yields "Not in rack". */}
+      {/* Rack: 7 LetterPills. Tap to append. Per the latest UX direction,
+          hardware-keyboard entry has been removed — this is the ONLY way
+          to compose a word in Tumbler. The validator still enforces
+          multiset legality on submit, so over-tapping the same letter
+          shows "Not in rack" rather than corrupting state. */}
       <div className="flex gap-2 flex-wrap justify-center" aria-label="Your letters">
         {rack.map((letter, i) => (
           <LetterPill
             key={i}
             letter={letter}
             size={64}
-            onTap={() => handleInputChange(input + letter)}
+            onTap={() => appendLetter(letter)}
           />
         ))}
       </div>
 
-      {/* Input + submit */}
-      <form
-        className="flex gap-2 w-full max-w-md"
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit();
-        }}
-      >
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => handleInputChange(e.target.value)}
-          style={inputStyle}
-          autoFocus
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder={started ? "Type a word…" : "Type to start"}
-          disabled={timeLeftMs <= 0}
-          aria-label="Word entry"
-          maxLength={15}
-        />
+      {/* Read-only word display + Delete + Enter. The display is a div
+          (not an input) so iPad Safari never tries to open its on-screen
+          keyboard — a "no text input" mode the user explicitly requested. */}
+      <div className="flex gap-2 w-full max-w-md items-stretch">
+        <div
+          aria-label="Word in progress"
+          aria-live="polite"
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "white",
+            color: ACCENT.text,
+            border: `2px solid ${ACCENT.primary}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontSize: "1.6em",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            minHeight: 56,
+            fontVariantNumeric: "tabular-nums",
+            userSelect: "none",
+          }}
+        >
+          {input || (
+            <span style={{ opacity: 0.35, fontSize: "0.7em", fontWeight: 500, letterSpacing: "normal" }}>
+              {started ? "tap a letter…" : "tap a letter to start"}
+            </span>
+          )}
+        </div>
         <button
-          type="submit"
+          type="button"
+          onClick={deleteLetter}
+          style={btnStyle("secondary")}
+          disabled={timeLeftMs <= 0 || input.length === 0}
+          aria-label="Delete last letter"
+        >
+          ⌫
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
           style={btnStyle("primary")}
-          disabled={timeLeftMs <= 0 || input.trim().length === 0}
+          disabled={timeLeftMs <= 0 || input.length === 0}
         >
           Enter
         </button>
-      </form>
+      </div>
 
       {/* Flash toast */}
       <div style={{ minHeight: 32 }} aria-live="polite">
@@ -316,20 +346,8 @@ const flashStyle: React.CSSProperties = {
   display: "inline-block",
 };
 
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "12px 14px",
-  fontSize: "1.4em",
-  borderRadius: 8,
-  border: `2px solid ${ACCENT.primary}`,
-  background: "white",
-  color: ACCENT.text,
-  minHeight: 48,
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-};
 
-function btnStyle(variant: "primary" | "ghost"): React.CSSProperties {
+function btnStyle(variant: "primary" | "secondary" | "ghost"): React.CSSProperties {
   if (variant === "ghost") {
     return {
       background: "transparent",
@@ -339,6 +357,20 @@ function btnStyle(variant: "primary" | "ghost"): React.CSSProperties {
       fontSize: "1em",
       fontWeight: 500,
       borderRadius: 8,
+      touchAction: "manipulation",
+      cursor: "pointer",
+    };
+  }
+  if (variant === "secondary") {
+    return {
+      background: "white",
+      color: ACCENT.text,
+      border: `2px solid ${ACCENT.primary}`,
+      padding: "12px 16px",
+      fontSize: "1.2em",
+      fontWeight: 700,
+      borderRadius: 8,
+      minHeight: 56,
       touchAction: "manipulation",
       cursor: "pointer",
     };

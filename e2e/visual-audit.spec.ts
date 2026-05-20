@@ -113,8 +113,11 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await page.waitForTimeout(300);
       await shot(page, "06-tumbler-start", vpName);
 
-      // Type "CAT" into the word entry input (timer starts on first keystroke).
-      await page.getByLabel(/word entry/i).fill("CAT");
+      // Tap-only mode now — tap two rack pills to show the in-progress
+      // word display. (Keyboard input was removed per the latest UX.)
+      const pills = page.getByRole("button", { name: /^[A-Z]$/ });
+      await pills.nth(0).click();
+      await pills.nth(1).click();
       await shot(page, "06b-tumbler-typed", vpName);
     });
 

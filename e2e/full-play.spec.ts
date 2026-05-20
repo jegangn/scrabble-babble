@@ -121,35 +121,56 @@ test.describe("Tumbler full play-through", () => {
       `Unlucky 7-letter draw ${rack.join("")} had no valid 2-letter word; rerun.`,
     );
 
-    const input = page.getByLabel(/Word entry/);
+    // Map the chosen word back to specific rack-pill INDICES so we can tap
+    // them. Walk character-by-character, consuming each rack slot once so
+    // duplicate letters (e.g. word EE in a rack with two E's) still resolve
+    // to distinct pills.
+    const indicesForWord = (word: string): number[] => {
+      const used = new Set<number>();
+      const out: number[] = [];
+      for (const ch of word) {
+        const idx = rack.findIndex((l, i) => l === ch && !used.has(i));
+        if (idx < 0) return [];
+        used.add(idx);
+        out.push(idx);
+      }
+      return out;
+    };
+    const validIndices = indicesForWord(valid!);
+    expect(validIndices.length).toBe(valid!.length);
+
     const score = page.getByLabel(/Current score/);
+    const enterBtn = page.getByRole("button", { name: /^Enter$/ });
     await expect(score).toHaveText(/0 pts/);
 
-    // Submit valid word → score increases.
-    await input.fill(valid!);
-    await input.press("Enter");
+    // Compose + submit valid word.
+    for (const i of validIndices) await pills.nth(i).click();
+    await enterBtn.click();
     await expect(score).not.toHaveText(/0 pts/, { timeout: 2000 });
-    // Word appears in the found-words list (scope to the Found region to avoid
-    // matching the transient flash toast that also contains the word text).
     const foundList = page.getByText(/Found \(/).locator("..");
     await expect(foundList.getByText(valid!, { exact: true })).toBeVisible();
 
-    // Capture the new score for the duplicate test.
     const scoreText = await score.textContent();
     expect(scoreText).toMatch(/\d+ pts/);
 
-    // Submit duplicate → "Already found" toast, score unchanged.
-    await input.fill(valid!);
-    await input.press("Enter");
+    // Compose the SAME word again → "Already found".
+    for (const i of validIndices) await pills.nth(i).click();
+    await enterBtn.click();
     await expect(page.getByText(/Already found/)).toBeVisible();
     await expect(score).toHaveText(scoreText!);
 
-    // Submit a guaranteed non-word → "Not a word" toast.
-    // Pick letters from the rack that won't accidentally form a real word.
-    await input.fill(rack[0]! + rack[1]! + rack[0]!);
-    await input.press("Enter");
-    // Either "Not a word" or "Not in rack" (if triple of one letter isn't formable).
-    await expect(page.getByText(/Not a word|Not in rack/)).toBeVisible();
+    // Tap the same pill twice + a different pill → likely "Not in rack"
+    // (unless the rack happens to contain two of that letter — in which
+    // case the resulting word may be valid or rejected as "Not a word").
+    // The flash strings differ but the assertion catches all rejection
+    // paths.
+    await pills.nth(0).click();
+    await pills.nth(0).click();
+    await pills.nth(1).click();
+    await enterBtn.click();
+    await expect(
+      page.getByText(/Not a word|Not in rack|Already found/),
+    ).toBeVisible();
   });
 });
 

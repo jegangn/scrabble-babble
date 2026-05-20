@@ -104,24 +104,17 @@ test("Tumbler renders 7 letters and a timer", async ({ page }) => {
   await page.screenshot({ path: "screenshots/05-tumbler.png", fullPage: true });
 });
 
-test("Tumbler accepts a valid word and rejects garbage", async ({ page }) => {
+test("Tumbler rejects a single-letter word as too short", async ({ page }) => {
   await page.getByRole("button", { name: /Tumbler/ }).click();
   const pills = page.getByRole("button", { name: /^[A-Z]$/ });
   await expect(pills).toHaveCount(7);
-  // Read the 7 letters off the buttons.
-  const letters: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    letters.push((await pills.nth(i).textContent())!.trim());
-  }
 
-  // Try a guaranteed-invalid garbage string first (zero-letter chance).
-  const input = page.getByLabel(/Word entry/);
-  await input.fill("ZZZZZ");
-  await input.press("Enter");
-  await expect(page.getByText(/Not a word|Not in rack/)).toBeVisible();
-
-  // Pause the timer immediately by backgrounding the tab.
-  // (Actually we don't have that hook in Playwright; just rely on the 60s budget.)
+  // Tap-only input mode: tap one pill (1-letter word), then Enter. Min
+  // word length is 2, so this is a guaranteed rejection that doesn't
+  // depend on the rack composition.
+  await pills.nth(0).click();
+  await page.getByRole("button", { name: /^Enter$/ }).click();
+  await expect(page.getByText(/Need 2\+? letters|Too short/)).toBeVisible();
   await page.screenshot({ path: "screenshots/06-tumbler-rejected.png", fullPage: true });
 });
 
