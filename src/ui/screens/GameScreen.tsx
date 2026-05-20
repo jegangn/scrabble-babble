@@ -23,7 +23,6 @@ import { Button } from "../components/Button.js";
 import { ModalFrame } from "../components/ModalFrame.js";
 import { PlayerCard } from "../components/PlayerCard.js";
 import { Rack } from "../components/Rack.js";
-import { SectionLabel } from "../components/SectionLabel.js";
 import { SwapPicker } from "../components/SwapPicker.js";
 import { Tagline } from "../components/Tagline.js";
 import { ThinkingOverlay } from "../components/ThinkingOverlay.js";
@@ -350,9 +349,14 @@ export function GameScreen(): JSX.Element | null {
           display: "flex",
           flexDirection: "column",
           width: "100%",
-          minHeight: "100%",
+          // Pin to viewport height so the bottom strip can't be pushed
+          // off-screen by an overly tall board. `100dvh` accounts for the
+          // dynamic browser chrome on iOS; the older `100vh` would have
+          // included the bottom safari toolbar's area on iPad.
+          height: "100dvh",
+          maxHeight: "100dvh",
           background: color.cream,
-          // Grain layer is decorative; rendered as a fixed underlay.
+          overflow: "hidden",
         }}
       >
         {/* Decorative paper grain — matches every other screen. */}
@@ -383,33 +387,49 @@ export function GameScreen(): JSX.Element | null {
           />
         )}
 
-        {/* Top: board + sidebar */}
+        {/* Top: board + sidebar. flex: 1 + min-height: 0 lets the inner
+            content shrink if the rack/action bar at the bottom claims
+            space; without min-height: 0 the auto rows would push the
+            action bar below the viewport on shorter iPads. */}
         <div
           className="gs-main-grid"
           style={{
             flex: 1,
+            minHeight: 0,
             position: "relative",
             zIndex: 1,
             display: "grid",
             gridTemplateColumns: "minmax(0, auto) 320px",
-            gap: space.x8,
-            padding: `${space.x16}px ${space.x8}px ${space.x4}px`,
+            gap: space.x6,
+            padding: `${space.x16 + 16}px ${space.x8}px ${space.x3}px`,
             alignItems: "start",
+            overflow: "hidden",
           }}
         >
           {/* Board column — keeps its container query so tile letters scale
-              with the rendered cell size. */}
+              with the rendered cell size. The board is sized to whichever
+              of viewport-height-derived or column-width is smaller; the
+              `calc(100dvh - 300px)` reservation keeps room for the top
+              padding (~48px) + bottom strip (~180px) + safety margin. */}
           <div
             className="gs-board-wrap"
             style={{
               display: "flex",
               justifyContent: "center",
               alignItems: "flex-start",
+              height: "100%",
+              minHeight: 0,
             }}
           >
             <div
               style={{
-                width: "min(70vh, 100%)",
+                // Reserve ~340 px for top BackPill/UserChip clearance
+                // (~80) + bottom strip (rack ~120 + action bar ~80 +
+                // padding ~40 ≈ 240). The actual rendered height stays
+                // 100% of column when the column is narrower.
+                width: "min(calc(100dvh - 340px), 100%)",
+                height: "min(calc(100dvh - 340px), 100%)",
+                maxWidth: "100%",
                 aspectRatio: "1",
                 containerType: "size",
                 containerName: "board",
@@ -419,13 +439,18 @@ export function GameScreen(): JSX.Element | null {
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar — scrollable if the player has many history entries
+              or a tall pending-word preview; keeps the bottom strip
+              anchored regardless. */}
           <aside
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: space.x4,
+              gap: space.x3,
               paddingTop: space.x2,
+              height: "100%",
+              minHeight: 0,
+              overflowY: "auto",
             }}
           >
             <div
@@ -549,15 +574,18 @@ export function GameScreen(): JSX.Element | null {
           </aside>
         </div>
 
-        {/* Bottom: rack + action bar */}
+        {/* Bottom: rack + action bar. flexShrink: 0 anchors this to the
+            bottom regardless of board content; auto-height keeps each
+            row natural-sized without forcing a fixed strip. */}
         <div
           style={{
             position: "relative",
             zIndex: 1,
-            padding: `${space.x4}px ${space.x8}px ${space.x6}px`,
+            flexShrink: 0,
+            padding: `${space.x3}px ${space.x8}px ${space.x4}px`,
             display: "flex",
             flexDirection: "column",
-            gap: space.x4,
+            gap: space.x3,
             borderTop: `1px solid ${color.creamDark}`,
             background: `color-mix(in oklab, ${color.cream} 60%, ${color.paper})`,
           }}
@@ -647,6 +675,9 @@ export function GameScreen(): JSX.Element | null {
             </>
           }
         >
+          {/* Body — a moss-tinted callout reinforces what "End game now"
+              will do without a third action button cluttering the
+              footer. */}
           <div
             style={{
               padding: space.x4,
@@ -655,11 +686,11 @@ export function GameScreen(): JSX.Element | null {
               color: color.danger,
               fontSize: size.caption,
               fontWeight: weight.med,
+              lineHeight: 1.5,
             }}
           >
-            <SectionLabel style={{ margin: 0, color: color.danger }}>
-              Resign
-            </SectionLabel>
+            Resigning is final. The current score stands and the round
+            is marked as a win for the other player.
           </div>
         </ModalFrame>
       )}

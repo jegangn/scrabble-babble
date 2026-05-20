@@ -73,7 +73,7 @@ export function NewGameScreen(): JSX.Element {
           // widths so the form remains usable on phones.
           gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: tokens.space.x12,
-          padding: `${tokens.space.x16}px ${tokens.space.x12}px ${tokens.space.x8}px`,
+          padding: `${tokens.space.x16 + 16}px ${tokens.space.x12}px ${tokens.space.x8}px`,
           alignContent: "start",
           maxWidth: 1240,
           margin: "0 auto",

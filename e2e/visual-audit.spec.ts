@@ -28,6 +28,90 @@ async function shot(page: Page, name: string, viewport: keyof typeof VIEWPORTS) 
   });
 }
 
+interface OverlapReport {
+  readonly a: string;
+  readonly b: string;
+  readonly overlap: { readonly w: number; readonly h: number };
+}
+
+/**
+ * Programmatic overlap detector — runs in the page context, scans every
+ * interactive element (button / a / input), and reports pairs whose
+ * bounding rects intersect by more than 4 px on each axis.
+ *
+ * Excludes element pairs where one is an ancestor of the other (a button
+ * "overlapping" its own inner span is not a layout bug). Also excludes
+ * fixed-position chrome (BackPill / UserChip) overlapping content beneath
+ * them since they're intentionally layered.
+ */
+async function detectOverlaps(page: Page): Promise<OverlapReport[]> {
+  return page.evaluate(() => {
+    const tag = (el: Element): string => {
+      const role = el.getAttribute("role");
+      const label = el.getAttribute("aria-label");
+      const text = (el.textContent ?? "").trim().slice(0, 32);
+      return `<${el.tagName.toLowerCase()}${role ? ` role="${role}"` : ""}${label ? ` aria="${label}"` : ""}> "${text}"`;
+    };
+    const isFixed = (el: Element): boolean => {
+      const pos = getComputedStyle(el as HTMLElement).position;
+      return pos === "fixed" || pos === "absolute";
+    };
+    const isAncestor = (a: Element, b: Element): boolean =>
+      a.contains(b) || b.contains(a);
+    const isVisible = (el: Element): boolean => {
+      const r = (el as HTMLElement).getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) return false;
+      const style = getComputedStyle(el as HTMLElement);
+      return style.visibility !== "hidden" && style.display !== "none";
+    };
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "button, a, [role='button'], input:not([type='hidden'])",
+      ),
+    ).filter(isVisible);
+
+    const reports: OverlapReport[] = [];
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i]!;
+        const b = items[j]!;
+        if (isAncestor(a, b)) continue;
+        // Both fixed/absolute — almost always intentional layering (chip
+        // over content, modal over backdrop, etc.). Skip these pairs.
+        if (isFixed(a) && isFixed(b)) continue;
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        const overlapW = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+        const overlapH = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+        if (overlapW > 4 && overlapH > 4) {
+          reports.push({
+            a: tag(a),
+            b: tag(b),
+            overlap: { w: Math.round(overlapW), h: Math.round(overlapH) },
+          });
+        }
+      }
+    }
+    return reports;
+  });
+}
+
+/**
+ * Soft-assert: log overlaps but don't fail the test. We use this so the
+ * audit run produces a complete catalogue of issues across every screen
+ * + viewport instead of bailing on the first one.
+ */
+async function reportOverlaps(page: Page, label: string): Promise<void> {
+  const overlaps = await detectOverlaps(page);
+  if (overlaps.length === 0) return;
+  // eslint-disable-next-line no-console
+  console.log(`\n[overlap] ${label} (${overlaps.length} pair${overlaps.length === 1 ? "" : "s"}):`);
+  for (const o of overlaps) {
+    // eslint-disable-next-line no-console
+    console.log(`  ${o.overlap.w}×${o.overlap.h}px  ${o.a}  ↔  ${o.b}`);
+  }
+}
+
 async function gotoHome(page: Page) {
   await page.goto("/");
   // Pre-seed current_user so the welcome name-prompt doesn't block screen
@@ -66,6 +150,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
     test("Home", async ({ page }) => {
       await gotoHome(page);
       await shot(page, "01-home", vpName);
+      await reportOverlaps(page, `${vpName} · Home`);
     });
 
     test("NewGame — default (Classic + hot-seat)", async ({ page }) => {
@@ -73,52 +158,64 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await page.getByRole("button", { name: /^new game$/i }).click();
       await expect(page.getByText(/opponent/i).first()).toBeVisible({ timeout: 5000 });
       await shot(page, "02-new-game-default", vpName);
+      await reportOverlaps(page, `${vpName} · NewGame default`);
     });
 
     test("NewGame — Mini + AI Easygoing", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByLabel(/^computer$/i).check();
-      await page.getByLabel(/^mini —/i).check();
-      // After picking AI, the difficulty fieldset replaces Player 2 input.
+      // Opponent: tap the "Computer" segment (new Segmented control —
+      // aria-pressed buttons, not radio inputs).
+      await page.getByRole("button", { name: /^computer$/i }).click();
+      // Board: tap the "Mini" board option card. The new BoardOption
+      // is a button, not a checked radio.
+      await page.getByRole("button", { name: /mini.*11/i }).click();
+      // After picking AI, the difficulty fieldset becomes visible with
+      // the 5-tier star-rating cards.
       await expect(page.getByText(/difficulty/i).first()).toBeVisible();
       await shot(page, "03-new-game-mini-ai", vpName);
+      await reportOverlaps(page, `${vpName} · NewGame mini AI`);
     });
 
     test("Game — Classic, hot-seat", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByRole("button", { name: /^start$/i }).click();
+      await page.getByRole("button", { name: /^start game$/i }).click();
       // Board rendered when the centre ★ appears.
       await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
       await page.waitForTimeout(500);
       await shot(page, "04-game-classic", vpName);
+      await reportOverlaps(page, `${vpName} · Game classic`);
     });
 
     test("Game — Mini, hot-seat", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByLabel(/^mini —/i).check();
-      await page.getByRole("button", { name: /^start$/i }).click();
+      await page.getByRole("button", { name: /mini.*11/i }).click();
+      await page.getByRole("button", { name: /^start game$/i }).click();
       await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
       await page.waitForTimeout(500);
       await shot(page, "05-game-mini", vpName);
+      await reportOverlaps(page, `${vpName} · Game mini`);
     });
 
     test("Tumbler", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /tumbler/i }).click();
-      // The 7-letter rack region appears once the round starts.
-      await expect(page.getByLabel(/your letters/i)).toBeVisible({ timeout: 10_000 });
+      // Header h1 confirms the screen is mounted.
+      await expect(page.getByRole("heading", { name: /^tumbler$/i })).toBeVisible({
+        timeout: 10_000,
+      });
       await page.waitForTimeout(300);
       await shot(page, "06-tumbler-start", vpName);
+      await reportOverlaps(page, `${vpName} · Tumbler start`);
 
-      // Tap-only mode now — tap two rack pills to show the in-progress
-      // word display. (Keyboard input was removed per the latest UX.)
-      const pills = page.getByRole("button", { name: /^[A-Z]$/ });
+      // Tap-only mode — tap two rack pills to show the in-progress word.
+      const pills = page.getByRole("button", { name: /^Letter [A-Z]$/ });
       await pills.nth(0).click();
       await pills.nth(1).click();
       await shot(page, "06b-tumbler-typed", vpName);
+      await reportOverlaps(page, `${vpName} · Tumbler typing`);
     });
 
     test("Spelling Bee", async ({ page }) => {
@@ -127,13 +224,15 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await expect(page.getByLabel(/letter hex/i)).toBeVisible({ timeout: 10_000 });
       await page.waitForTimeout(800); // let total-words enumerator settle
       await shot(page, "07-bee-start", vpName);
+      await reportOverlaps(page, `${vpName} · Bee start`);
 
       // Tap centre + a couple outer letters to show in-progress word.
-      const pills = await page.locator("[aria-label='Letter hex'] button").all();
+      const pills = await page.locator("[aria-label='Letter hex'] [role='button']").all();
       for (let i = 0; i < Math.min(4, pills.length); i++) {
         await pills[i]!.click();
       }
       await shot(page, "07b-bee-typing", vpName);
+      await reportOverlaps(page, `${vpName} · Bee typing`);
     });
 
     test("Spelling Bee slide trail visible during drag", async ({ page }) => {
@@ -164,41 +263,47 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
     test("Resign confirm modal + GameEnd screen", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByRole("button", { name: /^start$/i }).click();
+      await page.getByRole("button", { name: /^start game$/i }).click();
       // Open Resign confirmation.
       await page.getByRole("button", { name: /^resign$/i }).click();
-      await expect(page.getByText(/this ends the game/i)).toBeVisible();
+      // New modal copy: "End the game?" + "Your opponent will take the win."
+      await expect(page.getByText(/your opponent will take the win/i)).toBeVisible();
+      // Animation budget: modal fades in (200 ms) + rises (280 ms).
+      // Wait for both to settle so the screenshot captures the full panel.
+      await page.waitForTimeout(350);
       await shot(page, "08-resign-modal", vpName);
+      await reportOverlaps(page, `${vpName} · Resign modal`);
 
-      // Confirm — the destructive button is intentionally NOT labelled
-      // "Resign" (which would match the trigger) but "End game now".
+      // Confirm — destructive button is "End game now".
       await page.getByRole("button", { name: /end game now/i }).click();
-      await expect(page.getByRole("button", { name: /home|new game/i }).first()).toBeVisible({
-        timeout: 5000,
-      });
+      // GameEnd renders "{Name} wins." or "It's a tie." in a display-size heading.
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(300);
       await shot(page, "09-game-end", vpName);
+      await reportOverlaps(page, `${vpName} · GameEnd`);
     });
 
     test("Swap modal opens with rack tiles", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByRole("button", { name: /^start$/i }).click();
+      await page.getByRole("button", { name: /^start game$/i }).click();
       await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
-      // Swap should be enabled at game start (bag has 90+ tiles).
-      const swapBtn = page.getByRole("button", { name: /^swap$/i });
+      // Swap button — icon + label "Swap" — matches a partial regex.
+      const swapBtn = page.getByRole("button", { name: /swap/i }).first();
       await expect(swapBtn).toBeEnabled();
       await swapBtn.click();
-      // SwapPicker is a Modal with the rack tiles inside.
-      await expect(page.getByText(/swap/i).first()).toBeVisible();
-      await page.waitForTimeout(200);
+      // ModalFrame title is "Swap tiles"; should be visible.
+      await expect(page.getByRole("heading", { name: /swap tiles/i })).toBeVisible();
+      // Animation budget: see Resign modal note above.
+      await page.waitForTimeout(350);
       await shot(page, "10-swap-modal", vpName);
+      await reportOverlaps(page, `${vpName} · Swap modal`);
     });
 
     test("Drag overlay shows a moving tile (no disappearing)", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByRole("button", { name: /^start$/i }).click();
+      await page.getByRole("button", { name: /^start game$/i }).click();
       await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
 
       // Find a rack tile (DraggableRackTile renders a <div role="button">
@@ -229,18 +334,20 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
     test("HotSeatHandoff after passing in hot-seat", async ({ page }) => {
       await gotoHome(page);
       await page.getByRole("button", { name: /^new game$/i }).click();
-      await page.getByRole("button", { name: /^start$/i }).click();
+      await page.getByRole("button", { name: /^start game$/i }).click();
       await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
-      // Pass — that flips the turn, which in hot-seat shows the handoff overlay.
+      // Pass — flips turn → hot-seat handoff overlay appears.
       await page.getByRole("button", { name: /^pass$/i }).click();
-      // Handoff overlay shows "Pass the iPad to <name>" and a Ready button.
+      // Handoff overlay shows "Pass the iPad to <name>" + "I'm <name> — ready".
       await expect(page.getByText(/pass the ipad to/i)).toBeVisible({ timeout: 5000 });
-      await expect(page.getByRole("button", { name: /ready/i })).toBeVisible();
+      const readyBtn = page.getByRole("button", { name: /ready/i });
+      await expect(readyBtn).toBeVisible();
       await page.waitForTimeout(200);
       await shot(page, "11-handoff", vpName);
-      // Tapping Ready returns to the game.
-      await page.getByRole("button", { name: /ready/i }).click();
+      // Tap "I'm {name} — ready" to return to the game.
+      await readyBtn.click();
       await expect(page.getByText("★").first()).toBeVisible();
+      await reportOverlaps(page, `${vpName} · Handoff`);
     });
   });
 }

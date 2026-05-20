@@ -143,7 +143,7 @@ export function GameEndScreen(): JSX.Element | null {
       <div
         style={{
           flex: 1,
-          padding: `${space.x16}px ${space.x12}px ${space.x6}px`,
+          padding: `${space.x16 + 16}px ${space.x12}px ${space.x6}px`,
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: space.x10,

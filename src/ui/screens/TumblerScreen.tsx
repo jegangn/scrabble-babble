@@ -243,20 +243,38 @@ export function TumblerScreen(): JSX.Element | null {
       )}
 
       <div
+        // Pin the screen body to the viewport so the action row at the
+        // bottom of the left column never falls off the edge — the rack
+        // tiles and Submit are essential touch targets, not optional
+        // scroll-into-view content.
+        // Top padding clears the BackPill (top:24 + height 44 = 68 bottom)
+        // and the UserChip with a little safety margin.
         style={{
-          flex: 1,
+          height: "100dvh",
+          maxHeight: "100dvh",
+          overflow: "hidden",
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: space.x10,
-          padding: `${space.x16 + 8}px ${space.x10}px ${space.x6}px`,
+          gap: space.x8,
+          padding: `${space.x16 + 16}px ${space.x10}px ${space.x4}px`,
           maxWidth: 1240,
           margin: "0 auto",
           width: "100%",
           alignContent: "start",
         }}
       >
-        {/* Left — play area */}
-        <div style={{ display: "flex", flexDirection: "column", gap: space.x6 }}>
+        {/* Left — play area. Pinned height so the action row stays in
+            view; the rack + buttons live at the bottom via margin-top:
+            auto on their wrapper. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: space.x4,
+            minHeight: 0,
+            overflow: "hidden",
+          }}
+        >
           <header
             style={{
               display: "flex",
@@ -281,9 +299,23 @@ export function TumblerScreen(): JSX.Element | null {
                 Tumbler
               </h1>
             </div>
-            <div style={{ display: "flex", gap: space.x3 }}>
+            <div style={{ display: "flex", gap: space.x3, alignItems: "center" }}>
               <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} />
               <BigNumber value={score} label="Score" tone="brown" />
+              {started && (
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  onClick={() => {
+                    playUiTap();
+                    restartGame();
+                  }}
+                  muted
+                  ariaLabel="Restart round"
+                >
+                  ↻ Restart
+                </Button>
+              )}
             </div>
           </header>
 
@@ -301,8 +333,9 @@ export function TumblerScreen(): JSX.Element | null {
 
           {/* Rack — using Tile primitives directly because Tumbler is
               tap-only (no drag/drop) and the engine Rack expects engine
-              Tile objects, not raw letters. */}
-          <div style={{ display: "flex", flexDirection: "column", gap: space.x3 }}>
+              Tile objects, not raw letters. marginTop: auto anchors the
+              rack + action row to the bottom of the play column. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x3, marginTop: "auto" }}>
             <div
               style={{
                 display: "flex",
@@ -351,6 +384,10 @@ export function TumblerScreen(): JSX.Element | null {
                 );
               })}
             </div>
+            {/* Action row — 3 buttons per the handoff: Shuffle / Clear /
+                Submit. The mid-round Restart lives next to the score
+                BigNumber when `started` so users don't lose their place
+                if they hit it accidentally — see the header below. */}
             <div style={{ display: "flex", gap: space.x3, flexWrap: "wrap" }}>
               <Button kind="secondary" onClick={shuffleRack} icon={<span>⇅</span>} muted>
                 Shuffle
@@ -360,31 +397,29 @@ export function TumblerScreen(): JSX.Element | null {
               </Button>
               <div style={{ flex: 1, minWidth: space.x4 }} />
               <Button
-                kind="secondary"
-                onClick={() => {
-                  playUiTap();
-                  restartGame();
-                }}
-                muted
-              >
-                ↺ Restart
-              </Button>
-              <Button
                 kind="primary"
                 onClick={handleSubmit}
                 disabled={timeLeftMs <= 0 || input.length === 0}
                 muted
               >
-                Submit word
+                Submit
               </Button>
             </div>
           </div>
         </div>
 
         {/* Right — found words + personal best (during play) OR leaderboard
-            (pre-game). The pre-game view shows the persistent leaderboard
-            so the user sees what they're aiming for before they begin. */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: space.x4 }}>
+            (pre-game). overflow-y: auto so a long word list never pushes
+            the column off the bottom of the screen. */}
+        <aside
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: space.x4,
+            minHeight: 0,
+            overflowY: "auto",
+          }}
+        >
           {started ? (
             <FoundList
               title="Found this round"

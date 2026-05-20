@@ -68,7 +68,10 @@ export function ModalFrame({
         position: "fixed",
         inset: 0,
         zIndex: 50,
-        background: "rgba(40, 22, 8, 0.34)",
+        // 0.55 opacity gives genuine dimming — the handoff's 0.34 was
+        // too light against the cream background to actually dim the
+        // game board behind the modal; the modal panel got lost.
+        background: "rgba(40, 22, 8, 0.55)",
         display: "grid",
         placeItems: "center",
         padding: space.x4,

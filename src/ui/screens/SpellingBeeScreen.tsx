@@ -403,7 +403,7 @@ export function SpellingBeeScreen(): JSX.Element | null {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
           gap: space.x10,
-          padding: `${space.x16 + 8}px ${space.x10}px ${space.x6}px`,
+          padding: `${space.x16 + 16}px ${space.x10}px ${space.x6}px`,
           maxWidth: 1240,
           margin: "0 auto",
           width: "100%",
