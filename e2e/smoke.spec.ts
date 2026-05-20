@@ -80,7 +80,9 @@ test("starting a Classic hot-seat game renders a 15x15 board", async ({ page }) 
   // Verify a 15x15 board renders — 225 cells.
   const cells = page.locator('[data-testid="board-cell"], button:has-text(""), .board-cell');
   // Fall back to a more reliable count: the score bar should show two player names.
-  await expect(page.getByText(/Player 1/)).toBeVisible();
+  // ScoreBar shows the Player 1 name — defaults to currentUser ("Tester"
+  // pre-seeded above) or falls back to "Player 1" if no user is set.
+  await expect(page.getByText(/Tester|Player 1/)).toBeVisible();
   await page.screenshot({ path: "screenshots/03-classic-board.png", fullPage: true });
 });
 
@@ -88,7 +90,9 @@ test("starting a Mini hot-seat game renders the 11x11 variant", async ({ page })
   await page.getByRole("button", { name: /New game/ }).click();
   await page.getByLabel(/Mini.*11.11/).check();
   await page.getByRole("button", { name: /Start/ }).click();
-  await expect(page.getByText(/Player 1/)).toBeVisible();
+  // ScoreBar shows the Player 1 name — defaults to currentUser ("Tester"
+  // pre-seeded above) or falls back to "Player 1" if no user is set.
+  await expect(page.getByText(/Tester|Player 1/)).toBeVisible();
   await page.screenshot({ path: "screenshots/04-mini-board.png", fullPage: true });
 });
 

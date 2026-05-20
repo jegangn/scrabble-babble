@@ -7,10 +7,16 @@ import { ACCENT } from "../theme.js";
 
 export function NewGameScreen(): JSX.Element {
   const settings = useGameStore((s) => s.settings);
+  const currentUser = useGameStore((s) => s.currentUser);
   const startNewGame = useGameStore((s) => s.startNewGame);
   const goHome = useGameStore((s) => s.goHome);
 
-  const [name1, setName1] = useState(settings.playerNames[0]);
+  // Player 1 defaults to the device's "current user" (the name set on the
+  // home screen / first-launch prompt) so they don't have to retype it
+  // every new game. Falls back to the last-used Player 1 name and finally
+  // to "Player 1" if neither is set. The user can still override in the
+  // input before tapping Start.
+  const [name1, setName1] = useState(currentUser ?? settings.playerNames[0]);
   const [name2, setName2] = useState(settings.playerNames[1]);
   const [opponentKind, setOpponentKind] = useState<Opponent["kind"]>(
     settings.opponent.kind,

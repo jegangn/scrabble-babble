@@ -268,9 +268,10 @@ test.describe("Classic vs Computer", () => {
     // Difficulty defaults to Medium; leave alone.
     await page.getByRole("button", { name: /Start/ }).click();
 
-    // Read the Player 1 score (should be 0).
-    const p1Score = page.locator("text=Player 1").locator("..").locator("text=/^\\d+$/");
-    await expect(page.getByText(/Player 1/)).toBeVisible();
+    // Read the Player 1 score (should be 0). Player 1 now defaults to the
+    // current user name ("Tester" pre-seeded in beforeEach).
+    const p1Score = page.locator("text=Tester").locator("..").locator("text=/^\\d+$/");
+    await expect(page.getByText(/Tester|Player 1/)).toBeVisible();
     await expect(page.getByText(/Computer/)).toBeVisible();
 
     // The human is to-play first (turn 0). Press Pass.
@@ -300,7 +301,7 @@ test.describe("Cross-mode resume", () => {
   test("starting a Classic game then reloading shows Resume on home", async ({ page }) => {
     await page.getByRole("button", { name: /New game/ }).click();
     await page.getByRole("button", { name: /Start/ }).click();
-    await expect(page.getByText(/Player 1/)).toBeVisible();
+    await expect(page.getByText(/Tester|Player 1/)).toBeVisible();
 
     // Reload — Home should now show the Resume button.
     await page.goto(HOME_URL);
