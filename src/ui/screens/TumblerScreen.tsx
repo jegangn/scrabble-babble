@@ -10,13 +10,23 @@ import { createPrng } from "../../engine/prng.js";
 import type { Letter } from "../../engine/types.js";
 import {
   getTumblerLeaderboard,
+  getTumblerBest,
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playSuccess, playUiTap } from "../../audio/sounds.js";
-import { BackToHomeButton } from "../components/BackToHomeButton.js";
-import { LetterPill } from "../components/LetterPill.js";
-import { ACCENT } from "../theme.js";
+import { tokens } from "../tokens.js";
+import { BackPill } from "../components/BackPill.js";
+import { BigNumber } from "../components/BigNumber.js";
+import { Button } from "../components/Button.js";
+import { CurrentWord } from "../components/CurrentWord.js";
+import { FoundList } from "../components/FoundList.js";
+import { SectionLabel } from "../components/SectionLabel.js";
+import { Surface } from "../components/Surface.js";
+import { Tagline } from "../components/Tagline.js";
+import { Tile } from "../components/Tile.js";
+import { Toast } from "../components/Toast.js";
+import { UserChip } from "../components/UserChip.js";
 
 type Flash =
   | { kind: "added"; word: string; points: number }
@@ -24,17 +34,39 @@ type Flash =
   | { kind: "invalid"; word: string; reason: string };
 
 const FLASH_DURATION_MS = 1200;
+const RACK_TILE_SIZE = 84; // handoff: rack-first screen, larger tile
 
+/**
+ * Tumbler — 60-second word-finding sprint, rebuilt per the design handoff.
+ *
+ * Two-column iPad layout:
+ *   Left  — Header (tagline + h1 + BigNumber timer/score) → CurrentWord
+ *           strip → Toast flash → Rack of 7 cream tiles → action row
+ *           (Shuffle / Clear / Submit)
+ *   Right — FoundList (during play) OR Top-scores leaderboard
+ *           (pre-game) + Personal-best card
+ *
+ * The single-column reflow at narrow widths is the handoff's
+ * documented pattern: sidebar collapses below.
+ */
 export function TumblerScreen(): JSX.Element | null {
   const dictionary = useGameStore((s) => s.dictionary);
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
+  const currentUser = useGameStore((s) => s.currentUser);
+  const setCurrentUser = useGameStore((s) => s.setCurrentUser);
 
-  // One Tumbler "session" is bound to a seed. Stored in state (not useMemo)
-  // so the Restart button can mint a fresh seed without remounting the
-  // whole screen — that would lose the leaderboard load + flash timer.
+  // Seed lives in state so Restart can mint a fresh one without losing
+  // the leaderboard / personal-best loads or any in-flight timers.
   const [seed, setSeed] = useState(() => Date.now() & 0x7fffffff);
   const rack = useMemo(() => drawTumblerLetters(createPrng(seed)), [seed]);
+
+  // Visual shuffle order — the tiles in the rack don't change, just
+  // their on-screen positions. Shuffle button rotates by one.
+  const [rackOrder, setRackOrder] = useState(() => rack.map((_, i) => i));
+  useEffect(() => {
+    setRackOrder(rack.map((_, i) => i));
+  }, [rack]);
 
   const [input, setInput] = useState("");
   const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
@@ -43,32 +75,28 @@ export function TumblerScreen(): JSX.Element | null {
   const [started, setStarted] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
+  const [personalBest, setPersonalBest] = useState<number>(0);
 
   // Refs so the visibility handler always sees the latest values.
   const startedRef = useRef(false);
   const remainingMsRef = useRef(TUMBLER_DURATION_MS);
   const startedAtRef = useRef<number | null>(null);
 
-  // Load the leaderboard once on mount. The end-screen records new scores;
-  // when the user comes back to start another round the panel shows the
-  // latest standings (we don't bother live-reloading mid-session).
+  // Load leaderboard + personal-best on mount.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const board = await getTumblerLeaderboard();
-      if (!cancelled) setLeaderboard(board);
+      const [board, best] = await Promise.all([getTumblerLeaderboard(), getTumblerBest()]);
+      if (cancelled) return;
+      setLeaderboard(board);
+      setPersonalBest(best);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  /**
-   * Restart the session: mint a fresh seed (re-draws the rack via useMemo),
-   * reset all game state, and clear any in-flight timers. The leaderboard
-   * panel will be visible again because `started` flips back to false.
-   */
-  const restartGame = () => {
+  const restartGame = (): void => {
     setSeed(Date.now() & 0x7fffffff);
     setInput("");
     setFoundWords([]);
@@ -81,7 +109,7 @@ export function TumblerScreen(): JSX.Element | null {
     startedAtRef.current = null;
   };
 
-  // Drive the countdown. Effect re-runs when started flips true.
+  // Countdown — 100 ms tick. See visibility-change handler below for pause.
   useEffect(() => {
     if (!started) return;
     startedAtRef.current = Date.now();
@@ -98,19 +126,18 @@ export function TumblerScreen(): JSX.Element | null {
     return () => window.clearInterval(tick);
   }, [started]);
 
-  // Time-up handoff to the end screen. Stash final score on the screen route.
+  // Time-up handoff to end screen.
   useEffect(() => {
     if (started && timeLeftMs <= 0) {
       setScreen({ kind: "tumbler_end", score, foundWords });
     }
   }, [started, timeLeftMs, score, foundWords, setScreen]);
 
-  // Pause-on-blur: stop the clock when the tab is backgrounded, resume when visible.
+  // Pause-on-blur: bank elapsed time into remainingMsRef when hidden.
   useEffect(() => {
-    const onVisibilityChange = () => {
+    const onVisibilityChange = (): void => {
       if (!startedRef.current) return;
       if (document.hidden) {
-        // Bank elapsed time into remainingMs and stop the countdown.
         const start = startedAtRef.current;
         if (start !== null) {
           const elapsed = Date.now() - start;
@@ -118,7 +145,6 @@ export function TumblerScreen(): JSX.Element | null {
           startedAtRef.current = null;
         }
       } else {
-        // Resume from the banked remainder.
         startedAtRef.current = Date.now();
       }
     };
@@ -135,13 +161,15 @@ export function TumblerScreen(): JSX.Element | null {
 
   if (!dictionary) {
     return (
-      <div className="flex h-full w-full items-center justify-center p-6">
-        <p>Loading dictionary…</p>
-      </div>
+      <Surface>
+        <div style={{ flex: 1, display: "grid", placeItems: "center" }}>
+          <p>Loading dictionary…</p>
+        </div>
+      </Surface>
     );
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = (): void => {
     const raw = input.trim().toUpperCase();
     if (raw.length === 0) return;
     setInput("");
@@ -170,292 +198,353 @@ export function TumblerScreen(): JSX.Element | null {
     playSuccess();
   };
 
-  // Start the timer on the first letter added. Tile taps drive this now
-  // (hardware-keyboard entry was removed in favour of tap-only input).
-  const startTimerIfNeeded = () => {
+  const startTimerIfNeeded = (): void => {
     if (!started) {
       setStarted(true);
       startedRef.current = true;
     }
   };
 
-  const appendLetter = (letter: Letter) => {
+  const appendLetter = (letter: Letter): void => {
     if (timeLeftMs <= 0) return;
     if (input.length >= 15) return;
     startTimerIfNeeded();
     setInput(input + letter);
-    // Same warm thud as the Scrabble board placement — gives older users
-    // unmistakable feedback that the tap registered.
     playPlace();
   };
 
-  const deleteLetter = () => {
+  const shuffleRack = (): void => {
+    if (timeLeftMs <= 0) return;
+    playUiTap();
+    setRackOrder((order) => {
+      // Rotate by one — same idiom as the Bee shuffle. Cheap, deterministic,
+      // visually satisfying without an animation budget.
+      if (order.length <= 1) return order;
+      return [...order.slice(1), order[0]!];
+    });
+  };
+
+  const clearWord = (): void => {
     if (input.length === 0) return;
-    setInput(input.slice(0, -1));
+    playUiTap();
+    setInput("");
   };
 
   const secondsLeft = (timeLeftMs / 1000).toFixed(1);
-  const timeFlashing = started && timeLeftMs <= 10_000;
+  const timerTone = timeLeftMs <= 10_000 && started ? "warn" : "ink";
+
+  const { color, space, font, size, weight } = tokens;
 
   return (
-    <div
-      className="flex h-full w-full flex-col items-center p-4"
-      style={{ background: ACCENT.surface, gap: 14, position: "relative" }}
-    >
-      <BackToHomeButton onClick={goHome} />
-      {/* Page title. The back-home pill sits floating at top-left; this
-          title stays in the document flow so it can be centered above the
-          timer / score / restart row below. */}
-      <h1
+    <Surface padding={0}>
+      <BackPill onClick={goHome} />
+      {currentUser && (
+        <UserChip name={currentUser} onClick={() => setCurrentUser(currentUser)} />
+      )}
+
+      <div
         style={{
-          fontSize: "1.8em",
-          fontWeight: 700,
-          color: ACCENT.primary,
-          margin: 0,
+          flex: 1,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: space.x10,
+          padding: `${space.x16 + 8}px ${space.x10}px ${space.x6}px`,
+          maxWidth: 1240,
+          margin: "0 auto",
+          width: "100%",
+          alignContent: "start",
         }}
       >
-        Tumbler
-      </h1>
-      {/* Header: timer + score + (mid-game) restart. */}
-      <div
-        className="flex justify-center items-center w-full max-w-2xl"
-        style={{ minHeight: 56, gap: 32 }}
-      >
-        {/*
-          aria-live=polite so a screen reader can hear the countdown without
-          interrupting other speech; we flip to assertive at 0 so "Time's up!"
-          actually breaks through. The role="timer" + aria-atomic ensures the
-          number is read as one chunk, not digit-by-digit.
-        */}
-        <div
-          style={{
-            fontSize: "2em",
-            fontWeight: 700,
-            fontVariantNumeric: "tabular-nums",
-            color: timeFlashing ? ACCENT.danger : ACCENT.text,
-          }}
-          role="timer"
-          aria-live={timeLeftMs <= 0 ? "assertive" : "polite"}
-          aria-atomic="true"
-          aria-label={timeLeftMs <= 0 ? "Time's up" : "Time remaining"}
-        >
-          {secondsLeft}s
-        </div>
-        <div
-          style={{
-            fontSize: "1.4em",
-            fontWeight: 700,
-            color: ACCENT.primary,
-            fontVariantNumeric: "tabular-nums",
-          }}
-          aria-label="Current score"
-        >
-          {score} pts
-        </div>
-        {/* Restart button — only shown after the timer has started, since
-            pre-game there's nothing to restart. Drops the current score,
-            re-draws the rack, and resets the clock. */}
-        {started && (
-          <button
-            type="button"
-            onClick={() => {
-              playUiTap();
-              restartGame();
-            }}
-            aria-label="Restart round"
+        {/* Left — play area */}
+        <div style={{ display: "flex", flexDirection: "column", gap: space.x6 }}>
+          <header
             style={{
-              background: "white",
-              color: ACCENT.text,
-              border: `2px solid ${ACCENT.primary}`,
-              borderRadius: 999,
-              padding: "6px 14px",
-              fontSize: "0.95em",
-              fontWeight: 600,
-              minHeight: 36,
-              touchAction: "manipulation",
-              cursor: "pointer",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: space.x4,
             }}
           >
-            ↻ Restart
-          </button>
-        )}
-      </div>
-
-      {/* Rack: 7 LetterPills. Tap to append. Per the latest UX direction,
-          hardware-keyboard entry has been removed — this is the ONLY way
-          to compose a word in Tumbler. The validator still enforces
-          multiset legality on submit, so over-tapping the same letter
-          shows "Not in rack" rather than corrupting state. */}
-      <div className="flex gap-2 flex-wrap justify-center" aria-label="Your letters">
-        {rack.map((letter, i) => (
-          <LetterPill
-            key={i}
-            letter={letter}
-            size={64}
-            onTap={() => appendLetter(letter)}
-          />
-        ))}
-      </div>
-
-      {/* Read-only word display + Delete + Enter. The display is a div
-          (not an input) so iPad Safari never tries to open its on-screen
-          keyboard — a "no text input" mode the user explicitly requested. */}
-      <div className="flex gap-2 w-full max-w-md items-stretch">
-        <div
-          aria-label="Word in progress"
-          aria-live="polite"
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "white",
-            color: ACCENT.text,
-            border: `2px solid ${ACCENT.primary}`,
-            borderRadius: 8,
-            padding: "10px 14px",
-            fontSize: "1.6em",
-            fontWeight: 700,
-            letterSpacing: "0.1em",
-            minHeight: 56,
-            fontVariantNumeric: "tabular-nums",
-            userSelect: "none",
-          }}
-        >
-          {input || (
-            <span style={{ opacity: 0.35, fontSize: "0.7em", fontWeight: 500, letterSpacing: "normal" }}>
-              {started ? "tap a letter…" : "tap a letter to start"}
-            </span>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            playUiTap();
-            deleteLetter();
-          }}
-          style={btnStyle("secondary")}
-          disabled={timeLeftMs <= 0 || input.length === 0}
-          aria-label="Delete last letter"
-        >
-          ⌫
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          style={btnStyle("primary")}
-          disabled={timeLeftMs <= 0 || input.length === 0}
-        >
-          Enter
-        </button>
-      </div>
-
-      {/* Flash toast */}
-      <div style={{ minHeight: 32 }} aria-live="polite">
-        {flash && <FlashRow flash={flash} />}
-      </div>
-
-      {/*
-        Bottom panel toggles between two views:
-          - Pre-game (timer hasn't started): show the all-time leaderboard
-            so the user sees what they're aiming for before they begin.
-          - During / after game: show the live Found-words list.
-        Once the timer runs out, the screen transitions to TumblerEndScreen
-        which has both panels side-by-side.
-      */}
-      {!started ? (
-        <div
-          className="w-full max-w-md flex-1 overflow-y-auto"
-          style={{
-            background: "rgba(255,255,255,0.5)",
-            border: `1px solid ${ACCENT.primary}33`,
-            borderRadius: 10,
-            padding: 12,
-          }}
-        >
-          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
-            🏆 Top scores
-          </div>
-          {leaderboard.length === 0 ? (
-            <div style={{ opacity: 0.5 }}>
-              No scores yet. Tap a letter to start the 60-second sprint!
+            <div>
+              <Tagline>Solo mode</Tagline>
+              <h1
+                style={{
+                  fontFamily: font.serif,
+                  fontWeight: weight.heavy,
+                  fontSize: size.h1,
+                  margin: `${space.x2}px 0 0`,
+                  letterSpacing: "-0.02em",
+                  color: color.brown,
+                }}
+              >
+                Tumbler
+              </h1>
             </div>
-          ) : (
-            <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {leaderboard.map((entry, i) => (
-                <li
-                  key={`${entry.name}-${entry.timestamp}`}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "4px 8px",
-                    borderRadius: 6,
-                    fontSize: "0.95em",
-                    gap: 8,
-                  }}
-                >
-                  <span style={{ display: "flex", gap: 8, overflow: "hidden", minWidth: 0, flex: 1 }}>
-                    <span style={{ opacity: 0.5, minWidth: 18 }}>{i + 1}.</span>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {entry.name}
-                    </span>
-                  </span>
-                  <span
+            <div style={{ display: "flex", gap: space.x3 }}>
+              <BigNumber value={`${secondsLeft}s`} label="Time" tone={timerTone} />
+              <BigNumber value={score} label="Score" tone="brown" />
+            </div>
+          </header>
+
+          <CurrentWord
+            word={input}
+            hint={started ? "Tap a letter to extend the word" : "Tap a letter to start"}
+          />
+
+          <div
+            style={{ minHeight: 36, display: "flex", justifyContent: "center" }}
+            aria-live="polite"
+          >
+            {flash && <FlashToast flash={flash} />}
+          </div>
+
+          {/* Rack — using Tile primitives directly because Tumbler is
+              tap-only (no drag/drop) and the engine Rack expects engine
+              Tile objects, not raw letters. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x3 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+              }}
+            >
+              <Tagline>Your tiles · tap to compose</Tagline>
+              <span style={{ fontSize: size.caption, color: color.inkSoft }}>
+                Score grows with word length
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                gap: space.x3,
+                padding: `${space.x3}px ${space.x4}px`,
+                background: color.brown,
+                borderRadius: tokens.radius.card,
+                boxShadow: `inset 0 2px 6px rgba(0,0,0,.25), ${tokens.shadow.card}`,
+              }}
+            >
+              {rackOrder.map((rackIndex) => {
+                const letter = rack[rackIndex]!;
+                return (
+                  <button
+                    key={rackIndex}
+                    type="button"
+                    onClick={() => appendLetter(letter)}
+                    disabled={timeLeftMs <= 0}
+                    aria-label={`Letter ${letter}`}
                     style={{
-                      opacity: 0.55,
-                      fontSize: "0.85em",
-                      fontWeight: 500,
-                      fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap",
+                      appearance: "none",
+                      font: "inherit",
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      cursor: timeLeftMs <= 0 ? "not-allowed" : "pointer",
+                      touchAction: "manipulation",
                     }}
                   >
-                    {formatDate(entry.timestamp)}
-                  </span>
-                  <span style={{ fontVariantNumeric: "tabular-nums", minWidth: 32, textAlign: "right" }}>
-                    {entry.score}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+                    <Tile letter={letter} size={RACK_TILE_SIZE} variant="cream" />
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: space.x3, flexWrap: "wrap" }}>
+              <Button kind="secondary" onClick={shuffleRack} icon={<span>⇅</span>} muted>
+                Shuffle
+              </Button>
+              <Button kind="ghost" onClick={clearWord} disabled={input.length === 0} muted>
+                ↺ Clear
+              </Button>
+              <div style={{ flex: 1, minWidth: space.x4 }} />
+              <Button
+                kind="secondary"
+                onClick={() => {
+                  playUiTap();
+                  restartGame();
+                }}
+                muted
+              >
+                ↺ Restart
+              </Button>
+              <Button
+                kind="primary"
+                onClick={handleSubmit}
+                disabled={timeLeftMs <= 0 || input.length === 0}
+                muted
+              >
+                Submit word
+              </Button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div
-          className="w-full max-w-md flex-1 overflow-y-auto"
+
+        {/* Right — found words + personal best (during play) OR leaderboard
+            (pre-game). The pre-game view shows the persistent leaderboard
+            so the user sees what they're aiming for before they begin. */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: space.x4 }}>
+          {started ? (
+            <FoundList
+              title="Found this round"
+              words={foundWords}
+              count={foundWords.length}
+              columns={3}
+            />
+          ) : (
+            <LeaderboardPanel entries={leaderboard} />
+          )}
+
+          <PersonalBestCard best={personalBest} current={score} started={started} />
+        </aside>
+      </div>
+    </Surface>
+  );
+}
+
+interface PersonalBestCardProps {
+  readonly best: number;
+  readonly current: number;
+  readonly started: boolean;
+}
+
+function PersonalBestCard({ best, current, started }: PersonalBestCardProps): JSX.Element {
+  const { color, radius, shadow, space, font, size, weight } = tokens;
+  // During play, show the live "vs best" delta. Pre-game, just the best.
+  const beating = started && current > best;
+  return (
+    <div
+      style={{
+        padding: `${space.x3}px ${space.x4}px`,
+        background: color.paper,
+        border: `1.5px solid ${color.stroke}`,
+        borderRadius: radius.card,
+        boxShadow: shadow.card,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+        }}
+      >
+        <span
           style={{
-            background: "rgba(255,255,255,0.5)",
-            border: `1px solid ${ACCENT.primary}33`,
-            borderRadius: 10,
-            padding: 12,
+            fontSize: size.caption,
+            color: color.inkSoft,
+            textTransform: "uppercase",
+            letterSpacing: ".1em",
+            fontWeight: weight.med,
           }}
         >
-          <div style={{ fontSize: "0.9em", color: ACCENT.text, opacity: 0.7, marginBottom: 6 }}>
-            Found ({foundWords.length})
-          </div>
-          {foundWords.length === 0 ? (
-            <div style={{ opacity: 0.5 }}>No words yet.</div>
-          ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, columnCount: 2, columnGap: 16 }}>
-              {foundWords.map((w) => (
-                <li
-                  key={w}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "2px 0",
-                    fontSize: "1em",
-                  }}
-                >
-                  <span>{w}</span>
-                  <span style={{ opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>
-                    {scoreTumblerWord(w)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          Personal best
+        </span>
+        <span
+          style={{
+            fontFamily: font.serif,
+            fontWeight: weight.bold,
+            fontSize: size.h4,
+            color: beating ? color.success : color.brown,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {best}
+        </span>
+      </div>
+      {beating && (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: size.micro + 1,
+            color: color.success,
+            fontWeight: weight.med,
+          }}
+        >
+          New high — up {current - best}.
         </div>
+      )}
+    </div>
+  );
+}
+
+interface LeaderboardPanelProps {
+  readonly entries: ReadonlyArray<LeaderboardEntry>;
+}
+
+function LeaderboardPanel({ entries }: LeaderboardPanelProps): JSX.Element {
+  const { color, radius, shadow, space, font, size, weight } = tokens;
+  return (
+    <div
+      style={{
+        background: color.paper,
+        border: `1.5px solid ${color.stroke}`,
+        borderRadius: radius.card,
+        boxShadow: shadow.card,
+        padding: space.x4,
+        display: "flex",
+        flexDirection: "column",
+        gap: space.x3,
+      }}
+    >
+      <SectionLabel style={{ marginBottom: 0 }}>Top scores</SectionLabel>
+      {entries.length === 0 ? (
+        <span style={{ fontSize: size.caption, color: color.inkSoft }}>
+          No scores yet — tap a letter to start the 60-second sprint.
+        </span>
+      ) : (
+        <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {entries.map((entry, i) => (
+            <li
+              key={`${entry.name}-${entry.timestamp}`}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "auto 1fr auto auto",
+                gap: space.x3,
+                alignItems: "center",
+                padding: "6px 0",
+                borderBottom:
+                  i === entries.length - 1 ? "none" : `1px dashed ${color.creamDark}`,
+                fontSize: size.body,
+              }}
+            >
+              <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: color.ink,
+                  fontWeight: weight.med,
+                }}
+              >
+                {entry.name}
+              </span>
+              <span
+                style={{
+                  fontSize: size.micro + 1,
+                  color: color.inkSoft,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {formatDate(entry.timestamp)}
+              </span>
+              <span
+                style={{
+                  fontFamily: font.serif,
+                  fontWeight: weight.bold,
+                  fontVariantNumeric: "tabular-nums",
+                  color: color.brown,
+                  minWidth: 32,
+                  textAlign: "right",
+                }}
+              >
+                {entry.score}
+              </span>
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );
@@ -469,75 +558,16 @@ function formatDate(ts: number): string {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
-function FlashRow({ flash }: { flash: Flash }): JSX.Element {
-  if (flash.kind === "added") {
-    return (
-      <div style={{ ...flashStyle, background: "#cdf5d8", color: "#1f5e34" }}>
-        {flash.word} · +{flash.points}
-      </div>
-    );
-  }
-  if (flash.kind === "duplicate") {
-    return (
-      <div style={{ ...flashStyle, background: "#fff1cc", color: "#7a5e0d" }}>
-        Already found
-      </div>
-    );
-  }
-  return (
-    <div style={{ ...flashStyle, background: "#ffd8d8", color: ACCENT.danger }}>
-      {flash.reason}
-    </div>
-  );
+interface FlashToastProps {
+  readonly flash: Flash;
 }
 
-const flashStyle: React.CSSProperties = {
-  padding: "6px 14px",
-  borderRadius: 8,
-  fontWeight: 600,
-  fontSize: "0.95em",
-  display: "inline-block",
-};
-
-
-function btnStyle(variant: "primary" | "secondary" | "ghost"): React.CSSProperties {
-  if (variant === "ghost") {
-    return {
-      background: "transparent",
-      color: ACCENT.text,
-      border: "none",
-      padding: "8px 12px",
-      fontSize: "1em",
-      fontWeight: 500,
-      borderRadius: 8,
-      touchAction: "manipulation",
-      cursor: "pointer",
-    };
+function FlashToast({ flash }: FlashToastProps): JSX.Element {
+  if (flash.kind === "added") {
+    return <Toast kind="success" title={`${flash.word} · +${flash.points}`} />;
   }
-  if (variant === "secondary") {
-    return {
-      background: "white",
-      color: ACCENT.text,
-      border: `2px solid ${ACCENT.primary}`,
-      padding: "12px 16px",
-      fontSize: "1.2em",
-      fontWeight: 700,
-      borderRadius: 8,
-      minHeight: 56,
-      touchAction: "manipulation",
-      cursor: "pointer",
-    };
+  if (flash.kind === "duplicate") {
+    return <Toast kind="warn" title={`${flash.word} — already found`} />;
   }
-  return {
-    background: ACCENT.primary,
-    color: "white",
-    border: "none",
-    padding: "12px 20px",
-    fontSize: "1em",
-    fontWeight: 600,
-    borderRadius: 8,
-    minHeight: 48,
-    touchAction: "manipulation",
-    cursor: "pointer",
-  };
+  return <Toast kind="error" title={flash.word} sub={flash.reason} />;
 }
