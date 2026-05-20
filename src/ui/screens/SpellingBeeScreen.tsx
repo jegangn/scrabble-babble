@@ -17,7 +17,7 @@ import {
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playError, playSuccess } from "../../audio/sounds.js";
+import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
 
@@ -173,6 +173,9 @@ export function SpellingBeeScreen(): JSX.Element | null {
   const appendLetter = (letter: Letter) => {
     if (currentWord.length >= 15) return;
     setCurrentWord(currentWord + letter);
+    // Same warm thud as the Scrabble board placement — tactile audio
+    // feedback that the tap (or drag-step) registered.
+    playPlace();
   };
 
   const deleteLetter = () => {
@@ -357,7 +360,16 @@ export function SpellingBeeScreen(): JSX.Element | null {
           // Append to whatever's in the input. Replacement-on-drag would
           // be a different UX choice; appending keeps tap+drag composable
           // (tap A, then drag B-C-D, gives "ABCD").
-          setCurrentWord((cw) => (cw.length >= 15 ? cw : cw + letter));
+          // Use the functional setter to read fresh state; check length
+          // before deciding whether to play the sound (no thud if we
+          // were already at the 15-char cap, since nothing changed).
+          let appended = false;
+          setCurrentWord((cw) => {
+            if (cw.length >= 15) return cw;
+            appended = true;
+            return cw + letter;
+          });
+          if (appended) playPlace();
         }}
         onPointerUp={(e) => {
           dragActiveRef.current = false;

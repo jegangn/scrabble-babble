@@ -9,7 +9,7 @@ import {
 import { createPrng } from "../../engine/prng.js";
 import type { Letter } from "../../engine/types.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { playError, playSuccess } from "../../audio/sounds.js";
+import { playError, playPlace, playSuccess } from "../../audio/sounds.js";
 import { LetterPill } from "../components/LetterPill.js";
 import { ACCENT } from "../theme.js";
 
@@ -144,6 +144,9 @@ export function TumblerScreen(): JSX.Element | null {
     if (input.length >= 15) return;
     startTimerIfNeeded();
     setInput(input + letter);
+    // Same warm thud as the Scrabble board placement — gives older users
+    // unmistakable feedback that the tap registered.
+    playPlace();
   };
 
   const deleteLetter = () => {

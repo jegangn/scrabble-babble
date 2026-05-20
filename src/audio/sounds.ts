@@ -84,19 +84,22 @@ function tone(
 }
 
 /**
- * Soft warm thud — a low sine wave with a quick decay. Plays when a tile is
- * successfully placed on a board cell (tap-to-place or drag-drop).
+ * Soft warm thud — a low sine wave with a quick decay. Plays when:
+ *  - A tile lands on a board cell (Scrabble tap-to-place / drag-drop)
+ *  - An alphabet tile is selected in Tumbler or Spelling Bee
  *
- * Gain peaks bumped slightly (0.22 / 0.18 → 0.32 / 0.26) after release
- * testing — at the original levels the click was inaudible on iPad with
- * room noise even at moderate device volume. Still well below 0.5 so it
- * won't startle.
+ * Gain peaks tuned over multiple release rounds:
+ *   0.22 / 0.18  → too quiet for iPad room noise (original)
+ *   0.32 / 0.26  → still too quiet at moderate device volume (release 1)
+ *   0.45 / 0.36  → comfortably audible without startling (current)
+ *
+ * Still safely under 0.5 so a quiet room doesn't get a sharp pop.
  */
 export function playPlace(): void {
   const ac = getCtx();
   if (!ac) return;
-  tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.32 });
-  tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.26 });
+  tone(ac, { freq: 180, type: "sine", duration: 0.08, gainPeak: 0.45 });
+  tone(ac, { freq: 80, type: "sine", duration: 0.12, gainPeak: 0.36 });
 }
 
 /**
