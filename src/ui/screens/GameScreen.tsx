@@ -436,9 +436,14 @@ export function GameScreen(): JSX.Element | null {
           {currentUser && (
             /* Anchored to the aside (position: relative above) so the
                chip sits at the pane's top-right corner — not the
-               screen's. No onClick — opens the built-in "change name
-               from home" info modal. */
-            <UserChip name={currentUser} />
+               screen's. The aside itself sits 16 px below the viewport
+               top (gs-game-body has padding-top: space.x4 = 16), so
+               UserChip's own default top: 24 lands 16 px below the
+               BackPill that's positioned absolute on gs-game-body
+               directly. Override top to 8 (= 24 − 16) so both pills
+               sit on the same row. No onClick — opens the built-in
+               "change name from home" info modal. */
+            <UserChip name={currentUser} style={{ top: 8 }} />
           )}
           {/* Top group — header, player cards, status strip. */}
           <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
