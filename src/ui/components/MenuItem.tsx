@@ -49,7 +49,7 @@ export function MenuItem({
           : `linear-gradient(180deg, color-mix(in oklab, ${color.brown} 92%, white 8%) 0%, ${color.brown} 100%)`,
         color: color.cream,
         border: `1.5px solid ${color.brownDark}`,
-        padding: "20px 18px",
+        padding: "14px 18px",
         fontSize: tokens.size.bodyLg,
         boxShadow: shadow.primary,
       }
@@ -57,7 +57,7 @@ export function MenuItem({
         background: color.paper,
         color: color.ink,
         border: `1.5px solid ${hover ? color.brownMed : color.stroke}`,
-        padding: "16px 18px",
+        padding: "12px 18px",
         fontSize: tokens.size.body,
         boxShadow: hover ? shadow.cardHover : shadow.card,
       };

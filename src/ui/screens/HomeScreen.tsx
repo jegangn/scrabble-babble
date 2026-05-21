@@ -222,7 +222,7 @@ export function HomeScreen(): JSX.Element {
             >
               <MenuTile
                 letter={ch}
-                size={66}
+                size={60}
                 variant={rowIndex === 0 ? "cream" : "brown"}
               />
             </span>
@@ -307,17 +307,20 @@ export function HomeScreen(): JSX.Element {
       )}
 
       {/*
-        Page shell — centred 560 px column. Padding 56 px top, 96 px bottom,
-        28 px sides (18 px on ≤480 px viewports, handled via media query).
+        Page shell — centred 560 px column. Top + bottom padding use
+        clamp() so the layout fits comfortably on a tall iPad PWA (full
+        1024 / 1366 px height) AND on iPad Pro 5 in mobile Safari with
+        URL bar + bottom toolbar visible (~880 px usable height). Side
+        padding stays a constant 28 px.
       */}
       <main
         style={{
           maxWidth: 560,
           margin: "0 auto",
-          padding: "56px 28px 96px",
+          padding: "clamp(20px, 4vh, 56px) 28px clamp(28px, 8vh, 96px)",
           display: "flex",
           flexDirection: "column",
-          gap: 36,
+          gap: "clamp(20px, 3vh, 36px)",
           position: "relative",
           zIndex: 1,
         }}
@@ -335,8 +338,8 @@ export function HomeScreen(): JSX.Element {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 18,
-            paddingTop: 24,
+            gap: 14,
+            paddingTop: "clamp(0px, 1vh, 24px)",
           }}
         >
           <h1
@@ -346,7 +349,7 @@ export function HomeScreen(): JSX.Element {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 8,
+              gap: 6,
             }}
           >
             {heroRows}
@@ -393,7 +396,7 @@ export function HomeScreen(): JSX.Element {
         {/* MENU — six cards, 10 px gap. Resume is the primary row when
             a saved game exists; otherwise we skip it entirely (showing a
             disabled brown button as the visual anchor would mislead). */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: 10 }} aria-label="Main menu">
+        <nav style={{ display: "flex", flexDirection: "column", gap: 8 }} aria-label="Main menu">
           {hasInProgress && (
             <MenuItem
               icon="▶"
