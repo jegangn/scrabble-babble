@@ -18,6 +18,7 @@ import { GameEndScreen } from "./ui/screens/GameEndScreen.js";
 import { TumblerScreen } from "./ui/screens/TumblerScreen.js";
 import { TumblerEndScreen } from "./ui/screens/TumblerEndScreen.js";
 import { SpellingBeeScreen } from "./ui/screens/SpellingBeeScreen.js";
+import { ScoresScreen } from "./ui/screens/ScoresScreen.js";
 import { HotSeatHandoff } from "./ui/components/HotSeatHandoff.js";
 
 export function App(): JSX.Element {
@@ -112,5 +113,7 @@ export function App(): JSX.Element {
       return <TumblerEndScreen />;
     case "spelling_bee":
       return <SpellingBeeScreen />;
+    case "scores":
+      return <ScoresScreen />;
   }
 }

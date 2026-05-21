@@ -385,7 +385,12 @@ export function HomeScreen(): JSX.Element {
               }}
             />
           )}
-          <MenuItem icon="✦" label="New game" onClick={() => setScreen({ kind: "new_game" })} />
+          <MenuItem
+            icon="✦"
+            label="New game"
+            sublabel="Start a Scrabble match"
+            onClick={() => setScreen({ kind: "new_game" })}
+          />
           <MenuItem
             icon="⧗"
             label="Tumbler"
@@ -397,6 +402,12 @@ export function HomeScreen(): JSX.Element {
             label="Spelling Bee"
             sublabel="Daily puzzle"
             onClick={() => setScreen({ kind: "spelling_bee" })}
+          />
+          <MenuItem
+            icon="♛"
+            label="Scores"
+            sublabel="Past games and leaderboards"
+            onClick={() => setScreen({ kind: "scores" })}
           />
           <MenuItem
             icon="⚙"

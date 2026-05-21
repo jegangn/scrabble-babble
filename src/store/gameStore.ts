@@ -81,7 +81,8 @@ export type Screen =
   | { kind: "game_end" }
   | { kind: "tumbler" }
   | { kind: "tumbler_end"; score: number; foundWords: ReadonlyArray<string> }
-  | { kind: "spelling_bee" };
+  | { kind: "spelling_bee" }
+  | { kind: "scores" };
 
 export interface StoreState {
   screen: Screen;
