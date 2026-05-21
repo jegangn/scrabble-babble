@@ -385,23 +385,13 @@ function ExportPanel({ disabled, onExport }: ExportPanelProps): JSX.Element {
           lineHeight: 1.55,
         }}
       >
-        Save your current game and settings to a small JSON file. Useful
-        as a backup, or to move your progress to another device. Daily
-        Spelling Bee history and leaderboard scores are included.
+        Save a complete backup — your in-progress game, every finished
+        match, Tumbler personal best, daily Spelling Bee progress, all
+        leaderboards, and your audio + name settings — to a small JSON
+        file. Useful for moving everything between Safari and an
+        Add-to-Home-Screen install, or for keeping a backup on another
+        device.
       </p>
-      {disabled && (
-        <p
-          style={{
-            margin: 0,
-            fontSize: size.caption,
-            color: color.inkSoft,
-            fontStyle: "italic",
-          }}
-        >
-          You don't have an in-progress game to export right now — start a
-          new game first.
-        </p>
-      )}
       <div>
         <Button
           kind="primary"
@@ -453,9 +443,10 @@ function ImportPanel({ onImport }: ImportPanelProps): JSX.Element {
           lineHeight: 1.55,
         }}
       >
-        Restore an in-progress game from a previously exported JSON file.
-        This replaces your current saved game — back it up first if you
-        want to keep it.
+        Restore a backup from a previously exported JSON file. Your
+        current in-progress game and settings will be replaced; past
+        matches are merged — existing entries on this device are kept
+        and the imported ones fill in anything missing.
       </p>
       <div>
         <Button kind="primary" icon={<span>↓</span>} onClick={onImport}>

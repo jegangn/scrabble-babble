@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { enumerateSevenLetterPangrams } from "../../engine/games/spelling-bee.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { loadInProgress, saveInProgress } from "../../storage/game-storage.js";
-import { fromJSON, toJSON } from "../../storage/serializer.js";
+import { loadInProgress } from "../../storage/game-storage.js";
+import { backupToJSON, buildFullBackup, importFromJSON } from "../../storage/backup.js";
 import { playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { MenuItem } from "../components/MenuItem.js";
@@ -148,15 +148,21 @@ export function HomeScreen(): JSX.Element {
     if (game) hydrate(game);
   };
 
+  /**
+   * Full backup — exports the entire IDB (in-progress game, completed
+   * history, every settings row including Tumbler best, Bee daily
+   * progress, per-day leaderboards, player names, audio config). This
+   * is what lets the user transfer everything from Safari → installed
+   * PWA when iOS keeps the two storage buckets separate.
+   */
   const onExport = async () => {
-    const game = await loadInProgress();
-    if (!game) return;
-    const blob = new Blob([toJSON(game)], { type: "application/json" });
+    const backup = await buildFullBackup();
+    const blob = new Blob([backupToJSON(backup)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     const date = new Date().toISOString().slice(0, 10);
-    a.download = `scrabble-babble-${date}.json`;
+    a.download = `scrabble-babble-backup-${date}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -164,9 +170,23 @@ export function HomeScreen(): JSX.Element {
   const onImport = async (file: File) => {
     const text = await file.text();
     try {
-      const game = fromJSON(text);
-      await saveInProgress(game);
-      hydrate(game);
+      const result = await importFromJSON(text);
+      if (result.mode === "full") {
+        // Settings + history + in-progress just changed under our feet;
+        // the cleanest way to reflect everything (audio, player names,
+        // opponent, variant, current user, leaderboards) is a full
+        // reload. App.tsx will re-hydrate from the imported IDB on the
+        // next mount.
+        alert(
+          `Imported backup — ${result.historyAdded ?? 0} new past matches added, ` +
+            `${result.settingsApplied ?? 0} settings restored. Reloading…`,
+        );
+        window.location.reload();
+        return;
+      }
+      // Legacy single-game JSON — reload the in-progress game directly.
+      const game = await loadInProgress();
+      if (game) hydrate(game);
     } catch {
       alert("Couldn't read that file. Make sure it's a valid Scrabble Babble export.");
     }
@@ -457,7 +477,11 @@ export function HomeScreen(): JSX.Element {
             void onExport();
           }}
           onImport={() => fileInput.current?.click()}
-          exportDisabled={!hasInProgress}
+          /* Export is ALWAYS available — it dumps the full IDB, which
+             includes Tumbler best, Bee daily progress, leaderboards,
+             audio settings, and player names even when no Scrabble
+             match is in progress. */
+          exportDisabled={false}
         />
       )}
 
