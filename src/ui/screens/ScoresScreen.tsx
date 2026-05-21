@@ -2,52 +2,35 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "../../store/gameStore.js";
 import { loadHistory } from "../../storage/game-storage.js";
 import type { HistoryEntry } from "../../storage/db.js";
-import {
-  getTumblerLeaderboard,
-  getBeeTopScores,
-  type LeaderboardEntry,
-  type BeeTopEntry,
-} from "../../storage/solo-storage.js";
 import { playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { BackPill } from "../components/BackPill.js";
 import { FooterMark } from "../components/FooterMark.js";
-import { SectionLabel } from "../components/SectionLabel.js";
 import { UserChip } from "../components/UserChip.js";
 
 /**
- * Scores screen — single home for everything past:
- *   1. Scrabble — recent completed matches (date · winner beat loser · 312–268).
- *      Each row expands on tap to reveal variant, opponent type, and move count.
- *   2. Tumbler — top scores from the all-time leaderboard.
- *   3. Spelling Bee — top single-day scores across every day played.
- *
- * Sections with zero entries render a quiet "Nothing here yet" line so the
- * layout doesn't shift as data builds up over time.
+ * Scrabble scoreboard — every completed Scrabble match the device has
+ * recorded. Compact rows (`date · winner beat loser · 312–268`) expand
+ * on tap to reveal variant, opponent, move count, and the finished
+ * timestamp. Tumbler and Spelling Bee keep their own in-screen
+ * leaderboards; this page deliberately stays Scrabble-only so the list
+ * doesn't get crowded by daily Bee entries.
  */
 export function ScoresScreen(): JSX.Element {
   const setScreen = useGameStore((s) => s.setScreen);
   const currentUser = useGameStore((s) => s.currentUser);
 
-  const [scrabble, setScrabble] = useState<ReadonlyArray<HistoryEntry> | null>(null);
-  const [tumbler, setTumbler] = useState<ReadonlyArray<LeaderboardEntry> | null>(null);
-  const [bee, setBee] = useState<ReadonlyArray<BeeTopEntry> | null>(null);
+  const [entries, setEntries] = useState<ReadonlyArray<HistoryEntry> | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const [s, t, b] = await Promise.all([
-        loadHistory().catch(() => [] as ReadonlyArray<HistoryEntry>),
-        getTumblerLeaderboard().catch(() => [] as ReadonlyArray<LeaderboardEntry>),
-        getBeeTopScores(10).catch(() => [] as ReadonlyArray<BeeTopEntry>),
-      ]);
-      setScrabble(s);
-      setTumbler(t);
-      setBee(b);
+      const list = await loadHistory().catch(() => [] as ReadonlyArray<HistoryEntry>);
+      setEntries(list);
     })();
   }, []);
 
   const { color, space } = tokens;
-  const loading = scrabble === null || tumbler === null || bee === null;
+  const loading = entries === null;
 
   return (
     <div
@@ -111,22 +94,20 @@ export function ScoresScreen(): JSX.Element {
               fontWeight: tokens.weight.reg,
             }}
           >
-            Everything you've played
+            Past Scrabble matches
           </p>
         </header>
 
         {loading ? (
           <p style={{ color: color.inkSoft, fontSize: tokens.size.body }}>Loading…</p>
+        ) : entries!.length === 0 ? (
+          <EmptyHint text="No finished matches yet — your next finish lands here." />
         ) : (
-          <>
-            <ScrabbleSection entries={scrabble!} />
-            <LeaderboardSection
-              label="Tumbler · Top scores"
-              entries={tumbler!}
-              emptyHint="No Tumbler runs yet — play a round to land on the board."
-            />
-            <BeeSection entries={bee!} />
-          </>
+          <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
+            {entries!.map((e) => (
+              <ScrabbleRow key={e.id} entry={e} />
+            ))}
+          </div>
         )}
 
         <footer style={{ marginTop: tokens.space.x4 }}>
@@ -134,29 +115,6 @@ export function ScoresScreen(): JSX.Element {
         </footer>
       </main>
     </div>
-  );
-}
-
-// ─── Scrabble ─────────────────────────────────────────────────────
-
-interface ScrabbleSectionProps {
-  readonly entries: ReadonlyArray<HistoryEntry>;
-}
-
-function ScrabbleSection({ entries }: ScrabbleSectionProps): JSX.Element {
-  return (
-    <section>
-      <SectionLabel>Scrabble · Past matches</SectionLabel>
-      {entries.length === 0 ? (
-        <EmptyHint text="No finished matches yet — your next finish lands here." />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x2 }}>
-          {entries.map((e) => (
-            <ScrabbleRow key={e.id} entry={e} />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -331,133 +289,6 @@ function DetailCell({ label, value }: DetailCellProps): JSX.Element {
     </div>
   );
 }
-
-// ─── Tumbler + Bee shared ────────────────────────────────────────
-
-interface LeaderboardSectionProps {
-  readonly label: string;
-  readonly entries: ReadonlyArray<LeaderboardEntry>;
-  readonly emptyHint: string;
-}
-
-function LeaderboardSection({
-  label,
-  entries,
-  emptyHint,
-}: LeaderboardSectionProps): JSX.Element {
-  return (
-    <section>
-      <SectionLabel>{label}</SectionLabel>
-      {entries.length === 0 ? (
-        <EmptyHint text={emptyHint} />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x1 }}>
-          {entries.map((e, i) => (
-            <LeaderRow key={`${e.name}-${e.timestamp}`} rank={i + 1} entry={e} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-interface BeeSectionProps {
-  readonly entries: ReadonlyArray<BeeTopEntry>;
-}
-
-function BeeSection({ entries }: BeeSectionProps): JSX.Element {
-  return (
-    <section>
-      <SectionLabel>Spelling Bee · Top daily scores</SectionLabel>
-      {entries.length === 0 ? (
-        <EmptyHint text="No Bee days finished yet — find words to land on this board." />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.x1 }}>
-          {entries.map((e, i) => (
-            <LeaderRow
-              key={`${e.dateKey}-${e.name}-${e.timestamp}`}
-              rank={i + 1}
-              entry={e}
-              suffix={formatShortDate(e.timestamp)}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-interface LeaderRowProps {
-  readonly rank: number;
-  readonly entry: LeaderboardEntry;
-  readonly suffix?: string;
-}
-
-function LeaderRow({ rank, entry, suffix }: LeaderRowProps): JSX.Element {
-  const { color, space, radius, size, weight } = tokens;
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "auto 1fr auto auto",
-        alignItems: "baseline",
-        gap: space.x3,
-        padding: `${space.x2}px ${space.x4}px`,
-        background: color.paper,
-        border: `1.5px solid ${color.strokeSoft}`,
-        borderRadius: radius.chip,
-      }}
-    >
-      <span
-        style={{
-          color: rank <= 3 ? color.brown : color.inkSoft,
-          fontWeight: weight.bold,
-          fontFamily: tokens.font.serif,
-          fontSize: size.body,
-          fontVariantNumeric: "tabular-nums",
-          minWidth: 22,
-        }}
-      >
-        {rank}
-      </span>
-      <span
-        style={{
-          color: color.ink,
-          fontSize: size.body,
-          fontWeight: weight.med,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {entry.name}
-      </span>
-      {suffix && (
-        <span
-          style={{
-            color: color.inkMuted,
-            fontSize: tokens.size.caption,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {suffix}
-        </span>
-      )}
-      <span
-        style={{
-          color: color.brown,
-          fontSize: size.body,
-          fontWeight: weight.bold,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {entry.score}
-      </span>
-    </div>
-  );
-}
-
-// ─── Shared bits ─────────────────────────────────────────────────
 
 interface EmptyHintProps {
   readonly text: string;

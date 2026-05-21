@@ -406,7 +406,7 @@ export function HomeScreen(): JSX.Element {
           <MenuItem
             icon="♛"
             label="Scores"
-            sublabel="Past games and leaderboards"
+            sublabel="Scrabble match scoreboard"
             onClick={() => setScreen({ kind: "scores" })}
           />
           <MenuItem
