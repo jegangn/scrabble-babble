@@ -2,7 +2,7 @@
  * Curated subset of common English words for Phase 0 tests.
  *
  * These are facts (individual words are not copyrightable). Phase 1+ replaces
- * this with the full public-domain ENABLE wordlist (~172k words).
+ * this with the full CSW21 wordlist (~279k words).
  *
  * Each word is uppercase and 2–7 letters.
  */

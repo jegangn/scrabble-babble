@@ -2,7 +2,7 @@
  * Compact trie for word lookup.
  *
  * Phase 0 uses the curated fixture in `__fixtures__/dictionary-subset.ts`.
- * Phase 1+ will load the full ENABLE wordlist (~172k words) and cache the
+ * Phase 1+ will load the full CSW21 wordlist (~279k words) and cache the
  * built trie in IndexedDB.
  */
 

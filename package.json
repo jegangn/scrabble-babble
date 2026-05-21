@@ -28,7 +28,7 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint:engine-purity": "node scripts/check-engine-purity.mjs",
-    "fetch:enable": "node scripts/fetch-enable.mjs",
+    "fetch:csw21": "node scripts/fetch-csw21.mjs",
     "gen:icons": "node scripts/generate-icons.mjs",
     "e2e": "playwright test"
   },

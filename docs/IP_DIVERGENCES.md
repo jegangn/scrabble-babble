@@ -51,7 +51,13 @@ Key differences from Scrabble:
 
 ## Dictionary
 
-ENABLE (Enhanced North American Benchmark LExicon), ~172k words, public domain. Not TWL, not SOWPODS, not WWF's proprietary list.
+Collins Scrabble Words 2021 (CSW21), ~279,077 words (2–15 letters) — the international tournament lexicon.
+
+**Attribution / licensing notice:** CSW21 is © HarperCollins Publishers Limited, published under licence with Collins. The list is sourced from the community `scrabblewords` project, with definitions stripped so only the bare words ship.
+
+> Word list: Collins Scrabble Words 2021 (CSW21). Source: github.com/scrabblewords/scrabblewords
+
+> ⚠️ **This reverses the project's original dictionary decision.** Scrabble Babble first shipped ENABLE — a public-domain list — specifically to keep the app legally clean. The switch to CSW21 was a deliberate, informed choice by the owner for a larger international word list, accepting that **CSW21 is copyrighted, not public domain.** The board layout and tile values remain original / WWF-inspired and legally distinct from Hasbro Scrabble; only the dictionary's IP status changed.
 
 ## Rule Deltas
 

@@ -34,6 +34,6 @@ Open `http://localhost:4173`. The service worker caches everything on first load
 
 ## Offline & cache
 
-`vite-plugin-pwa` (Workbox under the hood) caches the app shell + assets + ENABLE wordlist on first visit. After that, the app loads offline.
+`vite-plugin-pwa` (Workbox under the hood) caches the app shell + assets + CSW21 wordlist on first visit. After that, the app loads offline.
 
 When you ship a new version: bump nothing; the SW with `registerType: "autoUpdate"` auto-detects the new build and refreshes on next visit.

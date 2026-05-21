@@ -15,7 +15,7 @@ import { test, expect, Page } from "@playwright/test";
 
 const HOME_URL = "/";
 
-// All valid 2-letter Scrabble words (TWL/ENABLE intersection). With a random
+// All valid 2-letter Scrabble words (also valid in CSW21). With a random
 // 7-letter Tumbler draw, statistically >99% of draws contain at least one.
 // Source: standard Scrabble lexicon — these are stable.
 const TWO_LETTER_WORDS: ReadonlyArray<string> = [

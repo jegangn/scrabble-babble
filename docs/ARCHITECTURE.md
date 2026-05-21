@@ -39,7 +39,7 @@ src/
   store/                    — Zustand state + pending-placement helpers
   ai-client/                — botClient: promise-based wrapper around the worker
   workers/                  — bot.worker.ts + bot-protocol.ts (shared message types)
-  data/                     — load-dictionary.ts (fetches enable.txt.gz)
+  data/                     — load-dictionary.ts (fetches csw21.txt.gz)
 ```
 
 ## Invariants
@@ -65,7 +65,7 @@ GameScreen (effect on turn change)
    ↓ getBotMove(state, difficulty)
 ai-client/botClient.ts  ─ postMessage(decide) ─→  workers/bot.worker.ts
                         ←─ postMessage(decided) ─                ↑
-                                                  fetches enable.txt.gz
+                                                  fetches csw21.txt.gz
                                                   builds trie, calls
                                                   engine/ai/bot.ts:decide
 ```

@@ -2,7 +2,7 @@
  * Message protocol shared between the main thread and the bot Web Worker.
  *
  * The worker is single-purpose: it owns one trie (built from the bundled
- * ENABLE wordlist) and answers `decide` requests by calling
+ * CSW21 wordlist) and answers `decide` requests by calling
  * {@link decide} from `src/engine/ai/bot.ts`.
  *
  * Both sides import these types so the wire format stays in sync.
@@ -16,7 +16,7 @@ import type { SerializedGameState } from "../storage/serializer.js";
 export interface InitMessage {
   readonly kind: "init";
   /**
-   * Base URL the worker should resolve `enable.txt.gz` against. The main
+   * Base URL the worker should resolve `csw21.txt.gz` against. The main
    * thread reads `document.baseURI`; workers do not have access to it.
    */
   readonly baseUrl: string;

@@ -4,7 +4,7 @@
  * Lifecycle:
  *  1. Main thread spawns the worker (Vite `?worker` import).
  *  2. Main thread posts `{ kind: "init", baseUrl }`.
- *  3. Worker fetches `enable.txt.gz` via {@link loadDictionary}, builds the trie,
+ *  3. Worker fetches `csw21.txt.gz` via {@link loadDictionary}, builds the trie,
  *     and posts `{ kind: "ready" }`.
  *  4. Main thread posts `{ kind: "decide", id, serializedState, difficulty }` per turn.
  *  5. Worker deserializes the state, calls {@link decide}, posts `{ kind: "decided", id, move }`.

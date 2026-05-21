@@ -15,7 +15,7 @@ Private Scrabble-style PWA gift for father-in-law's iPad. Solo (vs AI) + hot-sea
 - Package manager: **bun**.
 - Storage: IndexedDB via `idb` only — never localStorage (iOS Safari ITP evicts after 7 days).
 - Engine purity: `src/engine/` has zero React/DOM/storage/network imports. Enforced by `bun run lint:engine-purity`.
-- Legally distinct from Hasbro Scrabble: original board layout (4-fold symmetric), WWF-inspired tile values, ENABLE dictionary.
+- Board layout (original, 4-fold symmetric) and WWF-inspired tile values are legally distinct from Hasbro Scrabble. Dictionary is **Collins CSW21** (HarperCollins-copyrighted; used via the `scrabblewords` redistribution) — a deliberate owner override of the original public-domain-ENABLE constraint. See `docs/IP_DIVERGENCES.md`.
 - Defaults: MYR, metric, dd/MM/yyyy, +60 phones, UTC+8.
 
 ## Phase Status

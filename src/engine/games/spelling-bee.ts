@@ -48,7 +48,7 @@ let cachedDictRef: TrieNode | null = null;
  * let "add S" plurals dominate scoring and trivialize the puzzle).
  *
  * Cached per trie instance: the first call walks the full dictionary
- * (~50-200 ms on the ~172 k ENABLE list), subsequent calls return the
+ * (~80-300 ms on the ~279 k CSW21 list), subsequent calls return the
  * cached array. Pass a different `dict` to invalidate the cache.
  */
 export function enumerateSevenLetterPangrams(dict: TrieNode): ReadonlyArray<string> {
@@ -231,8 +231,8 @@ export function scoreBeeWord(word: string, puzzle: BeePuzzle): number {
  * the day's "you found N of M" denominator.
  */
 /**
- * Cap the DFS depth. The ENABLE dictionary has words up to 28 letters but
- * realistic NYT-style Bee answers max out at ~15. Without this cap the walk
+ * Cap the DFS depth at a realistic Bee answer length. CSW21 tops out at 15
+ * letters, well within this. Without this cap the walk
  * recurses to every leaf, producing thousands of pathologically long words
  * and blocking the main thread for hundreds of ms on first paint. 15 covers
  * every common pangram while keeping the walk to a single frame.

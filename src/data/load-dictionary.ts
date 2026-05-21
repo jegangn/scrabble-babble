@@ -2,10 +2,10 @@ import { buildTrie } from "../engine/dictionary.js";
 import type { TrieNode } from "../engine/dictionary.js";
 
 /** Lookup for the gzipped wordlist relative to the app's base URL. */
-const DICTIONARY_PATH = "enable.txt.gz";
+const DICTIONARY_PATH = "csw21.txt.gz";
 
 /**
- * Fetch the bundled ENABLE wordlist and build a trie. Used once on app cold start.
+ * Fetch the bundled CSW21 wordlist and build a trie. Used once on app cold start.
  *
  * Handles two cases:
  *  - The server transparently decompresses via `Content-Encoding: gzip`

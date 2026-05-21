@@ -10,9 +10,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icons/apple-touch-icon.png", "enable.txt.gz"],
+      includeAssets: ["icons/apple-touch-icon.png", "csw21.txt.gz"],
       workbox: {
-        // The ENABLE wordlist is ~700 KB gzipped; raise the default max so Workbox caches it.
+        // The CSW21 wordlist is ~710 KB gzipped; raise the default max so Workbox caches it.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,png,svg,gz,webmanifest}"],
       },
