@@ -426,6 +426,15 @@ export function GameScreen(): JSX.Element | null {
             // screen's top-left, so the variant + tiles-left header
             // isn't tucked behind either pill.
             paddingTop: 72,
+            // Bottom inset so the Resign button doesn't hug the very
+            // bottom edge of the aside (which itself sits flush with
+            // gs-game-body's padding-bottom: 16). Without this, the
+            // destructive outline on Resign reads as "clipped" on
+            // shorter viewports and on iPads where the iOS home
+            // indicator overlaps the bottom 16 px of the page.
+            // env(safe-area-inset-bottom) clears the home indicator
+            // on installed PWAs; max() falls back to 16 px elsewhere.
+            paddingBottom: "max(16px, env(safe-area-inset-bottom))",
             // Pinned — never scrolls. The contextual status strip
             // (last-move / pending / error) collapses three would-be
             // strips into one slot so this stays true even when a
@@ -436,14 +445,17 @@ export function GameScreen(): JSX.Element | null {
           {currentUser && (
             /* Anchored to the aside (position: relative above) so the
                chip sits at the pane's top-right corner — not the
-               screen's. The aside itself sits 16 px below the viewport
-               top (gs-game-body has padding-top: space.x4 = 16), so
-               UserChip's own default top: 24 lands 16 px below the
-               BackPill that's positioned absolute on gs-game-body
-               directly. Override top to 8 (= 24 − 16) so both pills
-               sit on the same row. No onClick — opens the built-in
-               "change name from home" info modal. */
-            <UserChip name={currentUser} style={{ top: 8 }} />
+               screen's. Two overrides:
+                 - top: 8 (= UserChip default 24 − gs-game-body
+                   padding-top 16) so the chip lines up with the
+                   BackPill on the screen's top-left.
+                 - right: 0 so the chip's right edge is flush with the
+                   aside's right edge — same x as the TilesLeft "N
+                   left" indicator below it, which sits flush via
+                   justify-content: space-between in the header row.
+               No onClick — opens the built-in "change name from home"
+               info modal. */
+            <UserChip name={currentUser} style={{ top: 8, right: 0 }} />
           )}
           {/* Top group — header, player cards, status strip. */}
           <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
