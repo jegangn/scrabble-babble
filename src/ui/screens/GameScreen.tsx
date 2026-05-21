@@ -395,56 +395,15 @@ export function GameScreen(): JSX.Element | null {
         />
 
         <BackPill onClick={goHome} />
-        {currentUser && (
-          /* No onClick — UserChip opens its built-in "change your name
-             from home" info modal so the chip never feels inert. */
-          <UserChip name={currentUser} />
-        )}
 
-        {/* Board — fills the available vertical space. The board's outer
-            wrapper is a perfectly-square box sized to whichever of
-            (column-width, available-height) is smaller, so the board is
-            always as big as the iPad will allow without overflowing. */}
-        <div
-          className="gs-board-wrap"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            position: "relative",
-            zIndex: 1,
-            // Establishes a size container so the inner board can size itself
-            // to the smaller of column width / height via `cqmin` units. Without
-            // this, max-width + max-height + aspect-ratio fight each other and
-            // the browser settles on a non-square (908×768 on Tab S8 etc.).
-            containerType: "size",
-          }}
-        >
-          <div
-            style={{
-              // 100cqmin = min(column inline-size, column block-size). This
-              // is the largest square that fits in the column on any device:
-              // width-constrained on small iPads, height-constrained on
-              // Tab S8 / wide displays.
-              width: "100cqmin",
-              height: "100cqmin",
-              containerType: "size",
-              containerName: "board",
-            }}
-          >
-            <Board board={board} pendingKeys={keys} onCellTap={stableOnCellTap} />
-          </div>
-        </div>
-
-        {/* Sidebar — column on the right with scoreboard, rack, action
+        {/* Sidebar — column on the left with scoreboard, rack, action
             stack, and contextual cards. Width chosen so the 7-tile rack
             wraps to 4 + 3 (instead of 3 + 3 + 1, which would push the
             Resign button past the viewport bottom on iPad). Top inset
-            of space.x12 reserves room for the UserChip floating at
-            top: 24 / right: 24 — without it the variant tagline would
-            sit underneath the chip. */}
+            reserves a header band shared by the BackPill (screen-level
+            top-left) and the UserChip (anchored to this pane's
+            top-right) so neither pill sits on top of the variant
+            tagline below them. */}
         <aside
           style={{
             position: "relative",
@@ -461,9 +420,11 @@ export function GameScreen(): JSX.Element | null {
             justifyContent: "space-between",
             height: "100%",
             minHeight: 0,
-            // 72 px top inset clears the absolutely-positioned UserChip
-            // (top: 24, height ~40 → bottom ~64) with a small buffer so
-            // the variant + tiles-left header isn't tucked behind it.
+            // 72 px top inset clears the UserChip below (anchored
+            // absolute to this aside at top: 24, height ~44 → bottom
+            // ~68) and the BackPill floating at the same height on the
+            // screen's top-left, so the variant + tiles-left header
+            // isn't tucked behind either pill.
             paddingTop: 72,
             // Pinned — never scrolls. The contextual status strip
             // (last-move / pending / error) collapses three would-be
@@ -472,6 +433,13 @@ export function GameScreen(): JSX.Element | null {
             overflowY: "hidden",
           }}
         >
+          {currentUser && (
+            /* Anchored to the aside (position: relative above) so the
+               chip sits at the pane's top-right corner — not the
+               screen's. No onClick — opens the built-in "change name
+               from home" info modal. */
+            <UserChip name={currentUser} />
+          )}
           {/* Top group — header, player cards, status strip. */}
           <div style={{ display: "flex", flexDirection: "column", gap: space.x2 }}>
           <div
@@ -700,6 +668,43 @@ export function GameScreen(): JSX.Element | null {
             </Button>
           </div>
         </aside>
+
+        {/* Board — fills the available vertical space. The board's outer
+            wrapper is a perfectly-square box sized to whichever of
+            (column-width, available-height) is smaller, so the board is
+            always as big as the iPad will allow without overflowing. */}
+        <div
+          className="gs-board-wrap"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            position: "relative",
+            zIndex: 1,
+            // Establishes a size container so the inner board can size itself
+            // to the smaller of column width / height via `cqmin` units. Without
+            // this, max-width + max-height + aspect-ratio fight each other and
+            // the browser settles on a non-square (908×768 on Tab S8 etc.).
+            containerType: "size",
+          }}
+        >
+          <div
+            style={{
+              // 100cqmin = min(column inline-size, column block-size). This
+              // is the largest square that fits in the column on any device:
+              // width-constrained on small iPads, height-constrained on
+              // Tab S8 / wide displays.
+              width: "100cqmin",
+              height: "100cqmin",
+              containerType: "size",
+              containerName: "board",
+            }}
+          >
+            <Board board={board} pendingKeys={keys} onCellTap={stableOnCellTap} />
+          </div>
+        </div>
       </div>
 
       {/* Modals + overlays */}
