@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeAirFit, DESIGN_W, DESIGN_H, ACTIVATION_MAX_WIDTH } from "../fitToViewport.js";
+import { computeAirFit, DESIGN_W, DESIGN_H, ACTIVATION_MAX_WIDTH } from "../airFit.js";
 
 describe("computeAirFit", () => {
   it("stays inactive on the iPad Pro (PWA 1366x1024)", () => {

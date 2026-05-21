@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { tokens } from "./tokens.js";
-import { computeAirFit, DESIGN_W, DESIGN_H, type ViewportInfo } from "./fitToViewport.js";
+import { computeAirFit, DESIGN_W, DESIGN_H, type ViewportInfo } from "./airFit.js";
 
 // `zoom` and the `--app-h` custom property aren't in React's CSSProperties;
 // extend the type rather than reaching for `any` (engine/repo bans `any`).
