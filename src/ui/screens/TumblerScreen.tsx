@@ -257,8 +257,8 @@ export function TumblerScreen(): JSX.Element | null {
         // so a long leaderboard doesn't push the rack + action row
         // off the screen.
         style={{
-          height: "100dvh",
-          maxHeight: "100dvh",
+          height: "var(--app-h)",
+          maxHeight: "var(--app-h)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",

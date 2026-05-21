@@ -68,7 +68,7 @@ export function NewGameScreen(): JSX.Element {
           // inside a pinned overflow:hidden ancestor (because it can't
           // scroll the input above the keyboard), so we let the page
           // scroll naturally when the keyboard appears.
-          minHeight: "100dvh",
+          minHeight: "var(--app-h)",
           display: "flex",
           flexDirection: "column",
           gap: tokens.space.x3,

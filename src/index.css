@@ -7,6 +7,13 @@ body,
   margin: 0;
 }
 
+/* Default app height = real viewport. FitToViewport overrides this to the
+   fixed canvas height (880px) on the iPad Air so pinned screens fill the
+   canvas instead of the shorter real viewport. */
+:root {
+  --app-h: 100dvh;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 18px;

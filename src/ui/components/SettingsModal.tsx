@@ -62,7 +62,7 @@ export function SettingsModal({
       // the bottom on iPad-height screens. Modal uses display:flex column
       // so header + body + footer stack and the body can scroll inside.
       style={{
-        maxHeight: "calc(100dvh - 24px)",
+        maxHeight: "calc(var(--app-h) - 24px)",
         display: "flex",
         flexDirection: "column",
       }}
@@ -80,7 +80,7 @@ export function SettingsModal({
           // (header + footer + body padding + backdrop padding) eats ~200 px,
           // so the inner area gets the rest. Falls back gracefully on short
           // viewports because `calc` clamps via min.
-          minHeight: "min(580px, calc(100dvh - 240px))",
+          minHeight: "min(580px, calc(var(--app-h) - 240px))",
         }}
       >
         {/* Left rail — menu */}
@@ -205,7 +205,7 @@ function SoundsPanel(): JSX.Element {
         // tall as the modal grows, so a 820 px viewport gives ~580 px of
         // scroll space. Tightened row gap (x2 not x4) so the five sound
         // rows fit without much scroll on iPad-height screens.
-        maxHeight: "min(580px, calc(100dvh - 240px))",
+        maxHeight: "min(580px, calc(var(--app-h) - 240px))",
         overflowY: "auto",
         paddingRight: space.x2,
       }}

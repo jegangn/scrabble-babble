@@ -421,8 +421,8 @@ export function SpellingBeeScreen(): JSX.Element | null {
         // Pinned to viewport — page itself doesn't scroll. Only the
         // bottom found-words + leaderboard area scrolls internally.
         style={{
-          height: "100dvh",
-          maxHeight: "100dvh",
+          height: "var(--app-h)",
+          maxHeight: "var(--app-h)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",

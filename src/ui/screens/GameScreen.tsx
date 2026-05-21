@@ -364,8 +364,8 @@ export function GameScreen(): JSX.Element | null {
           width: "100%",
           // Pin to the viewport so the sidebar never falls off the
           // bottom of the screen — every control must stay in view.
-          height: "100dvh",
-          maxHeight: "100dvh",
+          height: "var(--app-h)",
+          maxHeight: "var(--app-h)",
           background: color.cream,
           overflow: "hidden",
           // Tight 16 px top padding so the board reaches the top of the
