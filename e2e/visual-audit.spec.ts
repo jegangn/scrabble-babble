@@ -136,7 +136,7 @@ async function gotoHome(page: Page) {
     });
   });
   await page.reload();
-  await expect(page.getByRole("button", { name: /^new game$/i })).toBeVisible({
+  await expect(page.getByRole("button", { name: /new game/i })).toBeVisible({
     timeout: 20_000,
   });
 }
@@ -155,7 +155,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("NewGame — default (Classic + hot-seat)", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await expect(page.getByText(/opponent/i).first()).toBeVisible({ timeout: 5000 });
       await shot(page, "02-new-game-default", vpName);
       await reportOverlaps(page, `${vpName} · NewGame default`);
@@ -163,7 +163,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("NewGame — Mini + AI Easygoing", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       // Opponent: tap the "Computer" segment (new Segmented control —
       // aria-pressed buttons, not radio inputs).
       await page.getByRole("button", { name: /^computer$/i }).click();
@@ -179,10 +179,10 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("Game — Classic, hot-seat", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await page.getByRole("button", { name: /^start game$/i }).click();
       // Board rendered when the centre ★ appears.
-      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("button", { name: /^Pass$/i })).toBeVisible({ timeout: 10_000 });
       await page.waitForTimeout(500);
       await shot(page, "04-game-classic", vpName);
       await reportOverlaps(page, `${vpName} · Game classic`);
@@ -190,10 +190,10 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("Game — Mini, hot-seat", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await page.getByRole("button", { name: /mini.*11/i }).click();
       await page.getByRole("button", { name: /^start game$/i }).click();
-      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("button", { name: /^Pass$/i })).toBeVisible({ timeout: 10_000 });
       await page.waitForTimeout(500);
       await shot(page, "05-game-mini", vpName);
       await reportOverlaps(page, `${vpName} · Game mini`);
@@ -262,7 +262,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("Resign confirm modal + GameEnd screen", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await page.getByRole("button", { name: /^start game$/i }).click();
       // Open Resign confirmation.
       await page.getByRole("button", { name: /^resign$/i }).click();
@@ -285,9 +285,9 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("Swap modal opens with rack tiles", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await page.getByRole("button", { name: /^start game$/i }).click();
-      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("button", { name: /^Pass$/i })).toBeVisible({ timeout: 10_000 });
       // Swap button — icon + label "Swap" — matches a partial regex.
       const swapBtn = page.getByRole("button", { name: /swap/i }).first();
       await expect(swapBtn).toBeEnabled();
@@ -302,9 +302,9 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("Drag overlay shows a moving tile (no disappearing)", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await page.getByRole("button", { name: /^start game$/i }).click();
-      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("button", { name: /^Pass$/i })).toBeVisible({ timeout: 10_000 });
 
       // Find a rack tile (DraggableRackTile renders a <div role="button">
       // around a <Tile> with the letter).
@@ -333,11 +333,12 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
     test("HotSeatHandoff after passing in hot-seat", async ({ page }) => {
       await gotoHome(page);
-      await page.getByRole("button", { name: /^new game$/i }).click();
+      await page.getByRole("button", { name: /new game/i }).click();
       await page.getByRole("button", { name: /^start game$/i }).click();
-      await expect(page.getByText("★").first()).toBeVisible({ timeout: 10_000 });
-      // Pass — flips turn → hot-seat handoff overlay appears.
+      await expect(page.getByRole("button", { name: /^Pass$/i })).toBeVisible({ timeout: 10_000 });
+      // Pass — confirm in the dialog, which flips the turn → handoff overlay.
       await page.getByRole("button", { name: /^pass$/i }).click();
+      await page.getByRole("button", { name: /^pass turn$/i }).click();
       // Handoff overlay shows "Pass the iPad to <name>" + "I'm <name> — ready".
       await expect(page.getByText(/pass the ipad to/i)).toBeVisible({ timeout: 5000 });
       const readyBtn = page.getByRole("button", { name: /ready/i });
@@ -346,7 +347,7 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
       await shot(page, "11-handoff", vpName);
       // Tap "I'm {name} — ready" to return to the game.
       await readyBtn.click();
-      await expect(page.getByText("★").first()).toBeVisible();
+      await expect(page.getByRole("button", { name: /^Pass$/i })).toBeVisible();
       await reportOverlaps(page, `${vpName} · Handoff`);
     });
   });

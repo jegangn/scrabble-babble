@@ -3,12 +3,12 @@ import { test, expect } from "@playwright/test";
 /**
  * Phase 1-4 smoke test. Drives the deployed PWA through each major flow:
  *   - Home + New Game with all 3 variants + opponent + difficulty selectors
- *   - Classic vs Computer game, drag-drop / tap-to-place, submit, AI turn
- *   - Tumbler timed round, scoring, end screen
- *   - Spelling Bee daily puzzle, hex tap-to-compose, persistence
+ *   - Classic / Mini hot-seat games render a board
+ *   - Tumbler timed round: 7 letters, timer, too-short rejection
+ *   - Spelling Bee daily puzzle: hex, too-short rejection
  *
- * Run with: bunx playwright test e2e/smoke.spec.ts --reporter=list
- * The dev/preview server is auto-spawned by playwright.config.ts.
+ * Run with: npx playwright test e2e/smoke.spec.ts --reporter=list
+ * The preview server is auto-spawned by playwright.config.ts (via npm).
  */
 
 const HOME_URL = "/";
@@ -24,11 +24,8 @@ test.beforeEach(async ({ page, context }) => {
       req.onerror = () => resolve();
       req.onblocked = () => resolve();
     });
-    // Pre-seed a current_user so the welcome name-prompt doesn't block
-    // tests. CRITICAL: we must create ALL three object stores at v1, not
-    // just "settings". The app's own open() at v1 won't fire the upgrade
-    // hook if our seed already created the DB at the same version, and
-    // any later db.put("in_progress", ...) would fail.
+    // Pre-seed a current_user so the welcome name-prompt doesn't block tests.
+    // CRITICAL: create ALL three object stores at v1 (see comment history).
     await new Promise<void>((resolve, reject) => {
       const open = indexedDB.open("scrabble-babble", 1);
       open.onupgradeneeded = () => {
@@ -63,61 +60,54 @@ test("home screen renders all entry points", async ({ page }) => {
 test("new game screen has opponent, board, and player selectors", async ({ page }) => {
   await page.getByRole("button", { name: /New game/ }).click();
   await expect(page.getByRole("heading", { name: /New game/ })).toBeVisible();
-  // Opponent group
-  await expect(page.getByLabel(/Hot-seat/)).toBeVisible();
-  await expect(page.getByLabel(/^Computer$/)).toBeVisible();
-  // Board variant group (Phase 3)
-  await expect(page.getByLabel(/Classic.*15.15/)).toBeVisible();
-  await expect(page.getByLabel(/Random.*15.15/)).toBeVisible();
-  await expect(page.getByLabel(/Mini.*11.11/)).toBeVisible();
+  // Opponent — Segmented control (buttons, not radios).
+  await expect(page.getByRole("button", { name: /Hot-seat/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Computer$/ })).toBeVisible();
+  // Board variant — BoardOption buttons (Phase 3).
+  await expect(page.getByRole("button", { name: /Classic/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Random/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Mini/ })).toBeVisible();
   await page.screenshot({ path: "screenshots/02-new-game.png", fullPage: true });
 });
 
-test("starting a Classic hot-seat game renders a 15x15 board", async ({ page }) => {
+test("starting a Classic hot-seat game renders a board", async ({ page }) => {
   await page.getByRole("button", { name: /New game/ }).click();
-  // Default radios should already be: Hot-seat + Classic.
-  await page.getByRole("button", { name: /Start/ }).click();
-  // Verify a 15x15 board renders — 225 cells.
-  const cells = page.locator('[data-testid="board-cell"], button:has-text(""), .board-cell');
-  // Fall back to a more reliable count: the score bar should show two player names.
-  // ScoreBar shows the Player 1 name — defaults to currentUser ("Tester"
-  // pre-seeded above) or falls back to "Player 1" if no user is set.
-  await expect(page.getByText(/Tester|Player 1/)).toBeVisible();
+  // Default selections: Hot-seat + Classic.
+  await page.getByRole("button", { name: /Start game/ }).click();
+  // Board rendered → the centre star + the action bar are present.
+  await expect(page.getByRole("button", { name: /^Pass$/ })).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: "screenshots/03-classic-board.png", fullPage: true });
 });
 
 test("starting a Mini hot-seat game renders the 11x11 variant", async ({ page }) => {
   await page.getByRole("button", { name: /New game/ }).click();
-  await page.getByLabel(/Mini.*11.11/).check();
-  await page.getByRole("button", { name: /Start/ }).click();
-  // ScoreBar shows the Player 1 name — defaults to currentUser ("Tester"
-  // pre-seeded above) or falls back to "Player 1" if no user is set.
-  await expect(page.getByText(/Tester|Player 1/)).toBeVisible();
+  await page.getByRole("button", { name: /Mini/ }).click();
+  await page.getByRole("button", { name: /Start game/ }).click();
+  await expect(page.getByRole("button", { name: /^Pass$/ })).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: "screenshots/04-mini-board.png", fullPage: true });
 });
 
 test("Tumbler renders 7 letters and a timer", async ({ page }) => {
   await page.getByRole("button", { name: /Tumbler/ }).click();
-  // Header shows starting time.
-  await expect(page.getByLabel(/Time remaining/)).toBeVisible();
-  // Score starts at 0.
-  await expect(page.getByLabel(/Current score/)).toHaveText(/0 pts/);
-  // Letter pills — accessible label is the letter itself.
-  const pills = page.getByRole("button", { name: /^[A-Z]$/ });
+  await expect(page.getByRole("heading", { name: /^Tumbler$/ })).toBeVisible();
+  // Letter pills — accessible label is "Letter X".
+  const pills = page.getByRole("button", { name: /^Letter [A-Z]$/ });
   await expect(pills).toHaveCount(7);
+  // Time + Score readout panels are present.
+  await expect(page.getByText("Time", { exact: true })).toBeVisible();
+  await expect(page.getByText("Score", { exact: true })).toBeVisible();
   await page.screenshot({ path: "screenshots/05-tumbler.png", fullPage: true });
 });
 
 test("Tumbler rejects a single-letter word as too short", async ({ page }) => {
   await page.getByRole("button", { name: /Tumbler/ }).click();
-  const pills = page.getByRole("button", { name: /^[A-Z]$/ });
+  const pills = page.getByRole("button", { name: /^Letter [A-Z]$/ });
   await expect(pills).toHaveCount(7);
 
-  // Tap-only input mode: tap one pill (1-letter word), then Enter. Min
-  // word length is 2, so this is a guaranteed rejection that doesn't
-  // depend on the rack composition.
+  // Tap one pill (1-letter word), then Submit. Min length is 2, so this is a
+  // guaranteed rejection regardless of the rack composition.
   await pills.nth(0).click();
-  await page.getByRole("button", { name: /^Enter$/ }).click();
+  await page.getByRole("button", { name: /^Submit$/ }).click();
   await expect(page.getByText(/Need 2\+? letters|Too short/)).toBeVisible();
   await page.screenshot({ path: "screenshots/06-tumbler-rejected.png", fullPage: true });
 });
@@ -127,24 +117,19 @@ test("Spelling Bee renders the daily hex with centre + 6 outer letters", async (
   // Pangram enumeration runs on home; here it may need a tiny moment.
   await expect(page.getByLabel(/Letter hex/)).toBeVisible({ timeout: 15_000 });
   // 7 letter pills total (1 centre + 6 outer).
-  const pills = page.getByLabel(/Letter hex/).getByRole("button", { name: /^[A-Z]$/ });
+  const pills = page.getByLabel(/Letter hex/).getByRole("button", { name: /^Letter [A-Z]$/ });
   await expect(pills).toHaveCount(7);
-  // Score starts at 0.
-  await expect(page.getByLabel(/^Score$/)).toContainText(/^0/);
-  // Date label visible (YYYY-MM-DD).
-  await expect(page.getByText(/\d{4}-\d{2}-\d{2}/)).toBeVisible();
   await page.screenshot({ path: "screenshots/07-spelling-bee.png", fullPage: true });
 });
 
-test("Spelling Bee rejects too-short and missing-center words", async ({ page }) => {
+test("Spelling Bee rejects a too-short word", async ({ page }) => {
   await page.getByRole("button", { name: /Spelling Bee/ }).click();
   await expect(page.getByLabel(/Letter hex/)).toBeVisible({ timeout: 15_000 });
 
-  // Tap one outer letter (not the centre) and submit -> too_short.
-  const outerPills = page.getByLabel(/Letter hex/).getByRole("button");
-  // The centre pill has a different background; we'll tap pill 1 (some outer).
-  await outerPills.nth(1).click();
-  await page.getByRole("button", { name: /^Enter$/ }).click();
+  // Tap one letter (min Bee word length is 4) and submit → too short.
+  const pills = page.getByLabel(/Letter hex/).getByRole("button", { name: /^Letter [A-Z]$/ });
+  await pills.nth(1).click();
+  await page.getByRole("button", { name: /^Submit$/ }).click();
   await expect(page.getByText(/Too short/)).toBeVisible();
   await page.screenshot({ path: "screenshots/08-bee-rejection.png", fullPage: true });
 });

@@ -3,9 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright config for end-to-end smoke tests against the production build.
  *
- * `bun run build && bun run preview` produces a static dist at :4173.
- * Tests assume the preview server is running; configure `webServer` so
- * `bunx playwright test` launches it automatically.
+ * The `webServer` below builds + serves a static dist at :4173 so
+ * `npx playwright test` launches it automatically. Uses npm (not bun) for
+ * build/serve so it runs anywhere node/npm is on PATH.
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -22,10 +22,10 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "bun run preview -- --port 4173",
+    command: "npm run build && npm run preview -- --port 4173 --strictPort",
     url: "http://localhost:4173",
     reuseExistingServer: true,
-    timeout: 60_000,
+    timeout: 180_000,
   },
   projects: [
     {

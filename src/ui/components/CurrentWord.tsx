@@ -65,6 +65,7 @@ export function CurrentWord({
   if (letters.length === 0) {
     return (
       <div
+        aria-label="Current word"
         style={{
           height: stripHeight,
           display: "grid",
@@ -93,6 +94,7 @@ export function CurrentWord({
 
   return (
     <div
+      aria-label={`Current word: ${word.toUpperCase()}`}
       style={{
         display: "flex",
         gap: GAP,
