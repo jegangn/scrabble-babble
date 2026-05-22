@@ -14,6 +14,7 @@ import { Button } from "../components/Button.js";
 import { CompareBar } from "../components/CompareBar.js";
 import { FooterMark } from "../components/FooterMark.js";
 import { FoundList } from "../components/FoundList.js";
+import { PossibleWordsCard } from "../components/PossibleWordsCard.js";
 import { SectionLabel } from "../components/SectionLabel.js";
 import { Surface } from "../components/Surface.js";
 import { Tagline } from "../components/Tagline.js";
@@ -37,6 +38,7 @@ export function TumblerEndScreen(): JSX.Element | null {
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
   const currentUser = useGameStore((s) => s.currentUser);
+  const dictionary = useGameStore((s) => s.dictionary);
 
   const [previousBest, setPreviousBest] = useState<number | null>(null);
   const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
@@ -68,7 +70,7 @@ export function TumblerEndScreen(): JSX.Element | null {
 
   if (screen.kind !== "tumbler_end") return null;
 
-  const { score, foundWords } = screen;
+  const { score, foundWords, rack } = screen;
   const isNewBest = previousBest !== null && score > previousBest;
   const delta = previousBest === null ? 0 : score - previousBest;
 
@@ -302,7 +304,7 @@ export function TumblerEndScreen(): JSX.Element | null {
           </div>
         </div>
 
-        {/* Right — words grid */}
+        {/* Right — words grid + all-possible reveal */}
         <div style={{ display: "flex", flexDirection: "column", gap: space.x4 }}>
           <FoundList
             title="Words you found"
@@ -310,6 +312,7 @@ export function TumblerEndScreen(): JSX.Element | null {
             columns={3}
             words={sortedWords}
           />
+          <PossibleWordsCard rack={rack} dictionary={dictionary} foundWords={foundWords} />
         </div>
       </div>
 
