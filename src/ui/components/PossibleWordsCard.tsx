@@ -96,10 +96,10 @@ export function PossibleWordsCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))",
-          gap: 6,
+          gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+          gap: 8,
           overflowY: "auto",
-          maxHeight: 300,
+          maxHeight: 360,
           minHeight: 0,
           paddingRight: 4,
         }}

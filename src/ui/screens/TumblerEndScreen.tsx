@@ -304,8 +304,10 @@ export function TumblerEndScreen(): JSX.Element | null {
           </div>
         </div>
 
-        {/* Right — words grid + all-possible reveal */}
-        <div style={{ display: "flex", flexDirection: "column", gap: space.x4 }}>
+        {/* Right — words grid + all-possible reveal. alignSelf:start keeps the
+            cards at their content height instead of stretching to match a taller
+            left column (which left empty space under the found-words list). */}
+        <div style={{ display: "flex", flexDirection: "column", gap: space.x4, alignSelf: "start" }}>
           <FoundList
             title="Words you found"
             count={foundWords.length}
