@@ -131,7 +131,7 @@ export function TumblerScreen(): JSX.Element | null {
   // Time-up handoff to end screen.
   useEffect(() => {
     if (started && timeLeftMs <= 0) {
-      setScreen({ kind: "tumbler_end", score, foundWords });
+      setScreen({ kind: "tumbler_end", score, foundWords, rack });
     }
   }, [started, timeLeftMs, score, foundWords, setScreen]);
 

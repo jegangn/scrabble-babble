@@ -80,7 +80,7 @@ export type Screen =
   | { kind: "handoff"; nextPlayerIndex: number }
   | { kind: "game_end" }
   | { kind: "tumbler" }
-  | { kind: "tumbler_end"; score: number; foundWords: ReadonlyArray<string> }
+  | { kind: "tumbler_end"; score: number; foundWords: ReadonlyArray<string>; rack: ReadonlyArray<Letter> }
   | { kind: "spelling_bee" }
   | { kind: "scores" };
 
