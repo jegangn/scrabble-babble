@@ -133,7 +133,7 @@ export function TumblerScreen(): JSX.Element | null {
     if (started && timeLeftMs <= 0) {
       setScreen({ kind: "tumbler_end", score, foundWords, rack });
     }
-  }, [started, timeLeftMs, score, foundWords, setScreen]);
+  }, [started, timeLeftMs, score, foundWords, rack, setScreen]);
 
   // Pause-on-blur: bank elapsed time into remainingMsRef when hidden.
   useEffect(() => {
