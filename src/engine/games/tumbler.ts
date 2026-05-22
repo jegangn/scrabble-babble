@@ -120,6 +120,44 @@ export function validateTumblerWord(
 }
 
 /**
+ * Enumerate every dictionary word (length >= MIN_TUMBLER_WORD_LENGTH) that
+ * can be formed from `rack` as a multiset — each tile used at most as many
+ * times as it appears in the rack. Pure DFS over the trie; bounded by the
+ * rack (<= 7 distinct letters, depth <= 7), so a few thousand ops worst case.
+ *
+ * Returns uppercase words in trie-DFS order (deterministic); callers sort.
+ * No duplicates (trie paths are unique).
+ */
+export function enumerateTumblerWords(
+  rack: ReadonlyArray<Letter>,
+  dict: TrieNode,
+): string[] {
+  const remaining = new Map<string, number>();
+  for (const l of rack) remaining.set(l, (remaining.get(l) ?? 0) + 1);
+
+  const results: string[] = [];
+  const path: string[] = [];
+
+  const walk = (node: TrieNode): void => {
+    if (node.terminal && path.length >= MIN_TUMBLER_WORD_LENGTH) {
+      results.push(path.join(""));
+    }
+    for (const [letter, child] of node.children) {
+      const left = remaining.get(letter) ?? 0;
+      if (left <= 0) continue;
+      remaining.set(letter, left - 1);
+      path.push(letter);
+      walk(child);
+      path.pop();
+      remaining.set(letter, left);
+    }
+  };
+
+  walk(dict);
+  return results;
+}
+
+/**
  * Score a single Tumbler word.
  *
  * Formula: `(sum of letter values) × word length`.

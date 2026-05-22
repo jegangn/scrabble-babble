@@ -7,6 +7,7 @@ import {
   MIN_TUMBLER_WORD_LENGTH,
   TUMBLER_RACK_SIZE,
   drawTumblerLetters,
+  enumerateTumblerWords,
   scoreTumblerWord,
   validateTumblerWord,
 } from "../tumbler.js";
@@ -96,5 +97,48 @@ describe("validateTumblerWord", () => {
 
   it("is case-insensitive on input", () => {
     expect(validateTumblerWord(rack, "cat", DICT)).toEqual({ ok: true });
+  });
+});
+
+describe("enumerateTumblerWords", () => {
+  const SMALL = buildTrie([
+    "AT", "TA", "ACT", "CAT", "CATS", "CAST", "SCAT", "CAR", "ARC", "RAT", "TAR", "ART", "A", "I",
+  ]);
+
+  it("finds every word formable from the rack (>=2 letters, multiset)", () => {
+    const rack: Letter[] = ["C", "A", "T", "S"];
+    const got = [...enumerateTumblerWords(rack, SMALL)].sort();
+    expect(got).toEqual(["ACT", "AT", "CAST", "CAT", "CATS", "SCAT", "TA"]);
+  });
+
+  it("excludes words needing a letter the rack lacks", () => {
+    const rack: Letter[] = ["C", "A", "T"]; // no S or R
+    const got = [...enumerateTumblerWords(rack, SMALL)].sort();
+    expect(got).toEqual(["ACT", "AT", "CAT", "TA"]);
+  });
+
+  it("respects multiset counts and returns [] when nothing fits", () => {
+    const twoE = buildTrie(["EYE", "EWE", "BEE"]); // each needs two E's
+    const rack: Letter[] = ["E", "Y", "W", "B"]; // only one E
+    expect(enumerateTumblerWords(rack, twoE)).toEqual([]);
+  });
+
+  it("never returns single-letter words even when the dict has them", () => {
+    const rack: Letter[] = ["A", "I", "T"];
+    const got = enumerateTumblerWords(rack, SMALL);
+    expect(got).not.toContain("A");
+    expect(got).not.toContain("I");
+    for (const w of got) expect(w.length).toBeGreaterThanOrEqual(MIN_TUMBLER_WORD_LENGTH);
+  });
+
+  it("every result is accepted by validateTumblerWord for the rack (fixture dict)", () => {
+    const rack: Letter[] = ["C", "A", "T", "S", "R", "E", "N"];
+    const words = enumerateTumblerWords(rack, DICT);
+    expect(words.length).toBeGreaterThan(0);
+    for (const w of words) {
+      expect(validateTumblerWord(rack, w, DICT)).toEqual({ ok: true });
+    }
+    expect(words).toContain("CAT");
+    expect(words).toContain("CATS");
   });
 });
