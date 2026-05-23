@@ -23,7 +23,7 @@ export default defineConfig({
         short_name: "Scrabble",
         description: "Private Scrabble-style PWA gift.",
         display: "standalone",
-        orientation: "landscape-primary",
+        orientation: "any",
         // background_color + theme_color now match the new HomeScreen
         // cream palette (was the older warm-brown). Keeps the install /
         // splash screen visually consistent with the redesign.
