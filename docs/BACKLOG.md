@@ -9,3 +9,7 @@ Ideas noted during build but deferred. Each line tagged with the phase it could 
 - (post-launch) Custom themed tile sets (visual reskin only).
 - (post-launch) Spelling Bee score tiers ("Beginner / Good / Genius") derived from total possible score for the day — motivating but not essential.
 - (post-launch) Tumbler "show missed words" on the end screen (list of words from `enumerateBeeWords`-style enumeration he could have found).
+- (post-launch) Phone: pinch-zoom on the 15×15 board (tap-to-place suffices for now; Mini is the phone default, so cells are comfortable).
+- (post-launch) Phone: a bespoke phone-landscape layout (landscape currently reuses the scaled-down desktop canvas).
+- (post-launch) Phone: show the Tumbler personal-best on the in-game phone screen (dropped for portrait compactness; the end screen still shows best-vs-this-round).
+- (bug) Resign at equal scores shows "It's a tie" instead of the opponent winning — in the shared end-result logic (`GameEndScreen` `computeStats` / engine resign handling); affects both desktop and phone. Spun off as a separate task.

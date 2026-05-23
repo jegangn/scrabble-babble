@@ -27,6 +27,7 @@ Private Scrabble-style PWA gift for father-in-law's iPad. Solo (vs AI) + hot-sea
 | 2 | AI bot (Easy/Medium/Hard) in Web Worker | ✅ done |
 | 3 | Random-board + Mini 11×11 variants | ✅ done |
 | 4 | Tumbler + Spelling Bee | ✅ done |
+| 5 | Phone portrait port (additive DeviceRouter path; big screens unchanged) | ✅ done |
 
 ## Workflow
 
