@@ -107,7 +107,14 @@ export function PhoneHome(): JSX.Element {
 
         {/* Nav buttons */}
         <nav
-          style={{ display: "flex", flexDirection: "column", gap: space.x3 }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            gap: space.x3,
+            flex: 1,
+            minHeight: 0,
+          }}
           aria-label="Main menu"
         >
           {hasInProgress && (
@@ -143,7 +150,7 @@ export function PhoneHome(): JSX.Element {
         </nav>
 
         {/* Footer mark — same as desktop home */}
-        <FooterMark style={{ marginTop: "auto", paddingTop: space.x4 }} />
+        <FooterMark style={{ paddingTop: space.x4 }} />
       </div>
     </PhoneShell>
   );
