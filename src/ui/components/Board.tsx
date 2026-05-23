@@ -26,6 +26,7 @@ export function Board({ board, pendingKeys, onCellTap }: BoardProps): JSX.Elemen
   const center = Math.floor(size / 2);
   return (
     <div
+      data-testid="game-board"
       style={{
         display: "grid",
         gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,

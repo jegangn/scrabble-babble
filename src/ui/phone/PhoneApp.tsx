@@ -5,6 +5,7 @@ import { PhonePlaceholder } from "./PhonePlaceholder.js";
 import { PhoneHome } from "./screens/PhoneHome.js";
 import { PhoneScores } from "./screens/PhoneScores.js";
 import { PhoneNewGame } from "./screens/PhoneNewGame.js";
+import { PhoneGame } from "./screens/PhoneGame.js";
 
 export function PhoneApp(): JSX.Element {
   const screen = useGameStore((s) => s.screen);
@@ -14,7 +15,7 @@ export function PhoneApp(): JSX.Element {
     case "loading": return <LoadingScreen />;
     case "home": return <PhoneHome />;
     case "new_game": return <PhoneNewGame />;
-    case "game": return <PhonePlaceholder label="game" />;
+    case "game": return <PhoneGame />;
     case "handoff": {
       const nextName = game?.players[screen.nextPlayerIndex]?.name ?? "Next player";
       return <HotSeatHandoff nextPlayerName={nextName} onReady={() => setScreen({ kind: "game" })} />;
