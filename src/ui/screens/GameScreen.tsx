@@ -9,11 +9,11 @@ import {
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { getBotMove } from "../../ai-client/botClient.js";
-import { scorePlaceMove } from "../../engine/scorer.js";
-import { validatePlaceMove } from "../../engine/validator.js";
 import type { Letter, Position } from "../../engine/types.js";
 import { useGameStore } from "../../store/gameStore.js";
-import { applyPendingToBoard, pendingKeys, pendingToMove } from "../../store/pending.js";
+import { applyPendingToBoard, pendingKeys } from "../../store/pending.js";
+import { usePendingPreview } from "../hooks/usePendingPreview.js";
+import { useLastMove } from "../hooks/useLastMove.js";
 import { tokens } from "../tokens.js";
 import { BackPill } from "../components/BackPill.js";
 import { BlankLetterPicker } from "../components/BlankLetterPicker.js";
@@ -183,70 +183,8 @@ export function GameScreen(): JSX.Element | null {
     [pending],
   );
 
-  /**
-   * Pending-word preview — computes the word + projected score for the
-   * tiles the user has placed but not yet submitted. Returns:
-   *   - { word, score: number } when the placement is a legal move,
-   *   - { word, score: null }   when letters are placed but not (yet) legal,
-   *   - null                    when nothing is pending.
-   */
-  const pendingPreview = useMemo(() => {
-    if (pending.length === 0 || !game || !dictionary) return null;
-    const move = pendingToMove(pending);
-    const validation = validatePlaceMove(game, move, dictionary);
-    if (!validation.ok) {
-      // Best-effort: show the letters the user has placed, sorted by
-      // board POSITION (not insertion order) so the preview reads as
-      // the word the user actually sees forming on the board. E.g.
-      // dropping A→R→I→S vertically should show "ARIS", not the order
-      // in which the tiles were dragged ("ISA" etc).
-      const allSameRow = pending.every(
-        (p) => p.position.row === pending[0]!.position.row,
-      );
-      const allSameCol = pending.every(
-        (p) => p.position.col === pending[0]!.position.col,
-      );
-      const sorted = [...pending].sort((a, b) => {
-        if (allSameRow) return a.position.col - b.position.col;
-        if (allSameCol) return a.position.row - b.position.row;
-        return (
-          a.position.row - b.position.row || a.position.col - b.position.col
-        );
-      });
-      const partial = sorted
-        .map((p) =>
-          p.tile.kind === "letter"
-            ? p.tile.letter
-            : "letter" in p.tile && typeof p.tile.letter === "string"
-              ? p.tile.letter
-              : "?",
-        )
-        .join("");
-      return { word: partial, score: null as number | null };
-    }
-    const score = scorePlaceMove(game, move);
-    // ScoreResult.mainWord is a WordScore object — destructure to the
-    // string + use the result's total.
-    return { word: score.mainWord.word, score: score.total as number | null };
-  }, [pending, game, dictionary]);
-
-  /**
-   * Last-move chip data. Pulls the most recent place-move from history;
-   * passes / swaps / resigns don't surface here because there's no word
-   * to display. Returns null on the opening turn or when the most recent
-   * action wasn't a place.
-   */
-  const lastMove = useMemo(() => {
-    if (!game) return null;
-    for (let i = game.history.length - 1; i >= 0; i--) {
-      const entry = game.history[i]!;
-      if (entry.move.kind === "place") {
-        const player = game.players[entry.playerIndex]!;
-        return { word: entry.mainWord, score: entry.score, name: player.name };
-      }
-    }
-    return null;
-  }, [game]);
+  const pendingPreview = usePendingPreview(game, pending, dictionary);
+  const lastMove = useLastMove(game);
 
   if (!game || !board) return null;
 
