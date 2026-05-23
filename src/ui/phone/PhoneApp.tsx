@@ -1,7 +1,6 @@
 import { useGameStore } from "../../store/gameStore.js";
 import { LoadingScreen } from "../screens/LoadingScreen.js";
 import { HotSeatHandoff } from "../components/HotSeatHandoff.js";
-import { PhonePlaceholder } from "./PhonePlaceholder.js";
 import { PhoneHome } from "./screens/PhoneHome.js";
 import { PhoneScores } from "./screens/PhoneScores.js";
 import { PhoneNewGame } from "./screens/PhoneNewGame.js";
