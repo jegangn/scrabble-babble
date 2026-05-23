@@ -92,21 +92,39 @@ export function TumblerEndScreen(): JSX.Element | null {
       <BackPill onClick={goHome} />
       {currentUser && <UserChip name={currentUser} />}
 
+      {/* Pinned to the viewport (var(--app-h)) so the screen never exceeds the
+          design canvas. On the iPad Air the canvas is fixed-height and cannot
+          scroll, so an unbounded screen would clip the action buttons. The two
+          word-lists scroll inside their own cards instead. Mirrors the in-game
+          TumblerScreen's pinning pattern. */}
+      <div
+        style={{
+          height: "var(--app-h)",
+          maxHeight: "var(--app-h)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          width: "100%",
+        }}
+      >
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gridTemplateRows: "minmax(0, 1fr)",
           gap: space.x10,
           padding: `${space.x16 + 16}px ${space.x10}px ${space.x6}px`,
           maxWidth: 1240,
           margin: "0 auto",
           width: "100%",
-          alignContent: "start",
         }}
       >
-        {/* Left — score + actions */}
-        <div style={{ display: "flex", flexDirection: "column", gap: space.x6 }}>
+        {/* Left — score + actions. Stretches to the row height (actions pinned
+            to the bottom via marginTop:auto); scrolls if the score + leaderboard
+            ever exceed it so the actions stay reachable. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: space.x6, minHeight: 0, maxHeight: "100%", overflowY: "auto" }}>
           <div>
             <Tagline style={{ color: color.success }}>
               {isNewBest ? "Round complete · New best" : "Round complete"}
@@ -305,9 +323,11 @@ export function TumblerEndScreen(): JSX.Element | null {
         </div>
 
         {/* Right — words grid + all-possible reveal. alignSelf:start keeps the
-            cards at their content height instead of stretching to match a taller
-            left column (which left empty space under the found-words list). */}
-        <div style={{ display: "flex", flexDirection: "column", gap: space.x4, alignSelf: "start" }}>
+            cards at their content height for small rounds (no empty space under
+            the found-words list). maxHeight:100% caps the column at the row
+            height so a big round makes the found-list scroll inside its own card
+            (flex:1 + minHeight:0) instead of pushing the screen past the canvas. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: space.x4, alignSelf: "start", maxHeight: "100%", minHeight: 0 }}>
           <FoundList
             title="Words you found"
             count={foundWords.length}
@@ -319,10 +339,11 @@ export function TumblerEndScreen(): JSX.Element | null {
       </div>
 
       <footer
-        style={{ padding: `${space.x4}px ${space.x8}px ${space.x6}px` }}
+        style={{ padding: `${space.x4}px ${space.x8}px ${space.x4}px` }}
       >
         <FooterMark />
       </footer>
+      </div>
     </Surface>
   );
 }
