@@ -8,6 +8,7 @@ import { PhoneNewGame } from "./screens/PhoneNewGame.js";
 import { PhoneGame } from "./screens/PhoneGame.js";
 import { PhoneGameEnd } from "./screens/PhoneGameEnd.js";
 import { PhoneTumbler } from "./screens/PhoneTumbler.js";
+import { PhoneTumblerEnd } from "./screens/PhoneTumblerEnd.js";
 
 export function PhoneApp(): JSX.Element {
   const screen = useGameStore((s) => s.screen);
@@ -24,7 +25,7 @@ export function PhoneApp(): JSX.Element {
     }
     case "game_end": return <PhoneGameEnd />;
     case "tumbler": return <PhoneTumbler />;
-    case "tumbler_end": return <PhonePlaceholder label="tumbler_end" />;
+    case "tumbler_end": return <PhoneTumblerEnd />;
     case "spelling_bee": return <PhonePlaceholder label="spelling_bee" />;
     case "scores": return <PhoneScores />;
   }
