@@ -322,18 +322,20 @@ export function TumblerEndScreen(): JSX.Element | null {
           </div>
         </div>
 
-        {/* Right — words grid + all-possible reveal. alignSelf:start keeps the
-            cards at their content height for small rounds (no empty space under
-            the found-words list). maxHeight:100% caps the column at the row
-            height so a big round makes the found-list scroll inside its own card
-            (flex:1 + minHeight:0) instead of pushing the screen past the canvas. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: space.x4, alignSelf: "start", maxHeight: "100%", minHeight: 0 }}>
-          <FoundList
-            title="Words you found"
-            count={foundWords.length}
-            columns={3}
-            words={sortedWords}
-          />
+        {/* Right — words grid + all-possible reveal. The column stretches to the
+            row height. "Words you found" stays content-sized (flex:0 1 auto — no
+            empty stretch for small rounds, shrinks + scrolls internally for big
+            ones), and "All possible words" grows (flex:1) to fill the rest, so
+            the screen uses the whole page instead of leaving an empty gap. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: space.x4, minHeight: 0 }}>
+          <div style={{ flex: "0 1 auto", minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <FoundList
+              title="Words you found"
+              count={foundWords.length}
+              columns={3}
+              words={sortedWords}
+            />
+          </div>
           <PossibleWordsCard rack={rack} dictionary={dictionary} foundWords={foundWords} />
         </div>
       </div>

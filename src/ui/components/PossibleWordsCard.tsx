@@ -73,6 +73,11 @@ export function PossibleWordsCard({
         display: "flex",
         flexDirection: "column",
         gap: space.x3,
+        // Fill the available height in the end-screen column so the word grid
+        // grows to use the page instead of leaving an empty gap below. Bounded
+        // by the pinned screen, so the grid scrolls when it overflows.
+        flex: 1,
+        minHeight: 0,
       }}
     >
       <style>{`
@@ -99,7 +104,10 @@ export function PossibleWordsCard({
           gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
           gap: 8,
           overflowY: "auto",
-          maxHeight: 360,
+          // flex:1 (not a fixed maxHeight) so the grid fills the card and the
+          // card fills the column — the list grows to use the page, scrolling
+          // only when the words exceed the available height.
+          flex: 1,
           minHeight: 0,
           paddingRight: 4,
         }}

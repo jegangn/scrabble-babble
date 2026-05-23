@@ -164,11 +164,11 @@ async function playRound(page: Page, limit = SUBMIT_LIMIT): Promise<number> {
   return submitted;
 }
 
-/** Height of the "Words you found" card (px). */
-async function foundCardHeight(page: Page): Promise<number> {
-  return await page.evaluate(() => {
+/** Height (px) of the card whose section label exactly matches `labelText`. */
+async function cardHeight(page: Page, labelText: string): Promise<number> {
+  return await page.evaluate((text) => {
     const label = Array.from(document.querySelectorAll("*")).find(
-      (el) => el.textContent?.trim() === "Words you found",
+      (el) => el.textContent?.trim() === text,
     ) as HTMLElement | undefined;
     if (!label) return -1;
     let card: HTMLElement | null = label;
@@ -176,7 +176,7 @@ async function foundCardHeight(page: Page): Promise<number> {
       card = card.parentElement;
     }
     return card ? Math.round(card.getBoundingClientRect().height) : -1;
-  });
+  }, labelText);
 }
 
 /** Count the rendered word pills in the "Words you found" card. */
@@ -256,8 +256,8 @@ test.describe("Tumbler end-screen fits the canvas (no clip)", () => {
     await context.close();
   });
 
-  test("Air 1180x820 touch — small round stays compact (no empty found-list)", async ({ browser }) => {
-    const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
+  test("Pro 1366x880 — small round: found-list compact, all-possible fills page", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1366, height: 880 }, hasTouch: false });
     const page = await context.newPage();
     test.setTimeout(90_000);
     await freshHome(page);
@@ -265,13 +265,19 @@ test.describe("Tumbler end-screen fits the canvas (no clip)", () => {
     await page.clock.pauseAt(TUMBLER_TIME);
     await playRound(page, 4); // only a few words found
 
-    // With few words the found-list card must size to its content, not stretch
-    // to fill the column (the empty-space regression). 4 words ≈ 2 rows.
-    const cardH = await foundCardHeight(page);
-    expect(cardH, "found-list card should exist").toBeGreaterThan(0);
-    expect(cardH, `found-list card (${cardH}px) should be compact for ~4 words`).toBeLessThan(260);
+    // With few words the found-list card sizes to its content, not stretched to
+    // fill the column (the empty-space regression). 4 words ≈ 2 rows.
+    const foundH = await cardHeight(page, "Words you found");
+    expect(foundH, "found-list card should exist").toBeGreaterThan(0);
+    expect(foundH, `found-list card (${foundH}px) should be compact for ~4 words`).toBeLessThan(260);
 
-    await assertActionsWithinViewport(page, "Air small");
+    // "All possible words" grows to fill the leftover vertical space instead of
+    // leaving a big empty gap. Old behaviour capped it at ~430px (maxHeight 360
+    // + header); filling pushes it well past that.
+    const possibleH = await cardHeight(page, "All possible words");
+    expect(possibleH, `all-possible card (${possibleH}px) should fill the page`).toBeGreaterThan(500);
+
+    await assertActionsWithinViewport(page, "Pro small");
     await context.close();
   });
 });
