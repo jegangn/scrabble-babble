@@ -9,6 +9,7 @@ export interface DraggableRackTileProps {
   readonly disabled: boolean;
   readonly selected: boolean;
   readonly onTap: () => void;
+  readonly size?: number;
 }
 
 export function DraggableRackTile({
@@ -17,17 +18,13 @@ export function DraggableRackTile({
   disabled,
   selected,
   onTap,
+  size = 64,
 }: DraggableRackTileProps): JSX.Element {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `rack-${rackIndex}`,
     data: { kind: "rack", rackIndex },
     disabled,
   });
-
-  // NOTE: while dragging, the actual moving tile is rendered inside the
-  // <DragOverlay> mounted in GameScreen. The original here fades to a
-  // 40% "ghost" footprint so the rack slot is visually held but the user
-  // sees their finger carrying the tile.
   return (
     <div
       ref={setNodeRef}
@@ -37,8 +34,8 @@ export function DraggableRackTile({
       role="button"
       tabIndex={0}
       style={{
-        width: 64,
-        height: 64,
+        width: size,
+        height: size,
         cursor: disabled ? "default" : isDragging ? "grabbing" : "grab",
         opacity: disabled ? 0.25 : isDragging ? 0.4 : 1,
         outline: selected ? `3px solid ${TILE.bgPending}` : "none",
@@ -48,7 +45,7 @@ export function DraggableRackTile({
         transition: "opacity 120ms ease",
       }}
     >
-      <Tile tile={tile} />
+      <Tile tile={tile} size={size} />
     </div>
   );
 }
