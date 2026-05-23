@@ -23,10 +23,7 @@ Portrait was deliberately out of scope until now (target device is the father-in
 
 1. **Full portrait port** — every screen redesigned for portrait, board game included.
 2. **Support both orientations on a phone** — portrait uses the new layout; landscape falls back to today's shrink-to-fit view (already works).
-
-## Open item for review
-
-- **Mini 11×11 as the phone default variant.** On a 390px phone, 15×15 cells are ~24px (tight but standard for mobile Scrabble); Mini cells are ~33px (comfortable). Proposal: when on a phone, default New Game's variant to **Mini**, with Classic/Random still selectable. *Owner to confirm — does not block the rest of the spec.*
+3. **Mini 11×11 is the phone default variant.** On a 390px phone, 15×15 cells are ~24px (tight but standard for mobile Scrabble); Mini cells are ~33px (comfortable). On a phone, New Game defaults to **Mini**, with Classic/Random still one tap away. Big-screen default behaviour (last-picked variant) is unchanged.
 
 ---
 
@@ -155,7 +152,7 @@ All phone screens pin to `height: var(--app-h)` (= `100dvh` on the phone path) w
 Vertical stack: wordmark, then full-width `PhoneNavButton`s — **Resume** (only if an in-progress game exists), **New Game**, **Tumbler**, **Spelling Bee**, **Scores**. ≥56px targets.
 
 ### PhoneNewGame
-Single-column scrolling form: variant (Classic / Random / Mini as stacked selectable cards — defaulting to Mini per the open item), opponent (Hot-seat / AI + difficulty tier), player name(s), `Start`.
+Single-column scrolling form: variant (Classic / Random / Mini as stacked selectable cards, **defaulting to Mini on phones**), opponent (Hot-seat / AI + difficulty tier), player name(s), `Start`.
 
 ### PhoneTumbler
 Reuses the store's Tumbler state/actions/timer. Top: 7 letters + text input + countdown + live score. Below: found-words list that scrolls. Timer-start-on-first-keystroke and pause-on-blur behaviour unchanged (store-level).
