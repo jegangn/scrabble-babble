@@ -6,6 +6,7 @@ import { PhoneHome } from "./screens/PhoneHome.js";
 import { PhoneScores } from "./screens/PhoneScores.js";
 import { PhoneNewGame } from "./screens/PhoneNewGame.js";
 import { PhoneGame } from "./screens/PhoneGame.js";
+import { PhoneGameEnd } from "./screens/PhoneGameEnd.js";
 
 export function PhoneApp(): JSX.Element {
   const screen = useGameStore((s) => s.screen);
@@ -20,7 +21,7 @@ export function PhoneApp(): JSX.Element {
       const nextName = game?.players[screen.nextPlayerIndex]?.name ?? "Next player";
       return <HotSeatHandoff nextPlayerName={nextName} onReady={() => setScreen({ kind: "game" })} />;
     }
-    case "game_end": return <PhonePlaceholder label="game_end" />;
+    case "game_end": return <PhoneGameEnd />;
     case "tumbler": return <PhonePlaceholder label="tumbler" />;
     case "tumbler_end": return <PhonePlaceholder label="tumbler_end" />;
     case "spelling_bee": return <PhonePlaceholder label="spelling_bee" />;
