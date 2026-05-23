@@ -88,13 +88,15 @@ export function PhoneTopBar({
         )}
       </div>
 
-      {/* Centre: title */}
+      {/* Centre: title — rendered as h1 so getByRole("heading") finds it */}
       {title && (
-        <div
+        <h1
           style={{
+            margin: 0,
             color: color.ink,
             fontSize: size.body,
             fontWeight: weight.bold,
+            fontFamily: "inherit",
             textAlign: "center",
             letterSpacing: "-0.01em",
             whiteSpace: "nowrap",
@@ -103,7 +105,7 @@ export function PhoneTopBar({
           }}
         >
           {title}
-        </div>
+        </h1>
       )}
 
       {/* Right: trailing node or empty spacer */}

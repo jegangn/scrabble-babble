@@ -3,6 +3,8 @@ import { LoadingScreen } from "../screens/LoadingScreen.js";
 import { HotSeatHandoff } from "../components/HotSeatHandoff.js";
 import { PhonePlaceholder } from "./PhonePlaceholder.js";
 import { PhoneHome } from "./screens/PhoneHome.js";
+import { PhoneScores } from "./screens/PhoneScores.js";
+import { PhoneNewGame } from "./screens/PhoneNewGame.js";
 
 export function PhoneApp(): JSX.Element {
   const screen = useGameStore((s) => s.screen);
@@ -11,7 +13,7 @@ export function PhoneApp(): JSX.Element {
   switch (screen.kind) {
     case "loading": return <LoadingScreen />;
     case "home": return <PhoneHome />;
-    case "new_game": return <PhonePlaceholder label="new_game" />;
+    case "new_game": return <PhoneNewGame />;
     case "game": return <PhonePlaceholder label="game" />;
     case "handoff": {
       const nextName = game?.players[screen.nextPlayerIndex]?.name ?? "Next player";
@@ -21,6 +23,6 @@ export function PhoneApp(): JSX.Element {
     case "tumbler": return <PhonePlaceholder label="tumbler" />;
     case "tumbler_end": return <PhonePlaceholder label="tumbler_end" />;
     case "spelling_bee": return <PhonePlaceholder label="spelling_bee" />;
-    case "scores": return <PhonePlaceholder label="scores" />;
+    case "scores": return <PhoneScores />;
   }
 }
