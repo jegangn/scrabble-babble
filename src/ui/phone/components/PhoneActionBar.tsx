@@ -47,7 +47,10 @@ export function PhoneActionBar({
         background: color.cream,
         borderTop: `1px solid ${color.strokeSoft}`,
         paddingTop: space.x2,
-        paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+        // Bottom safe-area clearance is owned by PhoneShell (its paddingBottom
+        // wraps this bar); only the bar's own internal padding belongs here, or
+        // the home-indicator inset would be counted twice.
+        paddingBottom: space.x2,
         paddingLeft: space.x3,
         paddingRight: space.x3,
         position: "relative",
