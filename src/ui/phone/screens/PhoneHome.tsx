@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { APP_NAME } from "../../../config/branding.js";
 import { useGameStore } from "../../../store/gameStore.js";
 import { loadInProgress } from "../../../storage/game-storage.js";
 import { tokens } from "../../tokens.js";
 import { FooterMark } from "../../components/FooterMark.js";
+import { TileHero } from "../../components/TileHero.js";
 import { PhoneShell } from "../PhoneShell.js";
 import { PhoneNavButton } from "../components/PhoneNavButton.js";
 
@@ -31,7 +31,7 @@ export function PhoneHome(): JSX.Element {
     if (game) hydrate(game);
   };
 
-  const { color, size, weight, font, space, grain } = tokens;
+  const { space, grain } = tokens;
 
   return (
     <PhoneShell>
@@ -65,7 +65,9 @@ export function PhoneHome(): JSX.Element {
           zIndex: 1,
         }}
       >
-        {/* Wordmark heading — accessible name matches desktop heading */}
+        {/* Wordmark heading — the same animated tile hero as the desktop
+            home (shared <TileHero>), scaled down so SCRABBLE fits the
+            narrow phone width. */}
         <header
           style={{
             display: "flex",
@@ -75,34 +77,7 @@ export function PhoneHome(): JSX.Element {
             paddingTop: space.x4,
           }}
         >
-          <h1
-            aria-label={APP_NAME}
-            style={{
-              margin: 0,
-              fontSize: size.h2,
-              fontWeight: weight.heavy,
-              fontFamily: font.serif,
-              color: color.brown,
-              letterSpacing: "-0.02em",
-              textAlign: "center",
-              lineHeight: 1.1,
-            }}
-          >
-            {APP_NAME}
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              fontSize: size.caption,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: color.inkSoft,
-              fontWeight: weight.reg,
-              fontFamily: font.sans,
-            }}
-          >
-            Words, on your terms.
-          </p>
+          <TileHero tileSize={36} tileGap={4} />
         </header>
 
         {/* Nav buttons */}

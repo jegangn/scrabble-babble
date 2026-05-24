@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { enumerateSevenLetterPangrams } from "../../engine/games/spelling-bee.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { loadInProgress } from "../../storage/game-storage.js";
@@ -7,85 +7,9 @@ import { playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { MenuItem } from "../components/MenuItem.js";
 import { MenuTile } from "../components/MenuTile.js";
+import { TileHero } from "../components/TileHero.js";
 import { SettingsModal } from "../components/SettingsModal.js";
 import { UserNamePrompt } from "../components/UserNamePrompt.js";
-
-// ─── Hero "shuffle settle" animation ──────────────────────────────
-// Each tile enters scattered (random offset + rotation) and snaps into
-// the grid with a brief spring overshoot. The tagline fades up during
-// the last tile's settle. One-shot, no loop. Honors prefers-reduced-motion.
-
-const HERO_WORDS = ["SCRABBLE", "BABBLE"] as const;
-const HERO_TILE_COUNT = HERO_WORDS.reduce((n, w) => n + w.length, 0);
-const HERO_TILE_DURATION_MS = 900;
-const HERO_STAGGER_MAX_MS = 130;
-const HERO_TAGLINE_DURATION_MS = 400;
-const HERO_TAGLINE_OVERLAP_MS = 250; // tagline starts this many ms before the last tile lands
-const HERO_TAGLINE_DELAY_MS =
-  HERO_STAGGER_MAX_MS + HERO_TILE_DURATION_MS - HERO_TAGLINE_OVERLAP_MS;
-
-/**
- * Deterministic per-tile-index variance. Mulberry32 stepped four times
- * per tile so each tile gets four independent draws (rx-sign, rx-mag,
- * ry-sign, ry-mag) plus one more for rotation. Stable across re-renders
- * so the same tile always lands the same way — only the mount triggers
- * a replay.
- */
-function heroVariance(i: number): {
-  rx: number;
-  ry: number;
-  rot: number;
-  d: number;
-} {
-  const draw = (k: number): number => {
-    let t = (i * 8 + k + 1) * 0x6d2b79f5;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const sign = (x: number): 1 | -1 => (x < 0.5 ? -1 : 1);
-  const rx = sign(draw(0)) * (60 + draw(1) * 60); // ±60..±120 px
-  const ry = sign(draw(2)) * (30 + draw(3) * 60); // ±30..±90 px
-  const rot = (draw(4) - 0.5) * 44; // -22..+22 deg
-  // Sequential stagger across all tiles (not random) so the eye reads
-  // a clear left-to-right cascade rather than chaos.
-  const d = (i / Math.max(1, HERO_TILE_COUNT - 1)) * HERO_STAGGER_MAX_MS;
-  return { rx, ry, rot, d };
-}
-
-const HERO_KEYFRAMES = `
-@keyframes hero-shuffle-settle {
-  from {
-    opacity: 0;
-    transform: translate(var(--rx), var(--ry)) rotate(var(--rot)) scale(0.85);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes hero-tagline-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
-}
-.hero-tile {
-  display: inline-block;
-  animation: hero-shuffle-settle ${HERO_TILE_DURATION_MS}ms cubic-bezier(.34, 1.4, .5, 1) both;
-  animation-delay: var(--d, 0ms);
-}
-.hero-tagline {
-  opacity: 0;
-  animation: hero-tagline-up ${HERO_TAGLINE_DURATION_MS}ms ease-out both;
-  animation-delay: ${HERO_TAGLINE_DELAY_MS}ms;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-tile, .hero-tagline {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-}
-`;
 
 /**
  * Home (main menu) — built from the design-handoff spec in
@@ -194,44 +118,6 @@ export function HomeScreen(): JSX.Element {
 
   const dictMissing = dictionary === null;
 
-  // Precompute the hero rows once per mount. heroVariance is deterministic
-  // by index, so the visual is stable across renders; useMemo avoids
-  // re-mapping the JSX every time HomeScreen re-renders for other reasons.
-  const heroRows = useMemo(() => {
-    let globalIndex = 0;
-    return HERO_WORDS.map((word, rowIndex) => (
-      <div
-        key={rowIndex}
-        style={{ display: "flex", alignItems: "flex-end", gap: 6 }}
-      >
-        {Array.from(word).map((ch) => {
-          const i = globalIndex++;
-          const { rx, ry, rot, d } = heroVariance(i);
-          return (
-            <span
-              key={i}
-              className="hero-tile"
-              style={
-                {
-                  "--rx": `${rx.toFixed(2)}px`,
-                  "--ry": `${ry.toFixed(2)}px`,
-                  "--rot": `${rot.toFixed(2)}deg`,
-                  "--d": `${d.toFixed(0)}ms`,
-                } as CSSProperties
-              }
-            >
-              <MenuTile
-                letter={ch}
-                size={60}
-                variant={rowIndex === 0 ? "cream" : "brown"}
-              />
-            </span>
-          );
-        })}
-      </div>
-    ));
-  }, []);
-
   return (
     <div
       style={{
@@ -325,14 +211,11 @@ export function HomeScreen(): JSX.Element {
           zIndex: 1,
         }}
       >
-        {/* HERO — stacked tile rows + tagline. The tile-block is wrapped
-            in an <h1> with aria-label so screen readers (and Playwright's
-            getByRole("heading")) see one heading with accessible name
-            "Scrabble Babble" — instead of reading out the individual
-            tile letters as text. Each mount plays a one-shot shuffle-
-            settle animation per tile; tagline fades up during the last
-            tile's settle. See HERO_KEYFRAMES + heroVariance above. */}
-        <style>{HERO_KEYFRAMES}</style>
+        {/* HERO — animated tile wordmark + tagline. Shared with the phone
+            home via <TileHero> so the two titles never drift. The <h1>'s
+            aria-label means screen readers (and Playwright's
+            getByRole("heading")) read one heading named "Scrabble Babble"
+            rather than the individual tile letters. */}
         <header
           style={{
             display: "flex",
@@ -342,32 +225,7 @@ export function HomeScreen(): JSX.Element {
             paddingTop: "clamp(0px, 1vh, 24px)",
           }}
         >
-          <h1
-            aria-label="Scrabble Babble"
-            style={{
-              margin: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {heroRows}
-          </h1>
-          <p
-            className="hero-tagline"
-            style={{
-              margin: 0,
-              fontSize: tokens.size.caption,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: tokens.color.inkSoft,
-              fontWeight: tokens.weight.reg,
-              fontFamily: tokens.font.sans,
-            }}
-          >
-            Words, on your terms.
-          </p>
+          <TileHero tileSize={60} tileGap={6} />
         </header>
 
         {/*
