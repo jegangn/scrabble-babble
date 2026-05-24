@@ -15,7 +15,7 @@ export function PhoneApp(): JSX.Element {
   const setScreen = useGameStore((s) => s.setScreen);
   const game = useGameStore((s) => s.game);
   switch (screen.kind) {
-    case "loading": return <LoadingScreen />;
+    case "loading": return <LoadingScreen tileSize={36} tileGap={4} />;
     case "home": return <PhoneHome />;
     case "new_game": return <PhoneNewGame />;
     case "game": return <PhoneGame />;

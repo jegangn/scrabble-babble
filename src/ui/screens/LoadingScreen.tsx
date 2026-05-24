@@ -31,7 +31,21 @@ const VALUES: Record<string, number> = {
   X: 8, Y: 3, Z: 10,
 };
 
-export function LoadingScreen(): JSX.Element {
+export interface LoadingScreenProps {
+  /** Hero tile size in px. Defaults to 66 — the size used inside the
+   *  1366×880 canvas that FitToViewport scales for laptop / iPad Pro /
+   *  iPad Air. The phone renders this screen OUTSIDE FitToViewport, so it
+   *  passes a smaller value (≈36) to keep the 8-tile SCRABBLE row from
+   *  overflowing the narrow width. */
+  readonly tileSize?: number;
+  /** Gap between tiles within a hero row. Defaults to 6. */
+  readonly tileGap?: number;
+}
+
+export function LoadingScreen({
+  tileSize = 66,
+  tileGap = 6,
+}: LoadingScreenProps = {}): JSX.Element {
   const { color } = tokens;
   // When the dictionary trie lands in the store, fade the splash out.
   // App.tsx waits 200 ms before swapping screens so the transition
@@ -90,8 +104,8 @@ export function LoadingScreen(): JSX.Element {
             gap: 8,
           }}
         >
-          <HeroRow letters={TOP_ROW} variant="cream" />
-          <HeroRow letters={BOTTOM_ROW} variant="brown" />
+          <HeroRow letters={TOP_ROW} variant="cream" size={tileSize} gap={tileGap} />
+          <HeroRow letters={BOTTOM_ROW} variant="brown" size={tileSize} gap={tileGap} />
         </div>
 
         {/* Status block — three pulsing brown dots + the tagline. */}
@@ -130,14 +144,16 @@ export function LoadingScreen(): JSX.Element {
 interface HeroRowProps {
   readonly letters: ReadonlyArray<string>;
   readonly variant: "cream" | "brown";
+  readonly size: number;
+  readonly gap: number;
 }
 
 /** One row of static tiles — no entry animation. */
-function HeroRow({ letters, variant }: HeroRowProps): JSX.Element {
+function HeroRow({ letters, variant, size, gap }: HeroRowProps): JSX.Element {
   return (
-    <div style={{ display: "flex", gap: 6 }}>
+    <div style={{ display: "flex", gap }}>
       {letters.map((letter, i) => (
-        <Tile key={i} letter={letter} value={VALUES[letter]} variant={variant} size={66} />
+        <Tile key={i} letter={letter} value={VALUES[letter]} variant={variant} size={size} />
       ))}
     </div>
   );
