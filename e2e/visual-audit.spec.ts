@@ -276,8 +276,12 @@ for (const [vpName, vp] of Object.entries(VIEWPORTS) as Array<
 
       // Confirm — destructive button is "End game now".
       await page.getByRole("button", { name: /end game now/i }).click();
-      // GameEnd renders "{Name} wins." or "It's a tie." in a display-size heading.
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 5000 });
+      // GameEnd must honour the resign: the opponent wins (the modal promised
+      // "your opponent will take the win"). Pre-fix this showed "It's a tie."
+      // because both players had scored 0.
+      await expect(page.getByRole("heading", { name: / wins\.$/ })).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText("It's a tie.")).toHaveCount(0);
+      await expect(page.getByText(/resigned\./)).toBeVisible();
       await page.waitForTimeout(300);
       await shot(page, "09-game-end", vpName);
       await reportOverlaps(page, `${vpName} · GameEnd`);
