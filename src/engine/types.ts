@@ -179,6 +179,15 @@ export type EndReason =
   | { readonly kind: "consecutive_passes" }
   | { readonly kind: "resignation"; readonly playerIndex: number };
 
+/**
+ * Who won a finished game. A resignation hands the win to the non-resigner
+ * regardless of score (never a tie in the two-player game); every other end
+ * condition is decided on score, with an equal top score reported as a tie.
+ */
+export type GameResult =
+  | { readonly kind: "winner"; readonly playerIndex: number }
+  | { readonly kind: "tie" };
+
 /** A single entry in the move log. */
 export interface MoveHistoryEntry {
   readonly move: Move;

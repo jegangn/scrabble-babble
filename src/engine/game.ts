@@ -17,6 +17,7 @@ import type {
   BoardConfig,
   CellKey,
   EndReason,
+  GameResult,
   GameState,
   GameStepResult,
   Move,
@@ -254,4 +255,51 @@ export function applyMove(
       return { ok: true, state: applyResignMove(state, move), score: null };
     }
   }
+}
+
+/** Highest scorer among the eligible players; an eligible top tie is a tie. */
+function highestScorer(
+  players: ReadonlyArray<PlayerState>,
+  eligible: (index: number) => boolean,
+): GameResult {
+  let winnerIndex = -1;
+  let topScore = Number.NEGATIVE_INFINITY;
+  let tied = false;
+  players.forEach((player, index) => {
+    if (!eligible(index)) return;
+    if (player.score > topScore) {
+      topScore = player.score;
+      winnerIndex = index;
+      tied = false;
+    } else if (player.score === topScore) {
+      tied = true;
+    }
+  });
+  if (winnerIndex === -1 || tied) return { kind: "tie" };
+  return { kind: "winner", playerIndex: winnerIndex };
+}
+
+/**
+ * Decide who won.
+ *
+ * Resignation is special: the resigner forfeits, so the win goes to the
+ * highest-scoring player who did NOT resign — independent of the score, and
+ * never a tie in the two-player game. Every other end condition (rack-out,
+ * consecutive passes) is decided purely on score, an equal top score being a
+ * tie. Safe to call on an in-progress game (returns the current leader),
+ * though callers normally render it only once the game has ended.
+ *
+ * Takes only the fields it reads (`players` + `status`) so the persisted
+ * `SerializedGameState` from saved history satisfies it without being
+ * rehydrated into a full `GameState`.
+ */
+export function getGameResult(
+  state: Pick<GameState, "players" | "status">,
+): GameResult {
+  const { players, status } = state;
+  const resigner =
+    status.kind === "ended" && status.reason.kind === "resignation"
+      ? status.reason.playerIndex
+      : null;
+  return highestScorer(players, (index) => index !== resigner);
 }

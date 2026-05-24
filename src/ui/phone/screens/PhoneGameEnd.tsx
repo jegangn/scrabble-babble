@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useGameStore } from "../../../store/gameStore.js";
 import type { Difficulty } from "../../../engine/ai/bot.js";
+import { getGameResult } from "../../../engine/game.js";
 import type { GameState, Variant } from "../../../engine/types.js";
 import { tokens } from "../../tokens.js";
 import { Button } from "../../components/Button.js";
@@ -90,13 +91,28 @@ export function PhoneGameEnd(): JSX.Element | null {
   if (!game || game.status.kind !== "ended" || !stats) return null;
 
   const players = game.players;
-  const sorted = [...players]
+  // Winner comes from the engine so a resignation is honoured (the resigner
+  // forfeits regardless of score); a score-only sort would call a level-score
+  // resign a tie. Shared with the desktop GameEndScreen.
+  const result = getGameResult(game);
+  const tied = result.kind === "tie";
+  const winnerIndex = result.kind === "winner" ? result.playerIndex : -1;
+  const reason = game.status.reason;
+  const byResignation = reason.kind === "resignation";
+  const resignerName =
+    reason.kind === "resignation" ? players[reason.playerIndex]!.name : "";
+  // Winner first (when there is one), then by score.
+  const sorted = players
     .map((p, i) => ({ ...p, index: i }))
-    .sort((a, b) => b.score - a.score);
-  const winner = sorted[0]!;
-  const runnerUp = sorted[1]!;
-  const tied = winner.score === runnerUp.score;
-  const delta = winner.score - runnerUp.score;
+    .sort((a, b) => {
+      if (winnerIndex !== -1) {
+        if (a.index === winnerIndex) return -1;
+        if (b.index === winnerIndex) return 1;
+      }
+      return b.score - a.score;
+    });
+  const winnerName = winnerIndex === -1 ? "" : players[winnerIndex]!.name;
+  const delta = (sorted[0]?.score ?? 0) - (sorted[1]?.score ?? 0);
 
   const modeLabel =
     settings.opponent.kind === "ai"
@@ -107,6 +123,8 @@ export function PhoneGameEnd(): JSX.Element | null {
 
   const taglineBody = tied ? (
     <>Even — a tied finish across {stats.totalMoves} moves.</>
+  ) : byResignation ? (
+    <>{resignerName} resigned.</>
   ) : (
     <>
       By {delta} point{delta === 1 ? "" : "s"}
@@ -127,7 +145,7 @@ export function PhoneGameEnd(): JSX.Element | null {
     <PhoneShell
       top={
         <PhoneTopBar
-          title={tied ? "It's a tie" : `${winner.name} wins`}
+          title={tied ? "It's a tie" : `${winnerName} wins`}
         />
       }
     >
@@ -170,7 +188,7 @@ export function PhoneGameEnd(): JSX.Element | null {
               color: color.brown,
             }}
           >
-            {tied ? "It's a tie." : `${winner.name} wins.`}
+            {tied ? "It's a tie." : `${winnerName} wins.`}
           </h1>
           <p
             style={{
@@ -187,7 +205,7 @@ export function PhoneGameEnd(): JSX.Element | null {
         {/* Score rows — winner-first order */}
         <div style={{ display: "flex", flexDirection: "column", gap: space.x3 }}>
           {sorted.map((p) => {
-            const isWinner = !tied && p.index === winner.index;
+            const isWinner = !tied && p.index === winnerIndex;
             return (
               <PhoneFinalScoreRow
                 key={p.index}

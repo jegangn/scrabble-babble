@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGameStore } from "../../store/gameStore.js";
+import { getGameResult } from "../../engine/game.js";
 import { loadHistory } from "../../storage/game-storage.js";
 import type { HistoryEntry } from "../../storage/db.js";
 import { playUiTap } from "../../audio/sounds.js";
@@ -133,7 +134,10 @@ function ScrabbleRow({ entry }: ScrabbleRowProps): JSX.Element {
   const { color, space, radius, shadow, size, weight } = tokens;
   const game = entry.game;
   const [p0, p1] = game.players;
-  const winner = p0!.score === p1!.score ? null : p0!.score > p1!.score ? p0! : p1!;
+  // Engine-decided so a resignation reads correctly in history (a resign at
+  // level scores is a loss for the resigner, not a tie).
+  const result = getGameResult(game);
+  const winner = result.kind === "winner" ? game.players[result.playerIndex]! : null;
   const loser = winner ? (winner === p0! ? p1! : p0!) : null;
   const variantLabel = VARIANT_LABEL[game.variant ?? "classic"] ?? "Classic 15×15";
   const isAi = p1!.name === "Computer";

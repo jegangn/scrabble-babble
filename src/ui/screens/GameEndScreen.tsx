@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useGameStore } from "../../store/gameStore.js";
 import type { Difficulty } from "../../engine/ai/bot.js";
+import { getGameResult } from "../../engine/game.js";
 import type { GameState, Variant } from "../../engine/types.js";
 import { tokens } from "../tokens.js";
 import { BackPill } from "../components/BackPill.js";
@@ -96,13 +97,28 @@ export function GameEndScreen(): JSX.Element | null {
   if (!game || game.status.kind !== "ended" || !stats) return null;
 
   const players = game.players;
-  const sorted = [...players]
+  // Winner is decided by the engine, which accounts for resignation (the
+  // resigner forfeits regardless of score). Sorting by score alone would
+  // mis-report a resign at level scores as a tie.
+  const result = getGameResult(game);
+  const tied = result.kind === "tie";
+  const winnerIndex = result.kind === "winner" ? result.playerIndex : -1;
+  const reason = game.status.reason;
+  const byResignation = reason.kind === "resignation";
+  const resignerName =
+    reason.kind === "resignation" ? players[reason.playerIndex]!.name : "";
+  // Winner first (when there is one), then by score.
+  const sorted = players
     .map((p, i) => ({ ...p, index: i }))
-    .sort((a, b) => b.score - a.score);
-  const winner = sorted[0]!;
-  const runnerUp = sorted[1]!;
-  const tied = winner.score === runnerUp.score;
-  const delta = winner.score - runnerUp.score;
+    .sort((a, b) => {
+      if (winnerIndex !== -1) {
+        if (a.index === winnerIndex) return -1;
+        if (b.index === winnerIndex) return 1;
+      }
+      return b.score - a.score;
+    });
+  const winnerName = winnerIndex === -1 ? "" : players[winnerIndex]!.name;
+  const delta = (sorted[0]?.score ?? 0) - (sorted[1]?.score ?? 0);
 
   const modeLabel =
     settings.opponent.kind === "ai"
@@ -111,10 +127,12 @@ export function GameEndScreen(): JSX.Element | null {
 
   const { color, radius, shadow, space, font, size, weight } = tokens;
 
-  // Tagline body — tied vs win-by-N + optional top-move callout. We
-  // build it as a fragment so the strong colour swap works inline.
+  // Tagline body — tied / won-by-resignation / win-by-N + optional top-move
+  // callout. We build it as a fragment so the strong colour swap works inline.
   const taglineBody = tied ? (
     <>It was even — a tied finish across {stats.totalMoves} moves.</>
+  ) : byResignation ? (
+    <>{resignerName} resigned.</>
   ) : (
     <>
       By {delta} point{delta === 1 ? "" : "s"}
@@ -167,7 +185,7 @@ export function GameEndScreen(): JSX.Element | null {
                 color: color.brown,
               }}
             >
-              {tied ? "It's a tie." : `${winner.name} wins.`}
+              {tied ? "It's a tie." : `${winnerName} wins.`}
             </h1>
             <p
               style={{
@@ -183,7 +201,7 @@ export function GameEndScreen(): JSX.Element | null {
 
           <div style={{ display: "flex", flexDirection: "column", gap: space.x3 }}>
             {sorted.map((p) => {
-              const isWinner = !tied && p.index === winner.index;
+              const isWinner = !tied && p.index === winnerIndex;
               return (
                 <FinalScoreRow
                   key={p.index}

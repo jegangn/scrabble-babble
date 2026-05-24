@@ -11,6 +11,11 @@ test("phone game-end (via resign) shows result and on-screen actions", async ({ 
   await page.getByRole("button", { name: /End game now/ }).click();
   const home = page.getByRole("button", { name: /Home/ });
   await expect(home).toBeVisible({ timeout: 10_000 });
+  // Regression: a resign hands the win to the other player — never a tie,
+  // even though both players scored 0. (Pre-fix this showed "It's a tie.")
+  await expect(page.getByText("It's a tie.")).toHaveCount(0);
+  await expect(page.getByText(/ wins\./)).toBeVisible();
+  await expect(page.getByText(/resigned\./)).toBeVisible();
   await page.screenshot({ path: "screenshots/phone-05-gameend.png" });
   const box = await home.boundingBox();
   expect(box).not.toBeNull();

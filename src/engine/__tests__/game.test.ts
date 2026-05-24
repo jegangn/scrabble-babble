@@ -6,14 +6,14 @@ import {
   fourPassesEndScenario,
   openingMoveScenario,
 } from "../__fixtures__/scenarios.js";
-import { applyMove, createGame } from "../game.js";
+import { applyMove, createGame, getGameResult } from "../game.js";
 import {
   createPassMove,
   createPlaceMove,
   createResignMove,
   createSwapMove,
 } from "../move.js";
-import type { Move, PlacedTile, Tile } from "../types.js";
+import type { EndReason, GameState, Move, PlacedTile, Tile } from "../types.js";
 
 const DICT = buildTrie(FIXTURE_WORDS);
 const T = (l: string, v: number): Tile => ({ kind: "letter", letter: l as "A", value: v });
@@ -169,6 +169,56 @@ describe("applyMove – resign", () => {
     expect(
       result.state.status.kind === "ended" && result.state.status.reason.kind,
     ).toBe("resignation");
+  });
+});
+
+describe("getGameResult", () => {
+  // A minimal ended state with the two players' scores and a chosen end reason.
+  // getGameResult only reads players[].score and status, so spreading a real
+  // game keeps the value well-formed without hand-building every field.
+  const endedWith = (scores: [number, number], reason: EndReason): GameState => {
+    const base = createGame({ seed: 1, playerNames: ["Alice", "Bob"] });
+    return {
+      ...base,
+      players: base.players.map((p, i) => ({ ...p, score: scores[i]! })),
+      status: { kind: "ended", reason },
+    };
+  };
+
+  it("hands the win to the non-resigner even when scores are tied", () => {
+    // Bob (index 1) resigns with the game level at 40–40.
+    const state = endedWith([40, 40], { kind: "resignation", playerIndex: 1 });
+    expect(getGameResult(state)).toEqual({ kind: "winner", playerIndex: 0 });
+  });
+
+  it("hands the win to the non-resigner even when the resigner is ahead", () => {
+    // Alice (index 0) resigns while leading 90–30 → Bob still wins.
+    const state = endedWith([90, 30], { kind: "resignation", playerIndex: 0 });
+    expect(getGameResult(state)).toEqual({ kind: "winner", playerIndex: 1 });
+  });
+
+  it("hands the win to the non-resigner when the resigner is behind", () => {
+    const state = endedWith([30, 90], { kind: "resignation", playerIndex: 0 });
+    expect(getGameResult(state)).toEqual({ kind: "winner", playerIndex: 1 });
+  });
+
+  it("awards the higher score for a non-resignation end", () => {
+    const state = endedWith([120, 95], { kind: "consecutive_passes" });
+    expect(getGameResult(state)).toEqual({ kind: "winner", playerIndex: 0 });
+  });
+
+  it("reports a tie when a non-resignation end finishes level", () => {
+    const state = endedWith([100, 100], { kind: "rack_out", playerIndex: 0 });
+    expect(getGameResult(state)).toEqual({ kind: "tie" });
+  });
+
+  it("applyMove(resign) at the opening hands the win to the other player", () => {
+    const game = openingMoveScenario(); // 0–0, player 0 to move
+    const result = applyMove(game, createResignMove(), DICT);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Player 0 resigned on their turn → player 1 wins despite the 0–0 board.
+    expect(getGameResult(result.state)).toEqual({ kind: "winner", playerIndex: 1 });
   });
 });
 
