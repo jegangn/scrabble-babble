@@ -160,7 +160,10 @@ async function playRound(page: Page, limit = SUBMIT_LIMIT): Promise<number> {
 
   await page.clock.fastForward(61_000);
   await expect(page.getByText(/Round complete/i)).toBeVisible({ timeout: 10_000 });
-  await page.waitForTimeout(900); // let the "All possible words" shimmer resolve
+  // Advance the mocked clock past PossibleWordsCard's REVEAL_DELAY_MS (500ms)
+  // so the shimmer resolves and word pills are rendered before we count them.
+  await page.clock.fastForward(600);
+  await page.waitForTimeout(300); // let React re-render settle
   return submitted;
 }
 
@@ -179,11 +182,14 @@ async function cardHeight(page: Page, labelText: string): Promise<number> {
   }, labelText);
 }
 
-/** Count the rendered word pills in the "Words you found" card. */
+/** Count the revealed word pills in the "All possible words" card.
+ *  Only counts `.pw-pill` spans (the revealed state), skipping the skeleton. */
 async function foundWordCount(page: Page): Promise<number> {
+  // Wait for the shimmer to resolve before counting.
+  await page.waitForSelector(".pw-pill", { timeout: 5_000 }).catch(() => null);
   return await page.evaluate(() => {
     const label = Array.from(document.querySelectorAll("*")).find(
-      (el) => el.textContent?.trim() === "Words you found",
+      (el) => el.textContent?.trim() === "All possible words",
     ) as HTMLElement | undefined;
     if (!label) return 0;
     let card: HTMLElement | null = label;
@@ -191,10 +197,7 @@ async function foundWordCount(page: Page): Promise<number> {
       card = card.parentElement;
     }
     if (!card) return 0;
-    const grid = Array.from(card.querySelectorAll("div")).find(
-      (d) => getComputedStyle(d).display === "grid",
-    ) as HTMLElement | undefined;
-    return grid ? grid.childElementCount : 0;
+    return card.querySelectorAll(".pw-pill").length;
   });
 }
 
@@ -265,15 +268,9 @@ test.describe("Tumbler end-screen fits the canvas (no clip)", () => {
     await page.clock.pauseAt(TUMBLER_TIME);
     await playRound(page, 4); // only a few words found
 
-    // With few words the found-list card sizes to its content, not stretched to
-    // fill the column (the empty-space regression). 4 words ≈ 2 rows.
-    const foundH = await cardHeight(page, "Words you found");
-    expect(foundH, "found-list card should exist").toBeGreaterThan(0);
-    expect(foundH, `found-list card (${foundH}px) should be compact for ~4 words`).toBeLessThan(260);
-
-    // "All possible words" grows to fill the leftover vertical space instead of
-    // leaving a big empty gap. Old behaviour capped it at ~430px (maxHeight 360
-    // + header); filling pushes it well past that.
+    // With the "Words you found" list removed, "All possible words" is the only
+    // word list. It should fill the full column height — well past the old
+    // capped ~430px (maxHeight 360 + header).
     const possibleH = await cardHeight(page, "All possible words");
     expect(possibleH, `all-possible card (${possibleH}px) should fill the page`).toBeGreaterThan(500);
 

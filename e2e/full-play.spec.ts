@@ -174,7 +174,6 @@ test.describe("Tumbler full play-through", () => {
     await page.clock.fastForward(61_000);
 
     await expect(page.getByText(/Round complete/i)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/Words you found/i)).toBeVisible();
     await expect(page.getByText(/All possible words/i)).toBeVisible();
   });
 });

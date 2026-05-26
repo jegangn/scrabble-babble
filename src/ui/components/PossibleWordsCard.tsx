@@ -101,8 +101,11 @@ export function PossibleWordsCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
-          gap: 8,
+          // 116-px min (up from 104) gives longer 7-letter words a bit more
+          // breathing room now that this is the only word list on the
+          // Tumbler end screen. Gap bumped from 8 to 10 to match.
+          gridTemplateColumns: "repeat(auto-fill, minmax(116px, 1fr))",
+          gap: 10,
           overflowY: "auto",
           // flex:1 (not a fixed maxHeight) so the grid fills the card and the
           // card fills the column — the list grows to use the page, scrolling

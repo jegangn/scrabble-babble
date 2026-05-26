@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { scoreTumblerWord } from "../../engine/games/tumbler.js";
 import {
   getTumblerBest,
   getTumblerLeaderboard,
@@ -13,7 +12,6 @@ import { BackPill } from "../components/BackPill.js";
 import { Button } from "../components/Button.js";
 import { CompareBar } from "../components/CompareBar.js";
 import { FooterMark } from "../components/FooterMark.js";
-import { FoundList } from "../components/FoundList.js";
 import { PossibleWordsCard } from "../components/PossibleWordsCard.js";
 import { SectionLabel } from "../components/SectionLabel.js";
 import { Surface } from "../components/Surface.js";
@@ -75,12 +73,6 @@ export function TumblerEndScreen(): JSX.Element | null {
   const delta = previousBest === null ? 0 : score - previousBest;
 
   const { color, radius, shadow, space, font, size, weight } = tokens;
-
-  // Sort words by score descending — players naturally scan for their
-  // best plays first; the handoff grid renders them in this order.
-  const sortedWords = [...foundWords].sort(
-    (a, b) => scoreTumblerWord(b) - scoreTumblerWord(a),
-  );
 
   // CompareBar scale: 250 is generous enough to handle elite scores
   // without saturating, while still showing meaningful bar growth for
@@ -322,20 +314,11 @@ export function TumblerEndScreen(): JSX.Element | null {
           </div>
         </div>
 
-        {/* Right — words grid + all-possible reveal. The column stretches to the
-            row height. "Words you found" stays content-sized (flex:0 1 auto — no
-            empty stretch for small rounds, shrinks + scrolls internally for big
-            ones), and "All possible words" grows (flex:1) to fill the rest, so
-            the screen uses the whole page instead of leaving an empty gap. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: space.x4, minHeight: 0 }}>
-          <div style={{ flex: "0 1 auto", minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <FoundList
-              title="Words you found"
-              count={foundWords.length}
-              columns={3}
-              words={sortedWords}
-            />
-          </div>
+        {/* Right — single word list. "All possible words" tints + ✓-marks the
+            player's finds, so a second list of just their finds was redundant.
+            Freed of the competing list, PossibleWordsCard fills the full column
+            height (flex:1 on its inner grid takes the whole column). */}
+        <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
           <PossibleWordsCard rack={rack} dictionary={dictionary} foundWords={foundWords} />
         </div>
       </div>

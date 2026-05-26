@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { scoreTumblerWord } from "../../../engine/games/tumbler.js";
 import {
   getTumblerBest,
   getTumblerLeaderboard,
@@ -12,7 +11,6 @@ import { tokens } from "../../tokens.js";
 import { Button } from "../../components/Button.js";
 import { CompareBar } from "../../components/CompareBar.js";
 import { FooterMark } from "../../components/FooterMark.js";
-import { FoundList } from "../../components/FoundList.js";
 import { PossibleWordsCard } from "../../components/PossibleWordsCard.js";
 import { SectionLabel } from "../../components/SectionLabel.js";
 import { PhoneShell } from "../PhoneShell.js";
@@ -74,11 +72,6 @@ export function PhoneTumblerEnd(): JSX.Element | null {
   const delta = previousBest === null ? 0 : score - previousBest;
 
   const { color, radius, shadow, space, font, size, weight } = tokens;
-
-  // Sort words by score descending — best plays first.
-  const sortedWords = [...foundWords].sort(
-    (a, b) => scoreTumblerWord(b) - scoreTumblerWord(a),
-  );
 
   const compareMax = 250;
 
@@ -197,33 +190,18 @@ export function PhoneTumblerEnd(): JSX.Element | null {
           </div>
         )}
 
-        {/* Words you found — fixed-height scrollable card on phone */}
+        {/* All possible words — single word list, fills the available height
+            inside the scrollable middle column. Tints + ✓-marks the player's
+            finds, so a separate "Words you found" list is redundant. */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            minHeight: 0,
-            // Cap the found list so it doesn't dominate the screen on long rounds.
-            // PossibleWordsCard follows below.
-            maxHeight: 240,
-          }}
-        >
-          <FoundList
-            title="Words you found"
-            count={foundWords.length}
-            columns={3}
-            words={sortedWords}
-          />
-        </div>
-
-        {/* All possible words */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            // Give it a minimum visual presence but let it grow.
-            minHeight: 180,
-            maxHeight: 320,
+            // Give it a comfortable minimum on a tall phone (so leaderboard
+            // doesn't crowd it); no upper cap — the outer middle column has
+            // overflow-y:auto so any extra height just scrolls.
+            minHeight: 260,
+            flex: "1 0 auto",
           }}
         >
           <PossibleWordsCard rack={rack} dictionary={dictionary} foundWords={foundWords} />
