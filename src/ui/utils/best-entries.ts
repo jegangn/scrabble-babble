@@ -23,10 +23,12 @@ export function formatTumblerDate(ts: number): string {
  *  `localDateKey()`) to dd/MM/yyyy. Pure string reorder — no Date()
  *  involved, so no timezone surprises. */
 export function formatBeeDate(dateKey: string): string {
+  // dateKey is contractually "YYYY-MM-DD" (produced by localDateKey()). If a
+  // caller hands us anything else, pass it through unchanged rather than
+  // silently rendering "///" or "//foo" — easier to spot upstream bugs.
   const parts = dateKey.split("-");
-  const y = parts[0] ?? "";
-  const m = parts[1] ?? "";
-  const d = parts[2] ?? "";
+  if (parts.length !== 3) return dateKey;
+  const [y, m, d] = parts as [string, string, string];
   return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
 }
 

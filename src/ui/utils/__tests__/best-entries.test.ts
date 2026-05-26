@@ -37,6 +37,12 @@ describe("formatBeeDate", () => {
   it("does not interpret the date — pure string reorder", () => {
     expect(formatBeeDate("2099-12-31")).toBe("31/12/2099");
   });
+
+  it("passes malformed input through unchanged (not silently mangled)", () => {
+    expect(formatBeeDate("bad")).toBe("bad");
+    expect(formatBeeDate("")).toBe("");
+    expect(formatBeeDate("2026")).toBe("2026");
+  });
 });
 
 describe("adaptTumblerEntries", () => {

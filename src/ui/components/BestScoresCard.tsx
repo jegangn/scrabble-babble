@@ -65,7 +65,7 @@ export function BestScoresCard({
         type="button"
         onClick={hasEntries ? () => setExpanded((v) => !v) : undefined}
         disabled={!hasEntries}
-        aria-expanded={expanded}
+        aria-expanded={hasEntries ? expanded : undefined}
         aria-label={
           hasEntries
             ? expanded
