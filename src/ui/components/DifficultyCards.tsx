@@ -46,12 +46,12 @@ export function DifficultyCards({ value, onChange }: DifficultyCardsProps): JSX.
         gap: space.x2,
         overflowX: "auto",
         scrollbarWidth: "thin",
-        // 16-px cream-to-transparent fade on the right edge so the cliff
-        // looks intentional, not clipped. Cheap; if it ever looks gimmicky,
-        // delete this maskImage line — the visible right-edge clipping of
-        // the rightmost tile already telegraphs scrollability.
-        maskImage: "linear-gradient(to right, black calc(100% - 16px), transparent)",
-        WebkitMaskImage: "linear-gradient(to right, black calc(100% - 16px), transparent)",
+        // 32-px opaque buffer + 16-px paddingRight so the rightmost card's
+        // focus ring (when keyboard-focused) stays inside the opaque region.
+        // The mask fades the LAST 16 px on top of that buffer.
+        paddingRight: 16,
+        maskImage: "linear-gradient(to right, black calc(100% - 32px), transparent)",
+        WebkitMaskImage: "linear-gradient(to right, black calc(100% - 32px), transparent)",
       }}
       role="radiogroup"
       aria-label="Difficulty"
