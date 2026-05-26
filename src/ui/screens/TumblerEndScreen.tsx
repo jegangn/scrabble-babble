@@ -26,7 +26,8 @@ import { UserChip } from "../components/UserChip.js";
  *           giant numeric score, body copy about the delta, CompareBar
  *           (prev best vs this round), bottom-anchored Restart +
  *           Play-again actions.
- *   Right — FoundList grid of words this round (3 columns).
+ *   Right — PossibleWordsCard grid of every valid word the rack can make,
+ *           with the player's finds tinted + check-marked.
  *
  * Persists the score: writes the personal best to settings, appends
  * a leaderboard entry (when scored > 0 and a user-name exists).

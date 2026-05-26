@@ -22,8 +22,8 @@ import { PhoneTopBar } from "../components/PhoneTopBar.js";
  * Single-column layout for 390×844 portrait, pinned to `var(--app-h)`:
  *   PhoneTopBar      — title "Tumbler", no back (round is over)
  *   Scrollable area  — score header (+ new-best treatment), CompareBar,
- *                      "Words you found" FoundList, "All possible words"
- *                      PossibleWordsCard, leaderboard card, footer
+ *                      "All possible words" PossibleWordsCard (tints +
+ *                      ✓-marks the player's finds), leaderboard card, footer
  *   Action strip     — flexShrink:0 pinned at the bottom outside the
  *                      scroll area so Restart + Play again are ALWAYS
  *                      reachable regardless of list length.

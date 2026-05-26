@@ -182,9 +182,14 @@ async function cardHeight(page: Page, labelText: string): Promise<number> {
   }, labelText);
 }
 
-/** Count the revealed word pills in the "All possible words" card.
- *  Only counts `.pw-pill` spans (the revealed state), skipping the skeleton. */
-async function foundWordCount(page: Page): Promise<number> {
+/**
+ * Count the pills rendered in the "All possible words" card.
+ * Used to assert that a heavy round (61 words submitted) produces enough
+ * rendered pills (≥40) to stress the layout — pills include both the
+ * player's finds (✓-marked) and every other valid word from the rack.
+ * Only counts `.pw-pill` spans (the revealed state), skipping the skeleton.
+ */
+async function possibleWordCount(page: Page): Promise<number> {
   // Wait for the shimmer to resolve before counting.
   await page.waitForSelector(".pw-pill", { timeout: 5_000 }).catch(() => null);
   return await page.evaluate(() => {
@@ -227,7 +232,7 @@ test.describe("Tumbler end-screen fits the canvas (no clip)", () => {
     await page.clock.pauseAt(TUMBLER_TIME);
     await playRound(page);
 
-    expect(await foundWordCount(page)).toBeGreaterThanOrEqual(40);
+    expect(await possibleWordCount(page)).toBeGreaterThanOrEqual(40);
     await assertActionsWithinViewport(page, "Pro");
     await context.close();
   });
@@ -254,7 +259,7 @@ test.describe("Tumbler end-screen fits the canvas (no clip)", () => {
     expect(screenScrollH, "end-screen content must fit the 880px canvas").not.toBeNull();
     expect(screenScrollH!).toBeLessThanOrEqual(882);
 
-    expect(await foundWordCount(page)).toBeGreaterThanOrEqual(40);
+    expect(await possibleWordCount(page)).toBeGreaterThanOrEqual(40);
     await assertActionsWithinViewport(page, "Air");
     await context.close();
   });
@@ -268,9 +273,9 @@ test.describe("Tumbler end-screen fits the canvas (no clip)", () => {
     await page.clock.pauseAt(TUMBLER_TIME);
     await playRound(page, 4); // only a few words found
 
-    // With the "Words you found" list removed, "All possible words" is the only
-    // word list. It should fill the full column height — well past the old
-    // capped ~430px (maxHeight 360 + header).
+    // "All possible words" is the sole word list on the right column.
+    // It should fill the full column height — well past the old capped
+    // ~430px (maxHeight 360 + header) that the removed FoundList used to impose.
     const possibleH = await cardHeight(page, "All possible words");
     expect(possibleH, `all-possible card (${possibleH}px) should fill the page`).toBeGreaterThan(500);
 
