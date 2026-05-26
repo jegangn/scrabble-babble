@@ -9,7 +9,7 @@ export interface BestScoresCardProps {
   readonly currentPlayerName?: string | null;
   /** When > entries[0].score (the saved best), the card shows a
    *  "New high — up X" sub-line under the header. */
-  readonly liveScore?: number;
+  readonly liveScore?: number | undefined;
 }
 
 /**

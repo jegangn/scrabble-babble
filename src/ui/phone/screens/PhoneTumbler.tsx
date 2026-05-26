@@ -8,15 +8,21 @@ import {
 } from "../../../engine/games/tumbler.js";
 import { createPrng } from "../../../engine/prng.js";
 import type { Letter } from "../../../engine/types.js";
+import {
+  getTumblerLeaderboard,
+  type LeaderboardEntry,
+} from "../../../storage/solo-storage.js";
 import { useGameStore } from "../../../store/gameStore.js";
 import { playError, playPlace, playRecall, playSuccess, playUiTap } from "../../../audio/sounds.js";
 import { tokens } from "../../tokens.js";
+import { BestScoresCard } from "../../components/BestScoresCard.js";
 import { BigNumber } from "../../components/BigNumber.js";
 import { Button } from "../../components/Button.js";
 import { CurrentWord } from "../../components/CurrentWord.js";
 import { FoundList } from "../../components/FoundList.js";
 import { Tile } from "../../components/Tile.js";
 import { Toast } from "../../components/Toast.js";
+import { adaptTumblerEntries } from "../../utils/best-entries.js";
 import { PhoneShell } from "../PhoneShell.js";
 import { PhoneTopBar } from "../components/PhoneTopBar.js";
 
@@ -39,6 +45,7 @@ const RACK_TILE_SIZE = 52;
  *   CurrentWord   — live word strip with tap-to-remove
  *   Flash overlay — success / duplicate / invalid toast
  *   Action row    — Shuffle / Clear / Submit
+ *   BestScoresCard — collapsed best strip; expands to device-wide top-10
  *   FoundList     — scrolling found-words card, fills remaining space
  *
  * All store wiring (timer, pause-on-blur, scoring, submit, handoff to
@@ -49,6 +56,7 @@ export function PhoneTumbler(): JSX.Element | null {
   const dictionary = useGameStore((s) => s.dictionary);
   const setScreen = useGameStore((s) => s.setScreen);
   const goHome = useGameStore((s) => s.goHome);
+  const currentUser = useGameStore((s) => s.currentUser);
 
   const [seed, setSeed] = useState(() => Date.now() & 0x7fffffff);
   const rack = useMemo(() => drawTumblerLetters(createPrng(seed)), [seed]);
@@ -64,6 +72,7 @@ export function PhoneTumbler(): JSX.Element | null {
   const [timeLeftMs, setTimeLeftMs] = useState(TUMBLER_DURATION_MS);
   const [started, setStarted] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
 
   const startedRef = useRef(false);
   const remainingMsRef = useRef(TUMBLER_DURATION_MS);
@@ -123,6 +132,22 @@ export function PhoneTumbler(): JSX.Element | null {
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  // Load the Tumbler leaderboard once on mount so BestScoresCard has the
+  // device-wide top scores to show before / during play. We don't refetch
+  // mid-round — the end screen writes the new entry, and the next time
+  // this screen mounts (next round, next visit) we read it back.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const board = await getTumblerLeaderboard();
+      if (cancelled) return;
+      setLeaderboard(board);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Auto-clear the flash toast.
@@ -366,6 +391,13 @@ export function PhoneTumbler(): JSX.Element | null {
             Submit
           </Button>
         </div>
+
+        {/* Best scores — collapsed compact strip; tap to expand the device-wide top 10. */}
+        <BestScoresCard
+          entries={adaptTumblerEntries(leaderboard)}
+          currentPlayerName={currentUser}
+          liveScore={started ? score : undefined}
+        />
 
         {/* Found-words list — fills remaining vertical space, scrolls internally */}
         <FoundList

@@ -8,7 +8,6 @@ import {
 import type { BeePuzzle } from "../../../engine/games/spelling-bee.js";
 import type { Letter } from "../../../engine/types.js";
 import {
-  getBeePersonalBest,
   getBeeProgress,
   getBeeTopScores,
   localDateKey,
@@ -26,10 +25,12 @@ import {
 } from "../../../audio/sounds.js";
 import { tokens } from "../../tokens.js";
 import { BeePill } from "../../components/BeePill.js";
+import { BestScoresCard } from "../../components/BestScoresCard.js";
 import { Button } from "../../components/Button.js";
 import { CurrentWord } from "../../components/CurrentWord.js";
 import { FoundList } from "../../components/FoundList.js";
 import { Toast } from "../../components/Toast.js";
+import { adaptBeeEntries } from "../../utils/best-entries.js";
 import { PhoneShell } from "../PhoneShell.js";
 import { PhoneTopBar } from "../components/PhoneTopBar.js";
 
@@ -68,10 +69,11 @@ const HEX_OFFSETS = [
  *
  * Single-column layout for 390×844 portrait:
  *   PhoneTopBar     — back to Home, title "Spelling Bee"
- *   Score readout   — BigNumber-style score + personal best
+ *   Score readout   — BigNumber-style score badge
  *   Hex             — centred, 420 px container CSS-scaled to fit 390 px
  *   CurrentWord     — live word strip with flash overlay
  *   Action row      — Shuffle / Clear / Submit
+ *   BestScoresCard  — collapsed compact strip; tap to expand device-wide top 10
  *   FoundList       — fills remaining space, scrolls internally
  *
  * All store wiring (puzzle generation, daily progress persistence,
@@ -89,7 +91,6 @@ export function PhoneSpellingBee(): JSX.Element | null {
   const [outerOrder, setOuterOrder] = useState<ReadonlyArray<Letter>>([]);
   const [currentWord, setCurrentWord] = useState("");
   const [topScores, setTopScores] = useState<ReadonlyArray<BeeTopEntry>>([]);
-  const [personalBest, setPersonalBest] = useState(0);
   const [foundWords, setFoundWords] = useState<ReadonlyArray<string>>([]);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [puzzleError, setPuzzleError] = useState<string | null>(null);
@@ -135,14 +136,10 @@ export function PhoneSpellingBee(): JSX.Element | null {
     void (async () => {
       const saved = await getBeeProgress(dateKey);
       if (saved) setFoundWords(saved.found);
-      const [top, best] = await Promise.all([
-        getBeeTopScores(10),
-        currentUser ? getBeePersonalBest(currentUser) : Promise.resolve(0),
-      ]);
+      const top = await getBeeTopScores(10);
       setTopScores(top);
-      setPersonalBest(best);
     })();
-  }, [dictionary, dateKey, currentUser]);
+  }, [dictionary, dateKey]);
 
   // Prewarm pangram cache (matches desktop behaviour).
   useEffect(() => {
@@ -274,12 +271,8 @@ export function PhoneSpellingBee(): JSX.Element | null {
           0,
         );
         await recordBeeScore(dateKey, currentUser, total);
-        const [top, best] = await Promise.all([
-          getBeeTopScores(10),
-          getBeePersonalBest(currentUser),
-        ]);
+        const top = await getBeeTopScores(10);
         setTopScores(top);
-        setPersonalBest(best);
       }
     })();
     playSuccess();
@@ -435,7 +428,7 @@ export function PhoneSpellingBee(): JSX.Element | null {
           padding: `${space.x3}px ${space.x2}px ${space.x3}px`,
         }}
       >
-        {/* Score + personal-best readout */}
+        {/* Score readout */}
         <div
           style={{
             display: "flex",
@@ -481,45 +474,6 @@ export function PhoneSpellingBee(): JSX.Element | null {
               {score}
             </span>
           </div>
-          {personalBest > 0 && (
-            <div
-              style={{
-                background: color.paper,
-                border: `1.5px solid ${color.stroke}`,
-                borderRadius: tokens.radius.panel,
-                padding: `${space.x2}px ${space.x4}px`,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                minWidth: 90,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: size.micro,
-                  letterSpacing: ".12em",
-                  textTransform: "uppercase",
-                  fontWeight: weight.med,
-                  color: color.inkMuted,
-                }}
-              >
-                Best
-              </span>
-              <span
-                style={{
-                  fontFamily: font.serif,
-                  fontWeight: weight.heavy,
-                  fontSize: size.h3,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                  color: score > personalBest ? color.success : color.brown,
-                  marginTop: 2,
-                }}
-              >
-                {personalBest}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Hex — centred, scale-wrapped for narrow phones */}
@@ -699,6 +653,13 @@ export function PhoneSpellingBee(): JSX.Element | null {
             Submit
           </Button>
         </div>
+
+        {/* Best scores — collapsed compact strip; tap to expand the device-wide top 10. */}
+        <BestScoresCard
+          entries={adaptBeeEntries(topScores)}
+          currentPlayerName={currentUser}
+          liveScore={score > 0 ? score : undefined}
+        />
 
         {/* Found-words list — fills remaining vertical space, scrolls internally */}
         <FoundList

@@ -10,22 +10,22 @@ import { createPrng } from "../../engine/prng.js";
 import type { Letter } from "../../engine/types.js";
 import {
   getTumblerLeaderboard,
-  getTumblerBest,
   type LeaderboardEntry,
 } from "../../storage/solo-storage.js";
 import { useGameStore } from "../../store/gameStore.js";
 import { playError, playPlace, playRecall, playSuccess, playUiTap } from "../../audio/sounds.js";
 import { tokens } from "../tokens.js";
 import { BackPill } from "../components/BackPill.js";
+import { BestScoresCard } from "../components/BestScoresCard.js";
 import { BigNumber } from "../components/BigNumber.js";
 import { Button } from "../components/Button.js";
 import { CurrentWord } from "../components/CurrentWord.js";
 import { FoundList } from "../components/FoundList.js";
-import { SectionLabel } from "../components/SectionLabel.js";
 import { Surface } from "../components/Surface.js";
 import { Tile } from "../components/Tile.js";
 import { Toast } from "../components/Toast.js";
 import { UserChip } from "../components/UserChip.js";
+import { adaptTumblerEntries } from "../utils/best-entries.js";
 
 type Flash =
   | { kind: "added"; word: string; points: number }
@@ -76,22 +76,19 @@ export function TumblerScreen(): JSX.Element | null {
   const [started, setStarted] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [leaderboard, setLeaderboard] = useState<ReadonlyArray<LeaderboardEntry>>([]);
-  const [personalBest, setPersonalBest] = useState<number>(0);
-  const [topScoresExpanded, setTopScoresExpanded] = useState(false);
 
   // Refs so the visibility handler always sees the latest values.
   const startedRef = useRef(false);
   const remainingMsRef = useRef(TUMBLER_DURATION_MS);
   const startedAtRef = useRef<number | null>(null);
 
-  // Load leaderboard + personal-best on mount.
+  // Load leaderboard on mount.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [board, best] = await Promise.all([getTumblerLeaderboard(), getTumblerBest()]);
+      const board = await getTumblerLeaderboard();
       if (cancelled) return;
       setLeaderboard(board);
-      setPersonalBest(best);
     })();
     return () => {
       cancelled = true;
@@ -430,11 +427,10 @@ export function TumblerScreen(): JSX.Element | null {
           </Button>
         </div>
 
-        {/* Bottom — FoundList (always present, fills space), then the
-            compact PersonalBest strip, then the collapsible TopScores
-            card. Mirrors the Spelling Bee layout so both solo screens
-            read the same. Page itself stays pinned; only the FoundList
-            grid and the expanded TopScores list scroll internally. */}
+        {/* Bottom — FoundList fills remaining space, then the compact
+            BestScoresCard (collapsed strip that expands to top-10 list).
+            Page itself stays pinned; only the FoundList grid and the
+            expanded list inside BestScoresCard scroll internally. */}
         <div
           style={{
             width: "100%",
@@ -453,241 +449,15 @@ export function TumblerScreen(): JSX.Element | null {
             count={foundWords.length}
             columns={3}
           />
-          <PersonalBestCard best={personalBest} current={score} started={started} />
-          <TumblerTopScoresCard
-            entries={leaderboard}
-            expanded={topScoresExpanded}
-            currentUser={currentUser}
-            onToggle={() => {
-              playUiTap();
-              setTopScoresExpanded((v) => !v);
-            }}
+          <BestScoresCard
+            entries={adaptTumblerEntries(leaderboard)}
+            currentPlayerName={currentUser}
+            liveScore={started ? score : undefined}
           />
         </div>
       </div>
     </Surface>
   );
-}
-
-interface PersonalBestCardProps {
-  readonly best: number;
-  readonly current: number;
-  readonly started: boolean;
-}
-
-function PersonalBestCard({ best, current, started }: PersonalBestCardProps): JSX.Element {
-  const { color, radius, shadow, space, font, size, weight } = tokens;
-  // During play, show the live "vs best" delta. Pre-game, just the best.
-  const beating = started && current > best;
-  return (
-    <div
-      style={{
-        padding: `${space.x3}px ${space.x4}px`,
-        background: color.paper,
-        border: `1.5px solid ${color.stroke}`,
-        borderRadius: radius.card,
-        boxShadow: shadow.card,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-        }}
-      >
-        <span
-          style={{
-            fontSize: size.caption,
-            color: color.inkSoft,
-            textTransform: "uppercase",
-            letterSpacing: ".1em",
-            fontWeight: weight.med,
-          }}
-        >
-          Personal best
-        </span>
-        <span
-          style={{
-            fontFamily: font.serif,
-            fontWeight: weight.bold,
-            fontSize: size.h4,
-            color: beating ? color.success : color.brown,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {best}
-        </span>
-      </div>
-      {beating && (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: size.micro + 1,
-            color: color.success,
-            fontWeight: weight.med,
-          }}
-        >
-          New high — up {current - best}.
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface TumblerTopScoresCardProps {
-  readonly entries: ReadonlyArray<LeaderboardEntry>;
-  readonly expanded: boolean;
-  readonly currentUser: string | null;
-  readonly onToggle: () => void;
-}
-
-/** Collapsible Top-Scores card — same shape as the Spelling Bee version.
- *  Collapsed shows just the header + entry count; tapping expands an
- *  inline scroll region capped at 220 px so the page itself stays
- *  single-screen. */
-function TumblerTopScoresCard({
-  entries,
-  expanded,
-  currentUser,
-  onToggle,
-}: TumblerTopScoresCardProps): JSX.Element {
-  const { color, radius, shadow, space, font, size, weight } = tokens;
-  return (
-    <div
-      style={{
-        background: color.paper,
-        border: `1.5px solid ${color.stroke}`,
-        borderRadius: radius.card,
-        boxShadow: shadow.card,
-        flexShrink: 0,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        style={{
-          appearance: "none",
-          font: "inherit",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          padding: `${space.x3}px ${space.x4}px`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: space.x3,
-          touchAction: "manipulation",
-          width: "100%",
-        }}
-      >
-        <SectionLabel style={{ margin: 0 }}>Top scores</SectionLabel>
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: space.x2,
-            fontSize: size.caption,
-            color: color.inkSoft,
-            fontWeight: weight.med,
-          }}
-        >
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{entries.length}</span>
-          <span aria-hidden style={{ fontSize: size.body, color: color.brown }}>
-            {expanded ? "▾" : "▸"}
-          </span>
-        </span>
-      </button>
-      {expanded && (
-        <ol
-          style={{
-            listStyle: "none",
-            padding: `0 ${space.x4}px ${space.x3}px`,
-            margin: 0,
-            overflowY: "auto",
-            maxHeight: 220,
-          }}
-        >
-          {entries.length === 0 ? (
-            <li style={{ fontSize: size.caption, color: color.inkSoft, padding: "6px 0" }}>
-              No scores yet — tap a letter to start the 60-second sprint.
-            </li>
-          ) : (
-            entries.map((entry, i) => {
-              const isYou = currentUser !== null && entry.name === currentUser;
-              return (
-                <li
-                  key={`${entry.name}-${entry.timestamp}`}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "auto 1fr auto auto",
-                    gap: space.x3,
-                    alignItems: "center",
-                    padding: "6px 4px",
-                    borderRadius: 6,
-                    borderBottom:
-                      i === entries.length - 1
-                        ? "none"
-                        : `1px dashed ${color.creamDark}`,
-                    background: isYou
-                      ? `color-mix(in oklab, ${color.successBg} 60%, transparent)`
-                      : "transparent",
-                    fontSize: size.body,
-                  }}
-                >
-                  <span style={{ color: color.inkSoft, minWidth: 18 }}>{i + 1}.</span>
-                  <span
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      color: color.ink,
-                      fontWeight: isYou ? weight.bold : weight.med,
-                    }}
-                  >
-                    {entry.name}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: size.micro + 1,
-                      color: color.inkSoft,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {formatDate(entry.timestamp)}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: font.serif,
-                      fontWeight: weight.bold,
-                      fontVariantNumeric: "tabular-nums",
-                      color: color.brown,
-                      minWidth: 32,
-                      textAlign: "right",
-                    }}
-                  >
-                    {entry.score}
-                  </span>
-                </li>
-              );
-            })
-          )}
-        </ol>
-      )}
-    </div>
-  );
-}
-
-/** Format an epoch timestamp as dd/MM/yyyy (local), per project defaults. */
-function formatDate(ts: number): string {
-  const d = new Date(ts);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
 interface FlashToastProps {
