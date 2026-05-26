@@ -35,10 +35,23 @@ export function DifficultyCards({ value, onChange }: DifficultyCardsProps): JSX.
   const { color, radius, shadow, space, size, weight } = tokens;
   return (
     <div
+      // Scroll container — on phone widths (~358 px usable), the 5 cards at
+      // their 96-px min-basis (~480 px total) overflow horizontally. The
+      // overflow-x:auto provides the scroll. On the big-screen NewGameScreen
+      // (~720 px form), 5 × 96 < 720 so the cards grow via flex:1 to fill
+      // the row with no scrollbar — visually unchanged from the old grid.
       style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
+        display: "flex",
+        flexDirection: "row",
         gap: space.x2,
+        overflowX: "auto",
+        scrollbarWidth: "thin",
+        // 16-px cream-to-transparent fade on the right edge so the cliff
+        // looks intentional, not clipped. Cheap; if it ever looks gimmicky,
+        // delete this maskImage line — the visible right-edge clipping of
+        // the rightmost tile already telegraphs scrollability.
+        maskImage: "linear-gradient(to right, black calc(100% - 16px), transparent)",
+        WebkitMaskImage: "linear-gradient(to right, black calc(100% - 16px), transparent)",
       }}
       role="radiogroup"
       aria-label="Difficulty"
@@ -57,6 +70,12 @@ export function DifficultyCards({ value, onChange }: DifficultyCardsProps): JSX.
               onChange(t.id);
             }}
             style={{
+              // grow=1, shrink=0, basis=96px: at the 720-px NewGame form
+              // 5 × 96 = 480 < 720, leftover 240 distributes evenly so each
+              // card grows to ~144 px — visually equivalent to the old
+              // repeat(5, 1fr) grid. At 358-px phone usable, shrink=0 holds
+              // each card at 96 px, total 480 → horizontal scroll.
+              flex: "1 0 96px",
               appearance: "none",
               font: "inherit",
               textAlign: "left",
