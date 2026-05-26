@@ -38,7 +38,11 @@ export function NewGameScreen(): JSX.Element {
   const [difficulty, setDifficulty] = useState<Difficulty>(
     settings.opponent.kind === "ai" ? settings.opponent.difficulty : "easygoing",
   );
-  const [variant, setVariant] = useState<Variant>(settings.variant);
+  // Big-screen default is Classic, regardless of settings.variant (the
+  // last-picked variant for THAT device path). Phone has its own default
+  // ("mini") in PhoneNewGame.tsx — these two are intentionally diverged
+  // because phone cells are too small for the 15×15 board.
+  const [variant, setVariant] = useState<Variant>("classic");
 
   // Start gate: both names must have a non-whitespace trimmed value.
   // Player 2 is auto-filled to "Computer" so it's never empty when AI;
