@@ -1,16 +1,11 @@
-# UX Batch — Design (DRAFT — PENDING APPROVAL)
-
-> ⚠️ **STATUS: DRAFT, NOT YET APPROVED.** This was captured mid-brainstorm
-> before a context clear. Do NOT start implementing. Resume flow:
-> 1. Confirm the **one open question** (bottom of "Part 3").
-> 2. Make any edits the owner requests; get explicit design approval.
-> 3. Re-run the brainstorming spec self-review, then ask the owner to review
->    this file.
-> 4. Invoke `superpowers:writing-plans` → owner approves plan → execute
->    (TDD, conventional commits, push per CLAUDE.md).
+# UX Batch — Design
 
 **Owner:** Jegan (non-coding founder; directs, Claude builds).
-**Date drafted:** 2026-05-24.
+**Date drafted:** 2026-05-24. **Finalized:** 2026-05-26.
+
+> ✅ **STATUS: FINALIZED.** Open question resolved (Part 3 — owner picked the
+> single tap-to-expand card). Awaiting owner's final review of this file before
+> handoff to `superpowers:writing-plans`.
 
 ---
 
@@ -38,8 +33,11 @@ mirroring how `PhoneNewGame.tsx` (line 38) hardcodes `"mini"`. Phone stays Mini.
 All three boards remain selectable; only the initial selection changes.
 
 - Files: `src/ui/screens/NewGameScreen.tsx`.
-- Risk: trivial. Big-screen e2e (`visual-audit` NewGame) should still pass —
-  but note it may assert "Classic + hot-seat" as default already; verify.
+- Risk: trivial. `e2e/visual-audit.spec.ts:156` is already titled
+  `"NewGame — default (Classic + hot-seat)"` and takes screenshots — its
+  baseline images may or may not currently show Classic depending on the
+  default `settings.variant`. Implementation step: after the change, re-run
+  `npx playwright test` and update the baseline if it shifts.
 
 ### Part 2 — Phone difficulty tiles fit + sideways scroll
 Shared `src/ui/components/DifficultyCards.tsx` lays the 5 tiers out in a rigid
@@ -50,7 +48,11 @@ Shared `src/ui/components/DifficultyCards.tsx` lays the 5 tiers out in a rigid
 - Big screens (the 720px form): 5 × ~96px < 720 → cards grow to fill, **no
   scrollbar, visually unchanged**.
 - Phone (~358px usable): 5 cards keep min-width → **horizontal scroll**.
-- One shared change, no new prop needed. Add a subtle scroll affordance if easy.
+- One shared change, no new prop needed.
+- Scroll affordance (optional, only if the natural overflow looks cliff-like on
+  phone): a 16-px right-edge cream-to-transparent mask-image on the scroller,
+  faded out when the user has scrolled to the right. Skip if it looks gimmicky;
+  the cards already visibly clipping the rightmost tier is its own hint.
 - Files: `src/ui/components/DifficultyCards.tsx` (shared by `NewGameScreen` +
   `PhoneNewGame`).
 
@@ -71,13 +73,11 @@ Current state:
   top-scores list (it loads `topScores` but never renders them).
 
 Plan: build **one shared collapsible component** (proposed `BestScoresCard` in
-`src/ui/components/`):
-- Collapsed: clickable header "Personal best · N" (device-wide top score) + chevron.
-- Expanded: scrollable top-10 list (rank · name · date · score), current user's
-  rows highlighted; optional "new high — up X" sub when live score > best.
-- Self-managed expand state (useState) for easy reuse.
-- It **replaces** the two separate cards on the large screens and is **added** to
-  the phone screens — so all four read identically.
+`src/ui/components/`). Full UI contract is in the **Decision** block below.
+Summary: collapsed header reads `"Best · <#1 score>"`; tap expands a scrollable
+top-10 list (rank · name · date · score). Self-managed expand state. It
+**replaces** the two separate cards on the large screens and is **added** to
+the phone screens — so all four read identically.
 
 Data already exists — this is UI-only (`src/storage/solo-storage.ts`):
 - `getTumblerLeaderboard()` → `LeaderboardEntry[]` (name, score, timestamp), top 10.
@@ -90,12 +90,40 @@ Data already exists — this is UI-only (`src/storage/solo-storage.ts`):
 - "Best" value under device-wide scope = the #1 entry's score (entries are sorted
   desc), so `entries[0]?.score`. (For Tumbler that equals `getTumblerBest()`.)
 
-**⚠️ OPEN QUESTION — answer before building:**
-Merge the large screens' always-visible "Personal best" card AND the separate
-"Top scores" card into a *single tap-to-expand* card (recommended — matches the
-owner's "click best to expand top scores" wording and makes all 4 screens
-identical)? **OR** keep personal-best always-visible and only the top-scores
-collapsible? → **Owner's answer: __________**
+**✅ DECISION (2026-05-26):** Single tap-to-expand card on all 4 screens.
+The new `BestScoresCard` **replaces both** the always-visible `PersonalBestCard` /
+`BeePersonalBestCard` AND the separate collapsible `TumblerTopScoresCard` /
+`BeeTopScoresCard` on the large screens, and is **added** to both phone screens.
+Net result: all 4 playing screens render an identical compact header that
+expands on tap to the device-wide top 10.
+
+**Resulting UI contract for `BestScoresCard`:**
+- **Collapsed (default):** one row — `"Best · <#1 score>"` + chevron-down. Tap
+  (or Enter/Space) toggles. If `entries.length === 0`, show `"Best · —"` and
+  disable the toggle (no list to reveal).
+- **Expanded:** the same header (chevron-up) + a vertically scrollable list of
+  up to 10 entries: `rank · name · date · score`. Rows whose `name` matches the
+  current player's name (case-insensitive trim) get a highlighted background.
+- **Optional "new high — up X" sub-label** (small text under the header) when
+  the caller passes `liveScore > entries[0]?.score`. Caller-driven; the card
+  doesn't read game state itself.
+- **Props (proposed):**
+  ```ts
+  interface BestScoresCardProps {
+    readonly entries: ReadonlyArray<{ name: string; score: number; dateLabel: string }>;
+    readonly currentPlayerName?: string;   // for row highlight
+    readonly liveScore?: number;           // for "new high — up X" sub
+    readonly emptyLabel?: string;          // default "Best · —"
+  }
+  ```
+- **State:** self-managed `useState<boolean>` for expand/collapse. No props
+  needed to control it externally.
+- **Styling:** matches the existing card aesthetic (cream paper, `tokens.radius.card`,
+  `tokens.shadow.card`). Compact on phone, same component on large screens.
+- **Adapters per screen:** each screen normalizes its source data into the
+  `{ name, score, dateLabel }` shape:
+  - Tumbler → `getTumblerLeaderboard()` mapped with `timestamp → dd/MM/yyyy`.
+  - Bee → `getBeeTopScores()` mapped with `dateKey (YYYY-MM-DD) → dd/MM/yyyy`.
 
 ### Part 4 — Tumbler END screen: one word list only
 Files: `src/ui/screens/TumblerEndScreen.tsx`, `src/ui/phone/screens/PhoneTumblerEnd.tsx`.
@@ -103,11 +131,17 @@ Files: `src/ui/screens/TumblerEndScreen.tsx`, `src/ui/phone/screens/PhoneTumbler
 Remove the **"Words you found"** `FoundList` from both. Keep only **"All possible
 words"** (`src/ui/components/PossibleWordsCard.tsx`), which ALREADY tints +
 ✓-marks the words the player found and scrolls internally
-(`gridTemplateColumns: repeat(auto-fill, minmax(104px,1fr))`, `overflow-y:auto`).
-Freed of the competing list it fills the full height, so 90+ words stop looking
-cramped. Loosen chip spacing/min-width a touch for readability.
+(`gridTemplateColumns: repeat(auto-fill, minmax(104px,1fr))` at line 104,
+`overflow-y:auto`). Freed of the competing list it fills the full height, so
+90+ words stop looking cramped.
+- Chip target tweak: bump `minmax(104px,1fr) → minmax(116px,1fr)` and gap from
+  current value by ~2px. Final numbers locked at implementation time via a
+  Preview-MCP check against a long-list scenario (90+ words). If the bump makes
+  the laptop layout overflow horizontally, revert and document.
 - Large: right column becomes just `PossibleWordsCard` (full height). Left column
-  (score, CompareBar, Top scores, actions) unchanged.
+  (score, CompareBar, Top scores, actions) unchanged. Note: the "Top scores"
+  card in this left column is the **end-screen** top-scores card and is
+  **out of scope** for Part 3 (which targets the **in-game playing** screens).
 - Phone: drop the `FoundList` block; let `PossibleWordsCard` take the height.
 - No engine change — `PossibleWordsCard` already does highlight + scroll.
 
