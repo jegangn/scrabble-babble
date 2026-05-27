@@ -158,9 +158,9 @@ export interface BeeTopEntry extends LeaderboardEntry {
 }
 
 /** Iterate every per-day Bee leaderboard once and flatten the entries
- *  into a single list. Used by both `getBeeTopScores` and
- *  `getBeePersonalBest`; doing the IDB scan once per call is fine —
- *  the settings store stays under a few hundred rows in normal use.
+ *  into a single list. Used by `getBeeTopScores`; doing the IDB scan
+ *  once per call is fine — the settings store stays under a few hundred
+ *  rows in normal use.
  */
 async function readAllBeeEntries(): Promise<ReadonlyArray<BeeTopEntry>> {
   const db = await open();
@@ -186,20 +186,6 @@ export async function getBeeTopScores(limit = 10): Promise<ReadonlyArray<BeeTopE
   return [...all]
     .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
     .slice(0, limit);
-}
-
-/** The given player's highest single-day Bee score across all days.
- *  Returns 0 if the player has no history yet (or the name is empty).
- */
-export async function getBeePersonalBest(name: string): Promise<number> {
-  const cleanName = name.trim();
-  if (cleanName.length === 0) return 0;
-  const all = await readAllBeeEntries();
-  let best = 0;
-  for (const entry of all) {
-    if (entry.name === cleanName && entry.score > best) best = entry.score;
-  }
-  return best;
 }
 
 export async function recordBeeScore(
