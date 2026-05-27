@@ -8,6 +8,7 @@ import {
 } from "../../../storage/solo-storage.js";
 import { useGameStore } from "../../../store/gameStore.js";
 import { tokens } from "../../tokens.js";
+import { formatTumblerDate } from "../../utils/best-entries.js";
 import { Button } from "../../components/Button.js";
 import { CompareBar } from "../../components/CompareBar.js";
 import { FooterMark } from "../../components/FooterMark.js";
@@ -268,7 +269,7 @@ export function PhoneTumblerEnd(): JSX.Element | null {
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      {formatDate(entry.timestamp)}
+                      {formatTumblerDate(entry.timestamp)}
                     </span>
                     <span
                       style={{
@@ -331,12 +332,4 @@ export function PhoneTumblerEnd(): JSX.Element | null {
       </div>
     </PhoneShell>
   );
-}
-
-/** Format an epoch timestamp as dd/MM/yyyy (local), per project defaults. */
-function formatDate(ts: number): string {
-  const d = new Date(ts);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getFullYear()}`;
 }
