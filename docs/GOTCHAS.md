@@ -37,7 +37,7 @@
 
 - **4-fold rotational orbits**: on an odd-sized square (15 or 11), the centre `(c,c)` is the only fixed point of `(r,c) → (c, size-1-r)`. Every other cell belongs to an orbit of size 4. Random-board generation works at the orbit level — assigning a premium to one orbit means assigning it to 4 cells at once, so symmetry is invariant by construction.
 - **Random-board safety pins**: the corner orbit is force-assigned TW (so corners always feel Classic), and the two orbits orthogonally/diagonally adjacent to the centre are blocked from TW (a TW one cell from the centre DW lets a 2-tile opener stack TW × DW for a 6× word multiplier on the very first move). Rejection rate is tiny; the shuffle pool is large.
-- **`GameState.variant` is the source of truth**: the variant tag is stamped onto the game itself, not just settings. Export/import a saved game and the right variant comes back. Settings only remember the *last-picked* choice for the New Game default.
+- **`GameState.variant` is the source of truth**: the variant tag is stamped onto the game itself, not just settings. Export/import a saved game and the right variant comes back. Settings still store the *last-picked* variant, but New Game ignores it: big screens start on Classic, phones on Mini.
 - **Legacy saves**: pre-Phase-3 in-progress games don't have a `variant` field. `deserializeGame` defaults it to `"classic"` so older saves still resume cleanly. Covered by `serializer.test.ts`.
 - **No IndexedDB schema bump**: settings is keyed `{ key, value }`, so adding a new `"variant"` key is additive — no DB version bump needed.
 
@@ -75,7 +75,7 @@
 - **Pin actions outside the scroll**: phone end screens (game-end, tumbler-end) keep Restart / Play-again / Home in a `flexShrink:0` strip OUTSIDE the scrollable middle column, so a long words list can't push them off-screen (same lesson as the iPad `TumblerEndScreen` clip fix).
 - **Playwright phone specs**: `test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })`. Under chromium that makes `matchMedia('(any-pointer: coarse)')` match, so the phone gate fires — no production touch-heuristic change was needed. Reuse `e2e/phone-helpers.ts`'s `freshPhoneHome`.
 - **Spelling Bee hex on a phone**: the 420px hex is reused as-is, scaled `0.88` via `@media (max-width:440px)`. `getBoundingClientRect()` returns post-transform coordinates, so the slide-to-spell trail math stays correct under the scale.
-- **Mini is the phone New Game default**: `PhoneNewGame` initializes its variant selection to `"mini"` (it does NOT read `settings.variant`), because 15×15 cells are ~24px on a 390px phone vs Mini's comfortable ~34px. Big-screen New Game still defaults to the last-picked variant.
+- **Mini is the phone New Game default**: `PhoneNewGame` initializes its variant selection to `"mini"` (it does NOT read `settings.variant`), because 15×15 cells are ~24px on a 390px phone vs Mini's comfortable ~34px. Big-screen New Game is hardcoded to Classic the same way (`77a9fb8`).
 
 ## Post-launch (who won)
 

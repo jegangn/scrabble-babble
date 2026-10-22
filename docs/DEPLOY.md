@@ -2,20 +2,11 @@
 
 Scrabble Babble is a static PWA. No backend, no env vars, no secrets. Deploy to any free static host.
 
-## Option A — GitHub Pages
+## Vercel (the live site)
 
-1. Push the repo to GitHub.
-2. In repo Settings → Pages, set "Source" to "GitHub Actions".
-3. Push to `main`. The workflow in `.github/workflows/deploy.yml` builds and publishes `dist/` to the `gh-pages` branch.
-4. The app will be available at `https://<user>.github.io/<repo>/`.
+Vercel builds from GitHub: every push to `main` goes live. Settings: framework preset **Vite**, build command `bun run build`, output `dist`.
 
-**Base path note:** `vite.config.ts` uses `base: "./"`. This works under any subpath, so GitHub Pages' `/repo-name/` prefix is handled automatically.
-
-## Option B — Vercel
-
-1. Import the repo on vercel.com.
-2. Framework preset: **Vite**. Build command: `bun run build`. Output: `dist`.
-3. Deploy.
+The GitHub Pages workflow was removed in May 2026 (`9116d7a`); Vercel is the only host. `vite.config.ts` uses `base: "./"`, so the build also works under a subpath.
 
 ## Local preview
 
